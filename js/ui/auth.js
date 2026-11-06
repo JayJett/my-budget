@@ -5,6 +5,7 @@ import { render } from "./render.js";
 import { createStore, isNetworkError, clearDeviceCopies } from "../sync/store.js";
 import { blankBudget } from "../model/schema.js";
 import { startSetup, endSetup } from "./onboarding.js";
+import { loadSnapshots, ensureMonthly } from "./views/progress.js";
 
 const here = () => location.origin + location.pathname;
 const brand = `<div class="auth-brand"><div class="logo" aria-hidden="true">$</div><div class="brand">My Budget<small>Plan where every dollar goes, together</small></div></div>`;
@@ -169,6 +170,7 @@ async function openHH(id) {
   document.body.classList.remove("signed-out"); $("#auth").hidden = true;
   app.loaded = true;
   app.offline = !!loaded.offline;
+  app.snapshots = null; app.compareId = null;
   saveOfflineProfile();
   if (loaded.state) { app.state = loaded.state; app.hasData = true; app.store.saveCache(); }
   else {
@@ -181,7 +183,9 @@ async function openHH(id) {
   else if (loaded.resumed && app.canWrite) { app.store.schedule(); toast("Saving the changes you made while offline…"); }
   else if (loaded.offline) { setStatus("Offline", "offline", "You’re offline. Changes are kept on this phone and will sync when you’re back online."); showConn(OFFLINE_MSG); }
   else showSaved(loaded.meta && { by: loaded.meta.updated_by, at: loaded.meta.updated_at });
+  loadSnapshots();
   if (app.offline) return; // live updates start when the app reconnects
+  ensureMonthly();
   app.store.subscribe(status => {
     if (status === "SUBSCRIBED") showConn(navigator.onLine === false ? OFFLINE_MSG : "");
     else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") showConn("Live updates are paused. Your changes still save; refresh to see others’ latest changes.");

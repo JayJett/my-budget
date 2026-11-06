@@ -11,7 +11,7 @@ function loadPrefs() {
   } catch (_) { return { theme: "auto", density: "comfortable" }; }
 }
 
-export const TAB_HASH = { budget: "budget", networth: "net-worth", spending: "joint-spending", goals: "goals", invest: "investments" };
+export const TAB_HASH = { budget: "budget", networth: "net-worth", spending: "joint-spending", goals: "goals", invest: "investments", progress: "progress" };
 export const tabFromHash = () => { const h = location.hash.replace(/^#/, ""); return Object.keys(TAB_HASH).find(k => TAB_HASH[k] === h) || null; };
 
 export const app = {
@@ -22,7 +22,9 @@ export const app = {
   C: null,                       // the latest calculations (see model/calc.js)
   loaded: false, hasData: false, canWrite: true,
   sb: null, session: null, household: null, households: [], role: null, members: [], meId: null,
-  setup: null,                   // the setup guide, while it's showing (ui/onboarding.js)
+  setup: null,
+  snapshots: null,               // this household's snapshots for the Progress tab (ui/views/progress.js)
+  compareId: null,               // the snapshot being compared with today                   // the setup guide, while it's showing (ui/onboarding.js)
   store: null,                   // saving + live updates (sync/store.js)
   // filled in by render.js so other modules can ask for a redraw without importing it
   render: () => {}, refresh: () => {},

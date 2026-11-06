@@ -13,8 +13,9 @@ import * as networth from "./views/networth.js";
 import * as spending from "./views/spending.js";
 import * as goals from "./views/goals.js";
 import * as invest from "./views/invest.js";
+import * as progress from "./views/progress.js";
 
-const VIEWS_BY_TAB = { budget, networth, spending, goals, invest };
+const VIEWS_BY_TAB = { budget, networth, spending, goals, invest, progress };
 
 const ICONS = {
   budget: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6.2"/><path d="M8 1.8V8h6.2"/></svg>',
@@ -22,6 +23,7 @@ const ICONS = {
   spending: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M2.5 6h11l-1.2 7.5H3.7z"/><path d="M5.5 6l2.5-4 2.5 4"/></svg>',
   goals: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6.2"/><circle cx="8" cy="8" r="3.4"/><circle cx="8" cy="8" r=".9" fill="currentColor"/></svg>',
   invest: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12l4-4 3 2.5L14 4"/><path d="M10.5 4H14v3.5"/></svg>',
+  progress: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.2"/><path d="M8 4.5V8l2.4 1.6"/></svg>',
 };
 
 /** Which in-memory list a data-l key points at. "gp:<id>" is one person's goals. */
@@ -69,7 +71,7 @@ export function render() {
   app.colours = accountColours(app.state);
   $("#tabs").innerHTML = TABS(app.state).map(([k, l]) => `<button class="tab" role="tab" type="button" data-tab="${k}" aria-selected="${k === app.tab}">${ICONS[k]}<span class="tl">${esc(l)}</span><span class="ts">${esc(SHORT[k])}</span><span class="mark" data-mark="${k}"></span></button>`).join("");
   const note = !app.canWrite && app.household ? `<div class="welcome ro-note"><h3>You’re viewing ${esc(app.household.name)}</h3><p>You can look around, but changes are switched off. An owner can make you an editor in Household settings.</p></div>` : "";
-  $("#app").innerHTML = note + (app.loaded && !app.hasData && app.canWrite ? welcomeBox() : "") + viewAsBar() + VIEWS_BY_TAB[app.tab].view();
+  $("#app").innerHTML = note + (app.loaded && !app.hasData && app.canWrite ? welcomeBox() : "") + (app.tab === "progress" ? "" : viewAsBar()) + VIEWS_BY_TAB[app.tab].view();
   refresh();
   const ro = readOnly();
   document.body.classList.toggle("readonly", ro);
@@ -93,7 +95,7 @@ export function refresh() {
   if (mod.draw) mod.draw(C);
   renderBrand();
   // tab markers, attention box, allocation meter
-  TABS(app.state).forEach(([k]) => { const m = $(`[data-mark="${k}"]`), c = C.issues[k].length; if (m) { m.textContent = c || ""; m.parentElement.dataset.tip = c ? C.issues[k].join(" ") : ""; } });
+  TABS(app.state).forEach(([k]) => { const m = $(`[data-mark="${k}"]`), list = C.issues[k] || [], c = list.length; if (m) { m.textContent = c || ""; m.parentElement.dataset.tip = c ? list.join(" ") : ""; } });
   const at = $("#attn"), li = C.issues[app.tab] || [];
   if (at) { at.hidden = !li.length; at.innerHTML = li.length ? `<h3>${li.length === 1 ? "One thing" : li.length + " things"} to look at</h3><ul>${li.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""; }
   const me = $("#meter");

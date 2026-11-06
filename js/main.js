@@ -9,6 +9,7 @@ import { initAuth, showAuth } from "./ui/auth.js";
 import { initSettings } from "./ui/settings.js";
 import { initSetupEvents } from "./ui/onboarding.js";
 import "./ui/tour.js";
+import { initProgress } from "./ui/views/progress.js";
 
 applyUI();
 initTooltips();
@@ -17,6 +18,7 @@ initEvents();
 initImport();
 initSettings();
 initSetupEvents();
+initProgress();
 
 // Ctrl/Cmd+S saves straight away; leaving the page saves anything pending.
 document.addEventListener("keydown", e => {

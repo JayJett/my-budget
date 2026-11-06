@@ -166,3 +166,82 @@ export function drawCurve(C) {
   });
   $("#hit").addEventListener("pointerleave", () => { hov.style.opacity = 0; tip.classList.remove("on"); });
 }
+
+/* ---------- Progress tab charts ---------- */
+const PAD = { l: 62, r: 16, t: 14, b: 30 };
+/** Draw at the width actually available, so the text stays readable on phones (not shrunk). */
+const size = el => { const W = Math.max(300, Math.round(el.clientWidth || 820)); return { W, H: W < 560 ? 230 : 280 }; };
+/** A round step (1, 2, 2.5 or 5 × 10ⁿ) so gridlines land on friendly numbers like $10k, $20k. */
+function niceStep(raw) { const e = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / e; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * e; }
+/** zero: always include $0 (for bars). Without it, the chart zooms in on the values so changes show. */
+function scale(values, { zero = true } = {}) {
+  let lo = Math.min(...values), hi = Math.max(...values);
+  if (zero) { lo = Math.min(lo, 0); hi = Math.max(hi, 0); }
+  if (hi - lo < 1) { lo -= 500; hi += 500; }
+  if (!zero) { const pad = (hi - lo) * 0.15; lo -= pad; hi += pad; if (Math.min(...values) >= 0) lo = Math.max(0, lo); }
+  const step = niceStep((hi - lo) / 4);
+  lo = Math.floor(lo / step) * step; hi = Math.ceil(hi / step) * step;
+  return { lo, hi, step };
+}
+const money0 = v => { const a = Math.abs(v); return (v < 0 ? "−" : "") + (a >= 1e6 ? "$" + +(a / 1e6).toFixed(2) + "M" : a >= 1e3 ? "$" + +(a / 1e3).toFixed(1) + "k" : "$" + Math.round(a)); };
+const axis = (W, H, sc, y) => {
+  let g = "";
+  for (let v = sc.lo; v <= sc.hi + sc.step / 2; v += sc.step) g += `<line x1="${PAD.l}" x2="${W - PAD.r}" y1="${y(v)}" y2="${y(v)}"/><text x="${PAD.l - 8}" y="${y(v) + 4}" text-anchor="end">${money0(v)}</text>`;
+  return g;
+};
+
+/** A line chart over time. points: [{label, now}], series: [{name, values, color}]. The step to "Now" is dashed. */
+export function drawLineChart(el, points, series, aria) {
+  if (!el) return;
+  const { W, H } = size(el), n = points.length;
+  const all = series.flatMap(s => s.values).filter(v => v !== null);
+  const sc = scale(all, { zero: false });
+  const x = i => PAD.l + (n === 1 ? (W - PAD.l - PAD.r) / 2 : i * (W - PAD.l - PAD.r) / (n - 1));
+  const y = v => PAD.t + (1 - (v - sc.lo) / (sc.hi - sc.lo)) * (H - PAD.t - PAD.b);
+  let lines = "", dots = "";
+  series.forEach(s => {
+    const pts = s.values.map((v, i) => v === null ? null : [x(i), y(v)]);
+    const solid = pts.filter((p, i) => p && !points[i].now), last = pts[n - 1], prev = [...pts.slice(0, n - 1)].reverse().find(Boolean);
+    if (solid.length > 1) lines += `<path d="${solid.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join("")}" fill="none" style="stroke:${s.color}" stroke-width="2.5" stroke-linejoin="round"/>`;
+    if (points[n - 1].now && last && prev) lines += `<path d="M${prev[0]} ${prev[1]}L${last[0]} ${last[1]}" fill="none" style="stroke:${s.color}" stroke-width="2.5" stroke-dasharray="5 5"/>`;
+    pts.forEach((p, i) => { if (p) dots += `<circle cx="${p[0]}" cy="${p[1]}" r="${points[i].now ? 5 : 4}" style="fill:${points[i].now ? "var(--surface)" : s.color};stroke:${s.color}" stroke-width="2"><title>${esc(points[i].label)} · ${esc(s.name)}: ${m0(s.values[i])}</title></circle>`; });
+  });
+  const step = Math.max(1, Math.ceil(n / Math.max(3, Math.floor(W / 90))));
+  const labels = points.map((p, i) => i % step === 0 || i === n - 1 ? `<text x="${x(i)}" y="${H - 8}" text-anchor="middle"${p.now ? ' style="font-weight:700"' : ""}>${esc(p.label)}</text>` : "").join("");
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(aria)}"><g class="axis">${axis(W, H, sc, y)}${labels}</g>${sc.lo < 0 ? `<line x1="${PAD.l}" x2="${W - PAD.r}" y1="${y(0)}" y2="${y(0)}" style="stroke:var(--line-strong)"/>` : ""}${lines}${dots}</svg>`;
+}
+
+/** Stacked bars per point: what you own above the line, what you owe below it. */
+export function drawMixChart(el, points, parts) {
+  if (!el) return;
+  const { W, H } = size(el), n = points.length;
+  const ups = points.map(p => parts.filter(q => !q.below).reduce((s, q) => s + Math.max(0, p[q.key]), 0));
+  const downs = points.map(p => parts.filter(q => q.below).reduce((s, q) => s + Math.max(0, p[q.key]), 0));
+  const sc = scale([...ups, ...downs.map(d => -d)]);
+  const slot = (W - PAD.l - PAD.r) / n, bw = Math.min(46, slot * 0.6);
+  const x = i => PAD.l + slot * i + (slot - bw) / 2;
+  const y = v => PAD.t + (1 - (v - sc.lo) / (sc.hi - sc.lo)) * (H - PAD.t - PAD.b);
+  let bars = "";
+  points.forEach((p, i) => {
+    let top = 0, bottom = 0;
+    parts.forEach(q => {
+      const v = Math.max(0, p[q.key]); if (!v) return;
+      const [a, b] = q.below ? [-bottom, -(bottom += v)] : [top, (top += v)];
+      const y1 = y(Math.max(a, b)), y2 = y(Math.min(a, b));
+      bars += `<rect x="${x(i)}" y="${y1}" width="${bw}" height="${Math.max(1, y2 - y1)}" rx="3" style="fill:${q.color}${p.now ? ";opacity:.75" : ""}"><title>${esc(p.label)} · ${esc(q.name)}: ${m0(v)}</title></rect>`;
+    });
+  });
+  const step = Math.max(1, Math.ceil(n / Math.max(3, Math.floor(W / 90))));
+  const labels = points.map((p, i) => i % step === 0 || i === n - 1 ? `<text x="${x(i) + bw / 2}" y="${H - 8}" text-anchor="middle"${p.now ? ' style="font-weight:700"' : ""}>${esc(p.label)}</text>` : "").join("");
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="What you own and owe over time"><g class="axis">${axis(W, H, sc, y)}${labels}</g><line x1="${PAD.l}" x2="${W - PAD.r}" y1="${y(0)}" y2="${y(0)}" style="stroke:var(--line-strong)"/>${bars}</svg>`;
+}
+
+/** A tiny line of a goal's saved amount over time, with its target as a faint line. */
+export function sparkline(values, target, color) {
+  const W = 160, H = 40, vs = values.filter(v => v !== null);
+  if (vs.length < 2) return "";
+  const hi = Math.max(...vs, target || 0, 1);
+  const x = i => 2 + i * (W - 4) / (values.length - 1), y = v => H - 3 - (v / hi) * (H - 6);
+  const d = values.map((v, i) => v === null ? "" : `${i && values[i - 1] !== null ? "L" : "M"}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join("");
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" aria-hidden="true">${target ? `<line x1="2" x2="${W - 2}" y1="${y(target)}" y2="${y(target)}" style="stroke:var(--line-strong)" stroke-dasharray="3 3"/>` : ""}<path d="${d}" fill="none" style="stroke:${color}" stroke-width="2"/></svg>`;
+}
