@@ -9,7 +9,7 @@
    Words matter here: "saved" is money already put aside (the goal's Saved amount, typed in by you);
    "a fortnight" amounts are the plan from the Budget tab, never counted as saved. */
 import { app, readOnly } from "../ctx.js";
-import { esc } from "../dom.js";
+import { esc, toast } from "../dom.js";
 import { K, tipq, attrs, fmtNum, pc } from "../inputs.js";
 import { goalStatus } from "../../model/calc.js";
 import { WORDS, VIEWS } from "../../model/periods.js";
@@ -17,6 +17,7 @@ import { money, m0, pct, possessive } from "../../model/format.js";
 import { n, blank } from "../../model/util.js";
 import { jointGoalsLabel } from "./labels.js";
 import { budgetUI } from "../budget-sheets.js";
+import { itemIcon, iconPickerHTML } from "../icons.js";
 
 const CHEV = '<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5L10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const CHECK = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7"/></svg>';
@@ -35,8 +36,9 @@ export function goalGroups(S) {
 }
 export const groupOf = (S, key) => goalGroups(S).find(g => g.key === key);
 /** A small round badge: the shield for the emergency fund, otherwise the goal's first letter. */
-const badge = (g, grp, big = "") => grp.kind === "ef" ? `<span class="gl-ic ef ${big}" aria-hidden="true">${SHIELD}</span>`
-  : `<span class="gl-ic ${big}" aria-hidden="true">${blank(g.name) ? TARGET : esc(String(g.name).trim().charAt(0).toUpperCase())}</span>`;
+const defaultBadge = (g, grp) => grp.kind === "ef" ? SHIELD : blank(g.name) ? TARGET : esc(String(g.name).trim().charAt(0).toUpperCase());
+/** The goal's chosen icon if it has one, otherwise the usual badge. */
+export const badge = (g, grp, big = "") => `<span class="gl-ic${grp.kind === "ef" ? " ef" : ""} ${big}" aria-hidden="true">${itemIcon(g.icon) || defaultBadge(g, grp)}</span>`;
 
 function card(g, grp, ui, i) {
   const done = isDone(g), named = !blank(g.name);
@@ -129,6 +131,7 @@ export function goalSheet(key, g) {
     ${shares}
     <label class="bs-field"><span>Deadline (optional)</span><input class="bs-in" type="date" ${attrs(key, g.id, "deadline", "date")} value="${esc(g.deadline || "")}"${dis}>
       <small class="bs-sub">Leave it blank to see an estimated finish date.</small></label>
+    ${iconPickerHTML(key, g.id, g.icon, defaultBadge(g, grp), ro)}
     ${isEF || ro ? "" : `<button class="btn danger-soft block" type="button" data-del="${esc(key)}" data-i="${esc(g.id)}">Delete goal</button>`}`;
 }
 
@@ -194,4 +197,33 @@ export function fill(D, C) {
   D["ef.cover"] = n(ef.saved) === 0 ? { t: "", c: "" } : !mc ? { t: "Cover unknown", c: "" } : { t: `${(n(ef.saved) / mc).toFixed(1)} months cover`, c: n(ef.saved) / mc >= 3 ? "ok" : "warn" };
   D["gl.gj.spare"] = { t: C.gj.spare > 0.01 ? `${money(v(C.gj.spare))}${w.short} is spare: every goal here is reached. Add a goal to use it.` : "", c: C.gj.spare > 0.01 ? "on" : "" };
   P.forEach(p => { const A = C.gp[p.id]; D[`gl.${p.id}.spare`] = { t: A.spare > 0.01 ? `${money(v(A.spare))}${w.short} is spare: every goal here is reached. Add a goal to use it.` : "", c: A.spare > 0.01 ? "on" : "" }; });
+}
+
+/* ---------- a little cheer for real progress ----------
+   Only when your own edit to a goal's Saved or Target moves it past 25%, 50%, 75% or to reached (using the
+   same "reached" rule as everywhere else). Never on opening the app, reloading, or someone else's change,
+   so old achievements aren't celebrated again. Nothing is stored. */
+const progressOf = g => blank(g.target) ? null : isDone(g) ? 1 : n(g.target) === 0 ? 0 : n(g.saved) / n(g.target);
+const STEPS = [[0.75, "three-quarters of the way"], [0.5, "halfway there"], [0.25, "a quarter of the way"]];
+const findGoal = (l, id) => { const G = app.state.goals; return l === "ef" ? G.ef : (l === "gj" ? G.joint : G.personal[l.slice(3)] || []).find(g => g.id === id); };
+export function initGoals() {
+  let before = null;
+  const isGoalMoney = el => el && el.dataset && /^(ef|gj|gp:.+)$/.test(el.dataset.l || "") && ["saved", "target"].includes(el.dataset.f);
+  document.addEventListener("focusin", e => { if (!isGoalMoney(e.target)) return; const g = findGoal(e.target.dataset.l, e.target.dataset.i); before = g ? { id: g.id, p: progressOf(g) } : null; });
+  // Checked a moment after you stop typing (so "1", "10", "100", "1000" is one step), and when you leave the box.
+  let t = null;
+  document.addEventListener("input", e => { if (!isGoalMoney(e.target)) return; clearTimeout(t); const el = e.target; t = setTimeout(() => check(el), 900); });
+  document.addEventListener("change", e => { if (!isGoalMoney(e.target)) return; clearTimeout(t); check(e.target); });
+  function check(el) {
+    if (readOnly()) return;
+    const g = findGoal(el.dataset.l, el.dataset.i); if (!g || !before || before.id !== g.id || blank(g.name)) return;
+    const was = before.p ?? 0, now = progressOf(g); before = { id: g.id, p: now };
+    if (now === null || now <= was) return;
+    let line = null;
+    if (now >= 1 && was < 1) line = `${g.name} reached its target`;
+    else { const step = STEPS.find(([s]) => was < s && now >= s); if (step) line = `${g.name} is ${step[1]}`; }
+    if (!line) return;
+    toast(line, "ok");
+    document.querySelectorAll(`#sheet .gl-bar.big, [data-edit-goal][data-i="${CSS.escape(g.id)}"]`).forEach(x => { x.classList.remove("cheer"); void x.offsetWidth; x.classList.add("cheer"); });
+  }
 }

@@ -172,7 +172,7 @@ test("accent colour: per person, instant, saved to your login once, kept after r
   const { page, errors, ctx } = await open(RICH);
   await settle(page);
   assert.equal(await page.evaluate(() => document.documentElement.dataset.accent || "mint"), "mint");
-  await page.click("#menuBtn"); await page.click('[data-act="account"]');
+  await page.click("#menuBtn"); await page.click('[data-act="appearance"]');
   await page.waitForSelector(".acc-picker");
   await page.click('[data-accent-pick="ocean"]');
   await page.click('[data-accent-pick="lavender"]');

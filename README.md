@@ -119,6 +119,28 @@ There's **no build step**. GitHub Pages serves these files exactly as they are.
   (every figure checked against `invest-baseline.json`, recorded from the old screen) and
   `progress-ui.test.js`.
 
+### Personal look, item icons and polish (UI phase 5)
+
+- **Your look** (menu → Appearance): accent colour, light/dark/auto and spacing, all personal. Saved to
+  your login (`user_metadata.accent`, `.theme`, `.density`) with a per-user copy on the device
+  (`mb-accent-<id>`), so it follows you across devices and two people on one device keep their own.
+  Sign-out returns to the defaults. Light/dark and spacing used to be per device (`jm-budget-prefs`);
+  that choice carries over to your login the first time you sign in. Only accent tokens change with your
+  colour: expense/account-type, people's, status and chart-series colours never do.
+- **Item icons**: goals and expenses can have an icon (`icon` on the item in the household budget, one of
+  the keys in `js/ui/icons.js`). Shared with the household; only owners and editors can change it; it
+  never changes a type or a figure. No icon (or an unknown one) shows the usual badge. No database change
+  was needed: the budget already keeps any field on an item.
+- **Cheer**: when your own edit to a goal's Saved or Target moves it past 25/50/75% or to reached (the
+  usual "reached" rule), a short message and a one-off glow. Never on opening, reloading or someone
+  else's change. Nothing is stored.
+- **Motion**: pressed states on tappable cards, a short colour cross-fade when changing look, and all of it
+  off with reduced motion. Compact spacing now applies to the redesigned screens (tap targets stay 44px+).
+- Tests: `tests/browser/phase5-ui.test.js`.
+- Not done (on purpose): goal colours (personal goals already use each person's colour, and a second
+  colour would blur that), and a personal "show amounts per" default (that setting belongs to the
+  household's budget, so changing it per person would change it for everyone).
+
 ## How saving works
 
 The whole budget lives in one row (`budgets.state`), but the app never overwrites it. Each edit is

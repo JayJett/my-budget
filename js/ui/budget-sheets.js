@@ -17,6 +17,7 @@ import { SP_TYPES, typeIcon } from "./views/spending.js";
 import { NW_TYPES, nwIcon, nwType } from "./views/networth.js";
 import { goalSheet, goalGroups } from "./views/goals.js";
 import { investSheet } from "./views/invest.js";
+import { itemIcon, iconPickerHTML, pickerOpen } from "./icons.js";
 import { list } from "./render.js";
 import { openPop, closePop } from "./dom.js";
 import { money } from "../model/format.js";
@@ -73,7 +74,7 @@ function expenseSheet(x) {
         <label class="bs-field"><span>Set aside so far</span><span class="unit wide"><i>$</i><input type="text" inputmode="decimal" ${attrs("sp", x.id, "aside", "num")} value="${fmtNum(x.aside)}" aria-label="Set aside so far"${dis()}></span></label></div>
       <div class="sk-box">${K(`sp.${x.id}.sk`, "chip")}<p>${K(`sp.${x.id}.sk2`)}</p>
         <div class="ex-prog big" aria-hidden="true"><span data-k="sp.${esc(x.id)}.bar"></span></div><small>${K(`sp.${x.id}.saved`)}</small></div>`;
-  return `<div class="bs-hero"><span class="ex-ic big" style="--cat:${cat}" aria-hidden="true">${typeIcon(x.type)}</span><div><div class="bs-amt">${K(`sp.${x.id}.v`)}</div><small>${esc(w.per)}${K(`sp.${x.id}.pb`)}</small></div></div>
+  return `<div class="bs-hero"><span class="ex-ic big" style="--cat:${cat}" aria-hidden="true">${itemIcon(x.icon) || typeIcon(x.type)}</span><div><div class="bs-amt">${K(`sp.${x.id}.v`)}</div><small>${esc(w.per)}${K(`sp.${x.id}.pb`)}</small></div></div>
     <label class="bs-field"><span>Name</span><input class="bs-in" type="text" ${attrs("sp", x.id, "name", "text")} value="${esc(x.name)}" placeholder="e.g. Groceries" autocomplete="off"${dis()}></label>
     <fieldset class="bs-field"><legend>Type ${tipq(SP_TYPES.map(t => `${t.key}: ${t.help}`).join(" "))}</legend><div class="seg seg-radio">${types.map(t => `<label><input type="radio" name="sptype-${esc(x.id)}" value="${esc(t)}" ${attrs("sp", x.id, "type", "text")}${x.type === t ? " checked" : ""}${dis()}><span>${esc(t)}</span></label>`).join("")}</div></fieldset>
     <div class="bs-field"><span class="bs-label">Cost ${tipq(`Enter it however it’s billed. It’s converted to an amount ${w.per}, so everything adds up.`)}</span>
@@ -82,6 +83,7 @@ function expenseSheet(x) {
       <small class="bs-sub">${K(`sp.${x.id}.about`)}</small></div>
     ${sinking}
     <label class="bs-field"><span>Notes</span><textarea class="bs-in" rows="2" ${attrs("sp", x.id, "notes", "text")} placeholder="Optional"${dis()}>${esc(x.notes || "")}</textarea></label>
+    ${iconPickerHTML("sp", x.id, x.icon, typeIcon(x.type), readOnly())}
     ${readOnly() ? "" : `<button class="btn danger-soft block" type="button" data-del="sp" data-i="${esc(x.id)}">Delete expense</button>`}`;
 }
 
@@ -141,13 +143,13 @@ function draw() {
 function close() { UI.sheet = null; const d = $("#sheet"); if (d.open && d.querySelector(".bsheet")) d.close(); }
 
 function openSheet(kind, id, focusName) {
-  UI.sheet = { kind, id, tab: app.tab }; draw(); app.refresh();
+  pickerOpen.v = false; UI.sheet = { kind, id, tab: app.tab }; draw(); app.refresh();
   if (focusName) { const el = $(`#sheet [data-f="name"]`); if (el) el.focus(); }
 }
 export const openExpenseSheet = (id, o = {}) => openSheet("sp", id, o.focusName);
 export const openNetWorthSheet = (id, o = {}) => openSheet("nw", id, o.focusName);
 export function openGoalSheet(l, id, { focusName } = {}) {
-  UI.sheet = { kind: "goal", l, id, tab: app.tab }; draw(); app.refresh();
+  pickerOpen.v = false; UI.sheet = { kind: "goal", l, id, tab: app.tab }; draw(); app.refresh();
   if (focusName) { const el = $(`#sheet [data-f="name"]`); if (el) el.focus(); }
 }
 function newGoal(l) { const id = addRow(l); UI.fresh = { id }; changed({ full: true }); openGoalSheet(l, id, { focusName: true }); }
@@ -191,6 +193,12 @@ export function initBudgetSheets() {
     const eg = t.closest("[data-edit-goal]"); if (eg && !eg.disabled) { openGoalSheet(eg.dataset.editGoal, eg.dataset.i); return; }
     const ep = t.closest("[data-edit-person]"); if (ep) { openPersonSheet(ep.dataset.editPerson); return; }
     if (readOnly()) return;
+    const ic = t.closest("[data-icon-l]");
+    if (ic && !ic.disabled) { // an icon is just how the item looks: saved on the item like any other edit
+      const it = (list(ic.dataset.iconL) || []).find(x => x.id === ic.dataset.iconI); if (!it) return;
+      if (ic.dataset.icon) it.icon = ic.dataset.icon; else delete it.icon;
+      changed({ full: true }); return;
+    }
     if (t.closest("[data-reorder]")) { const on = !(UI.reorder && UI.reorderTab === app.tab); UI.reorder = on; UI.reorderTab = app.tab; app.render(); return; }
     if (t.closest("[data-acc-new]")) { const id = addRow("acc"); UI.fresh = { id }; changed({ full: true }); openAccountSheet(id, { focusName: true }); return; }
     const sn = t.closest("[data-sp-new]");

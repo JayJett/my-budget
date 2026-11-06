@@ -12,6 +12,7 @@ import { trendPoints, progressNotes, goalNote, goalHistory, compare, summarize, 
 import { money, m0, monthYear } from "../../model/format.js";
 import { drawMixChart, drawHistory, sparkline } from "../charts.js";
 import { addMonths } from "../../model/util.js";
+import { itemIcon } from "../icons.js";
 
 const CACHE = id => `mb-snaps-v1-${id}`;
 const MIX = [
@@ -20,6 +21,11 @@ const MIX = [
   { key: "super", name: "KiwiSaver / super", color: "#3E5A63" },
   { key: "debt", name: "Debt", color: "var(--bad)", below: true },
 ];
+/** The goal's icon as chosen on the Goals tab (today's goal with the same id), or its first letter. */
+function goalIcon(g) {
+  const G = app.state.goals, cur = [G.ef, ...G.joint, ...Object.values(G.personal).flat()].find(x => x.id === g.id);
+  return `<span class="gl-ic${g.id === "ef" ? " ef" : ""}" aria-hidden="true">${itemIcon(cur && cur.icon) || esc(String(g.name || "?").trim().charAt(0).toUpperCase())}</span>`;
+}
 const CHECK = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7"/></svg>';
 
 /* ---------- data ---------- */
@@ -55,7 +61,7 @@ async function saveNow(btn) {
   if (error) { toast(app.friendly ? app.friendly(error) : "Couldn’t save a snapshot"); return; }
   app.snapshots = [...(app.snapshots || []).filter(s => s.kind !== "manual" || s.id !== data.id), data];
   try { localStorage.setItem(CACHE(app.household.id), JSON.stringify(app.snapshots)); } catch (_) {}
-  toast("Snapshot saved"); // only once the database has confirmed it
+  toast("Snapshot saved", "ok"); // only once the database has confirmed it
   app.pgSel = null;
   app.render();
 }
@@ -109,7 +115,7 @@ export function view() {
   const hero = `<section class="card pg-hero" aria-live="polite">
     <div class="b-row"><span class="eyebrow">Your progress</span>${saveBtn(false)}</div>
     <div class="sp-head"><span class="amt">${money(now.netWorth)}</span><span class="lab">net worth today</span></div>
-    <p class="pg-delta">${prev ? `${changeChip(now.netWorth - prev.netWorth, "total")} <span>since ${esc(monthYear(prev.date))}</span>` : `<span>Your first snapshot is your starting point. Changes show from next month.</span>`}</p>
+    ${prev ? `<p class="pg-delta">${changeChip(now.netWorth - prev.netWorth, "total")} <span>since ${esc(monthYear(prev.date))}</span></p>` : ""}
     <ul class="pg-notelist" id="pgNotes">${progressNotes(pts, app.today).map(t => `<li>${esc(t)}</li>`).join("")}</ul>
   </section>`;
 
@@ -136,7 +142,7 @@ export function view() {
   const goals = `<section class="pg-gl"><div class="b-row sec"><h2>Savings progress</h2></div>
     ${now.goals.length ? `<ul class="pg-glist">${now.goals.map(g => {
       const done = g.pct !== null && g.pct >= 1, hist = goalHistory(pts, g.id);
-      return `<li class="card pg-g${done ? " done" : ""}"><div class="pg-g-top"><span class="pg-g-n"><b>${esc(g.name)}</b><small>${esc(g.group)}</small></span>${done ? `<span class="gl-done">${CHECK}Reached</span>` : ""}</div>
+      return `<li class="card pg-g${done ? " done" : ""}"><div class="pg-g-top">${goalIcon(g)}<span class="pg-g-n"><b>${esc(g.name)}</b><small>${esc(g.group)}</small></span>${done ? `<span class="gl-done">${CHECK}Reached</span>` : ""}</div>
         <div class="pg-g-row"><div class="pg-g-main"><span class="pg-g-v">${m0(g.saved)}${g.target ? `<small> of ${m0(g.target)}</small>` : ""}</span>
           ${g.target ? `<span class="gl-bar"><span style="width:${Math.min(1, g.pct || 0) * 100}%"></span></span>` : ""}
           <small class="dim">${esc(goalNote(g, pts, app.today) || "Add a target to track progress")}</small></div>${sparkline(hist.map(h => h.saved), g.target, "var(--accent)")}</div></li>`;
