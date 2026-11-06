@@ -177,6 +177,7 @@
         return { data: true, error: null };
       }
       case "save_snapshot_now": {
+        if (fake.failNext > 0) { fake.failNext--; return err("Failed to fetch"); }
         if (!["owner", "editor"].includes(roleIn(id))) return err("Only owners and editors can save a snapshot");
         const hh = fake.hh(id), d = snapData(hh.budget);
         if (!d) return err("There’s nothing to save yet: set up the budget first");

@@ -16,6 +16,7 @@ import { tipq } from "./inputs.js";
 import { SP_TYPES, typeIcon } from "./views/spending.js";
 import { NW_TYPES, nwIcon, nwType } from "./views/networth.js";
 import { goalSheet, goalGroups } from "./views/goals.js";
+import { investSheet } from "./views/invest.js";
 import { list } from "./render.js";
 import { openPop, closePop } from "./dom.js";
 import { money } from "../model/format.js";
@@ -125,12 +126,12 @@ function personSheet(p) {
 /** Draw (or redraw) the open sheet from the current budget, keeping the cursor where it was. */
 function draw() {
   const s = UI.sheet; if (!s) return;
-  const S = app.state, item = (s.kind === "goal" ? list(s.l) || [] : s.kind === "acc" ? S.accounts : s.kind === "sp" ? S.spend : s.kind === "nw" ? S.nw.accounts : S.people).find(x => x.id === s.id);
+  const S = app.state, item = s.kind === "inv" ? S.invest : (s.kind === "goal" ? list(s.l) || [] : s.kind === "acc" ? S.accounts : s.kind === "sp" ? S.spend : s.kind === "nw" ? S.nw.accounts : S.people).find(x => x.id === s.id);
   if (!item || app.tab !== s.tab) { close(); return; } // deleted (here or by someone else), or left the tab
   const ae = document.activeElement, keep = ae && ae.closest && ae.closest("#sheet") && ae.dataset && ae.dataset.f ? { l: ae.dataset.l, i: ae.dataset.i, f: ae.dataset.f, v: ae.type === "radio" ? ae.value : null, s: ae.selectionStart } : null;
   const y = $("#sheet").scrollTop;
   const title = item.name || { acc: "New allocation", sp: "New expense", nw: "New account", goal: "New goal", person: "Person" }[s.kind];
-  show(title, s.kind === "goal" ? goalSheet(s.l, item) : s.kind === "acc" ? accountSheet(item) : s.kind === "sp" ? expenseSheet(item) : s.kind === "nw" ? networthSheet(item) : personSheet(item));
+  show(s.kind === "inv" ? "Assumptions" : title, s.kind === "inv" ? investSheet() : s.kind === "goal" ? goalSheet(s.l, item) : s.kind === "acc" ? accountSheet(item) : s.kind === "sp" ? expenseSheet(item) : s.kind === "nw" ? networthSheet(item) : personSheet(item));
   $("#sheet").scrollTop = y;
   if (keep) {
     const sel = `#sheet [data-l="${CSS.escape(keep.l)}"][data-i="${CSS.escape(keep.i)}"][data-f="${CSS.escape(keep.f)}"]${keep.v ? `[value="${CSS.escape(keep.v)}"]` : ""}`;
@@ -186,6 +187,7 @@ export function initBudgetSheets() {
     const ea = t.closest("[data-edit-acc]"); if (ea && !ea.disabled) { openAccountSheet(ea.dataset.editAcc); return; }
     const es = t.closest("[data-edit-sp]"); if (es && !es.disabled) { openExpenseSheet(es.dataset.editSp); return; }
     const en = t.closest("[data-edit-nw]"); if (en && !en.disabled) { openNetWorthSheet(en.dataset.editNw); return; }
+    if (t.closest("[data-iv-edit]")) { UI.sheet = { kind: "inv", id: "inv", tab: app.tab }; draw(); app.refresh(); return; }
     const eg = t.closest("[data-edit-goal]"); if (eg && !eg.disabled) { openGoalSheet(eg.dataset.editGoal, eg.dataset.i); return; }
     const ep = t.closest("[data-edit-person]"); if (ep) { openPersonSheet(ep.dataset.editPerson); return; }
     if (readOnly()) return;

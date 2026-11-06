@@ -100,6 +100,25 @@ There's **no build step**. GitHub Pages serves these files exactly as they are.
 - `tests/browser/goals-ui.test.js` checks every figure against `tests/browser/nwgoals-baseline.json`, plus
   edge cases, editing, add/cancel/delete, reorder, cross-tab effects, widths and viewers.
 
+### Invest and Progress tabs (UI phase 4)
+
+- **Invest** leads with the forecast for the years chosen (5, 10, 20 or 30), what you put in and the growth
+  after fees, and the chart. Tapping, dragging or the arrow keys pick a year; its figures show under the
+  chart. All of it comes from `C.inv.years` (`projectInvestments`, unchanged): choosing years or picking a
+  point never recalculates or saves anything. Starting investments (Net worth) and the amount going in
+  (Budget) link to their tabs. The three assumptions are adjusted in a sheet with the same saved fields.
+  Milestones pick the years; the yearly breakdown (all 30 years, every column) is folded away.
+- **Progress** leads with net worth today and the change since last month's snapshot, then the history
+  chart: a solid dot per recorded month (the latest snapshot that month, as before), placed by date and
+  joined by straight lines, and a hollow "Today" dot joined by a dashed line. 6M / 1Y ranges appear
+  once there's more than six months of history; they only filter. With no snapshots there's a "journey
+  starts here" card; with one, two figures and no line. Assets & debt show today with the change worded
+  ("$200 less owed"); compare picks any snapshot; History lists them all. Nothing in `snapshots.js`
+  changed, and nothing here writes a snapshot except "Save snapshot".
+- Shared drawing: `drawGrowth` and `drawHistory` in `js/ui/charts.js`. Tests: `invest-ui.test.js`
+  (every figure checked against `invest-baseline.json`, recorded from the old screen) and
+  `progress-ui.test.js`.
+
 ## How saving works
 
 The whole budget lives in one row (`budgets.state`), but the app never overwrites it. Each edit is
