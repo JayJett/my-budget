@@ -20,15 +20,16 @@ const pctText = v => `${+(Number(v || 0) * 100).toFixed(2)}%`;
 
 export function view() {
   const S = app.state, w = WORDS[S.viewAs], h = horizon(), ro = readOnly();
+  const empty = !!app.C && !(app.C.inv.start > 0) && !(app.C.inv.annual > 0); // nothing to forecast: no $0 chart or $0 milestones
   const hero = `<section class="card iv-hero" aria-live="polite">
     <div class="b-row"><span class="eyebrow">Forecast ${tipq("An illustration of where regular investing could lead, using your assumptions below. Real returns go up and down; this is not a guarantee or advice.")}</span>
       <div class="seg iv-h" role="group" aria-label="Years ahead">${HORIZONS.map(y => `<button type="button" data-iv-h="${y}" aria-pressed="${y === h}">${y}y</button>`).join("")}</div></div>
     <div class="sp-head"><span class="amt">${K("iv.h.bal")}</span></div>
     <p class="iv-lab">${K("iv.h.lab")}</p>
-    ${app.C && !(app.C.inv.start > 0) && !(app.C.inv.annual > 0) ? `<div class="iv-empty"><span class="sp-empty-ic" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12l3.5-4 3 2.5 4.5-6"/><path d="M10.5 4.5h3v3"/></svg></span><p><b>Nothing invested yet</b>Add an Investment account on Net worth, or give an Investment allocation a share of pay on Budget, to see a forecast.</p></div>` : ""}
-    <div class="sp-figs iv-figs"><div><small><i class="dot dash"></i>You put in</small><b>${K("iv.h.c")}</b></div><div><small><i class="dot" style="background:var(--invest)"></i>Growth after fees</small><b>${K("iv.h.g")}</b></div></div>
+    ${empty ? `<div class="iv-empty"><span class="sp-empty-ic" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12l3.5-4 3 2.5 4.5-6"/><path d="M10.5 4.5h3v3"/></svg></span><p><b>Nothing invested yet</b>Add an Investment account on Net worth, or give an Investment allocation a share of pay on Budget, to see a forecast.</p></div>` : ""}
+    ${empty ? "" : `<div class="sp-figs iv-figs"><div><small><i class="dot dash"></i>You put in</small><b>${K("iv.h.c")}</b></div><div><small><i class="dot" style="background:var(--invest)"></i>Growth after fees</small><b>${K("iv.h.g")}</b></div></div>
     <div class="iv-chart" id="ivChart" tabindex="0" role="group" aria-label="Forecast chart. Use the left and right arrow keys to pick a year." aria-describedby="ivRead"></div>
-    <div class="iv-read" id="ivRead" aria-live="polite"></div>
+    <div class="iv-read" id="ivRead" aria-live="polite"></div>`}
     <p class="iv-note">Illustrative projection, not a guarantee.</p>
   </section>`;
   const sources = `<section class="iv-src">
@@ -51,7 +52,7 @@ export function view() {
     <li>Returns compound and fees come off the balance every fortnight, so the growth shown is after fees. Contributions rise by the yearly increase you set.</li>
     <li>Markets go up and down; the smooth line is the long-term shape under fixed assumptions, not a prediction.</li>
   </ul></details>`;
-  return `<div class="iv-page"><div class="iv-side">${hero}</div><div class="iv-main">${sources}${assumptions}${miles}${table}${help}</div></div>`;
+  return `<div class="iv-page"><div class="iv-side">${hero}</div><div class="iv-main">${sources}${assumptions}${empty ? "" : miles + table}${help}</div></div>`;
 }
 
 /** The assumptions sheet (opened from ui/budget-sheets.js). The same three saved settings as before. */

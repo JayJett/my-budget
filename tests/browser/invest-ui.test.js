@@ -108,8 +108,9 @@ test("yearly breakdown: hidden until asked for, then every year with every colum
 
 test("edge cases: nothing invested, a falling market, very large balances: never NaN or Infinity", { skip }, async () => {
   for (const name of ["nothing", "negative", "big", "noContrib", "noStart", "flat"]) {
-    const { page, errors, ctx } = await ivTab(CASES[name], { width: 320 });
-    await page.click("#ivYears summary");
+    const { page, errors, ctx } = await open(CASES[name], { width: 320 }); await settle(page); await goTab(page, "invest");
+    if (name === "nothing") assert.equal(await page.locator("#ivChart, #ivYears").count(), 0, "nothing invested: no chart or table of zeros");
+    else await page.click("#ivYears summary");
     assert.doesNotMatch(await page.textContent("#app"), /NaN|Infinity|undefined/, name);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false, name);
     if (name === "negative") assert.match(await text(page, "iv.h.g"), /^−\$/, "growth can be negative and says so");

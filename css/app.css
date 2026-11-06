@@ -4,14 +4,14 @@
   --line:#E3E7DE; --line-strong:#CCD3C6;
   --accent:#2F6B4F; --accent-hover:#245840; --accent-soft:#E2EFE6; --on-accent:#FFFFFF;
   --c-blue:#2F6DB5; --c-blue-tint:#EDF4FC; --c-blue-edge:#C3D7EE;
-  --c-gold:#A9720A; --c-gold-tint:#FCF5E6; --c-gold-edge:#EAD3A3;
-  --c-coral:#B4532F; --c-coral-tint:#FCEFEA; --c-coral-edge:#EDC7B8;
+  --c-gold:#8F6007; --c-gold-tint:#FCF5E6; --c-gold-edge:#EAD3A3;   /* darkened in phase 6 for AA text contrast */
+  --c-coral:#AC4F2C; --c-coral-tint:#FCEFEA; --c-coral-edge:#EDC7B8;
   --c-rose:#A8416F; --c-rose-tint:#FBEEF4; --c-rose-edge:#EBC2D6;
   --c-slate:#4A6574; --c-slate-tint:#EEF3F5; --c-slate-edge:#C5D3DA;
   --joint:#2C846B; --invest:#7A5AB0;
   --cat-fixed:#3E5A63; --cat-flex:var(--joint); --cat-sink:var(--invest);   /* expense types (never the accent) */
   --nw-op:var(--c-blue); --nw-sav:var(--joint); --nw-inv:var(--invest); --nw-sup:var(--c-gold); --nw-debt:var(--c-coral);   /* account types (never the accent) */
-  --ok:#2E7A4B; --ok-soft:#E3F2E8; --warn:#A8650F; --warn-soft:#FBEEDA; --bad:#BE3A2C; --bad-soft:#FBE5E1;
+  --ok:#2E7A4B; --ok-soft:#E3F2E8; --warn:#95580A; --warn-soft:#FBEEDA; --bad:#BE3A2C; --bad-soft:#FBE5E1;
   --attn:#E2672C; --unalloc:#D7DCD2;
   --shadow:0 1px 2px rgba(31,38,34,.05);
   --r-lg:16px; --r:12px; --r-sm:9px;
@@ -1429,3 +1429,12 @@ body.compact .sp-head .amt, body.compact .nw-head .amt{ font-size:2rem; }
 .ico-ch{ color:var(--accent); font-weight:650; font-size:var(--fs-sm); }
 .ico-box[open] .ico-pick{ padding:0 12px 12px; }
 .ico-box .ico-pick button{ background:var(--surface); }
+
+/* ============ UI phase 6: audit fixes ============ */
+/* Bigger touch areas without changing how things look (WCAG 2.5.8; Apple's 44pt guidance) */
+.qi, .tip-t{ position:relative; }
+.qi::after{ content:""; position:absolute; inset:-11px; }
+.tip-t::after{ content:""; position:absolute; inset:-12px -4px; }
+details.help summary, details.more summary, .iv-years summary, .ico-box summary{ min-height:44px; }
+#sheet .sheet-head .btn, #sheet .sheet-head .btn.icon{ min-height:44px; min-width:44px; }
+.note-input{ font-size:16px; }   /* under 16px, iPhone and iPad Safari zoom the page when you tap it */

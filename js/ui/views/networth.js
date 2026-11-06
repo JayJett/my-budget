@@ -111,7 +111,7 @@ export function view() {
     <li>Enter debts as positive numbers; they’re subtracted from your assets.</li>
     <li>Update balances roughly monthly and press “Reviewed today”.</li>
   </ul></details>`;
-  return `<div class="nw-page"><div class="nw-side">${hero}${review}</div><div class="nw-main">${list}${help}</div></div>`;
+  return `<div class="nw-page"><div class="nw-side">${hero}${L.length ? review : ""}</div><div class="nw-main">${list}${help}</div></div>`;
 }
 
 function reviewedWhen(s, today) {

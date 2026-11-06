@@ -41,7 +41,10 @@ document.addEventListener("keydown", e => {
 });
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden" && app.store && app.store.busy()) app.store.flushNow(); });
 // Warn before leaving while a change is still on its way. Not when offline: those edits are kept on the device and sync later.
-window.addEventListener("beforeunload", e => { if (navigator.onLine !== false && app.store && app.store.hasUnsaved()) { e.preventDefault(); e.returnValue = ""; } });
+// "Offline" is the app's own view too (it loaded from this device, or its last save attempt found no
+// connection): navigator.onLine alone can say "online" when there's no internet (common on iPhones).
+const offlineNow = () => navigator.onLine === false || app.offline || app.saveStatus === "offline";
+window.addEventListener("beforeunload", e => { if (!offlineNow() && app.store && app.store.hasUnsaved()) { e.preventDefault(); e.returnValue = ""; } });
 
 const configured = /^https:\/\/[a-z0-9-]+\.supabase\.(co|in)\/?$/i.test(SUPABASE_URL.trim()) && SUPABASE_ANON_KEY.trim().length > 30;
 if (!configured || !window.supabase) showAuth("setup");
