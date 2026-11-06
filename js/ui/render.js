@@ -5,8 +5,8 @@ import { $, $$, esc } from "./dom.js";
 import { pc } from "./inputs.js";
 import { compute } from "../model/calc.js";
 import { WORDS, VIEWS } from "../model/periods.js";
-import { pct } from "../model/format.js";
-import { accountColours, personVar } from "./charts.js";
+import { listNames } from "../model/format.js";
+import { accountColours } from "./charts.js";
 import { TABS, SHORT } from "./views/labels.js";
 import * as budget from "./views/budget.js";
 import * as networth from "./views/networth.js";
@@ -39,21 +39,18 @@ export function applyUI() {
   document.body.classList.toggle("compact", app.ui.density === "compact");
 }
 
-const initials = P => P.map(p => (p.name || "?").trim().charAt(0).toUpperCase() || "?").join(P.length === 2 ? "+" : "");
+const initial = p => (p.name || "?").trim().charAt(0).toUpperCase() || "?";
 
-/** Header: logo, names, "per fortnight" label and the browser tab title. */
+/** Header: one small avatar per person in the budget (in their colour), the household's name,
+    and, for more than one person, their names underneath. Nothing here is fixed to particular people. */
 export function renderBrand() {
-  const P = app.state.people, w = WORDS[app.state.viewAs];
-  const names = P.filter(p => p.name);
-  const logo = $(".top .logo");
-  if (logo) {
-    logo.textContent = initials(P).slice(0, 4);
-    logo.style.background = P.length > 1 ? `linear-gradient(135deg, ${P.map((p, i) => `${personVar(p)} ${i / P.length * 100}% ${(i + 1) / P.length * 100}%`).join(", ")})` : personVar(P[0]);
-  }
+  const P = app.state.people, names = P.map(p => (p.name || "").trim()).filter(Boolean);
+  const title = app.household ? app.household.name : (names.length ? listNames(names) : "My budget");
+  const av = $("#avatars");
+  if (av) av.innerHTML = P.slice(0, 4).map(p => `<span class="av ${pc(p)}">${esc(initial(p))}</span>`).join("");
   const brand = $("#brandNames");
-  if (brand) brand.innerHTML = (names.length ? names.map(p => `<span class="${pc(p)}">${esc(p.name)}</span>`).join('<span class="plus">+</span>') : esc(app.household ? app.household.name : "Budget"))
-    + `<small>${esc(app.household ? app.household.name + " · " : "")}Amounts shown ${w.per}</small>`;
-  document.title = (names.length ? names.map(p => p.name).join(" + ") : "My") + " · Budget";
+  if (brand) brand.innerHTML = `<span class="brand-t">${esc(title)}</span>${P.length > 1 && names.length ? `<small>${esc(listNames(names))}</small>` : ""}`;
+  document.title = `${title} · Budget`;
 }
 
 const viewAsBar = () => {
@@ -69,9 +66,11 @@ export function render() {
   if (app.setup) { renderBrand(); app.setup.render(); return; } // the setup guide has the page to itself
   app.C = compute(app.state, app.today);
   app.colours = accountColours(app.state);
-  $("#tabs").innerHTML = TABS(app.state).map(([k, l]) => `<button class="tab" role="tab" type="button" data-tab="${k}" aria-selected="${k === app.tab}">${ICONS[k]}<span class="tl">${esc(l)}</span><span class="ts">${esc(SHORT[k])}</span><span class="mark" data-mark="${k}"></span></button>`).join("");
+  $("#tabs").innerHTML = TABS(app.state).map(([k, l]) => `<button class="tab" role="tab" type="button" data-tab="${k}" aria-selected="${k === app.tab}"><span class="ti">${ICONS[k]}</span><span class="tl">${esc(l)}</span><span class="ts">${esc(SHORT[k])}</span><span class="mark" data-mark="${k}"></span></button>`).join("");
   const note = !app.canWrite && app.household ? `<div class="welcome ro-note"><h3>You’re viewing ${esc(app.household.name)}</h3><p>You can look around, but changes are switched off. An owner can make you an editor in Household settings.</p></div>` : "";
-  $("#app").innerHTML = note + (app.loaded && !app.hasData && app.canWrite ? welcomeBox() : "") + (app.tab === "progress" ? "" : viewAsBar()) + VIEWS_BY_TAB[app.tab].view();
+  // (Budget has its own period switch, in the income card.)
+  $("#app").innerHTML = note + (app.loaded && !app.hasData && app.canWrite ? welcomeBox() : "") + (app.tab === "progress" || app.tab === "budget" ? "" : viewAsBar()) + VIEWS_BY_TAB[app.tab].view();
+  if (app.beforeRefresh) app.beforeRefresh(); // e.g. an open editing sheet redraws itself from the new state
   refresh();
   const ro = readOnly();
   document.body.classList.toggle("readonly", ro);
@@ -94,17 +93,10 @@ export function refresh() {
   });
   if (mod.draw) mod.draw(C);
   renderBrand();
-  // tab markers, attention box, allocation meter
+  // tab markers and the attention box
   TABS(app.state).forEach(([k]) => { const m = $(`[data-mark="${k}"]`), list = C.issues[k] || [], c = list.length; if (m) { m.textContent = c || ""; m.parentElement.dataset.tip = c ? list.join(" ") : ""; } });
   const at = $("#attn"), li = C.issues[app.tab] || [];
   if (at) { at.hidden = !li.length; at.innerHTML = li.length ? `<h3>${li.length === 1 ? "One thing" : li.length + " things"} to look at</h3><ul>${li.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""; }
-  const me = $("#meter");
-  me.hidden = app.tab !== "budget";
-  if (app.tab === "budget") {
-    const part = p => { const x = C.tot.pct[p.id], ok = Math.round(x * 1e4) === 1e4, rem = 1 - x;
-      return `<div class="mt ${pc(p)}"><b>${esc(p.name || "Unnamed")}</b><span class="mt-bar"><span style="width:${Math.min(x, 1) * 100}%"></span></span><span class="mt-v ${ok ? "ok" : "bad"}">${pct(x, 1)}</span>${rem > 0.00005 ? `<button class="fill-btn" type="button" data-fill="${esc(p.id)}">Fill ${pct(rem, 1)}</button>` : ""}</div>`; };
-    me.innerHTML = `<span class="lbl">Allocated</span>${C.people.map(part).join("")}`;
-  }
 }
 
 app.render = render;

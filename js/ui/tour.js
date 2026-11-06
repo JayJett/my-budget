@@ -5,9 +5,9 @@ import { $ } from "./dom.js";
 
 const STOPS = [
   { sel: "#app .viewas", title: "Pick your period", text: "Every amount can be shown per week, fortnight or month. It doesn’t change the plan, just how you see it." },
-  { sel: "#app .hero", title: "People and pay", text: "Each person’s take-home pay and how often it arrives. Weekly, fortnightly and monthly pay can be mixed." },
-  { sel: "#app .w-acc", title: "Your allocation plan", text: "What % of each person’s pay goes into each account. Tinted boxes are yours to change; everything else works itself out." },
-  { sel: "#meter", title: "Every dollar has a job", text: "This bar tracks how much of each person’s pay is planned. Aim for 100%, and use Fill to top up the last bit." },
+  { sel: "#app .b-income", title: "Income", text: "Everyone’s take-home pay, added up. Tap a person to change their pay, how often it arrives, or their colour." },
+  { sel: "#allocStatus", title: "Every dollar has a job", text: "How much of each person’s pay is planned. Aim for 100%, and use Fill to top up the last bit." },
+  { sel: "#app .b-allocs", title: "Your allocations", text: "Where the pay goes, account by account. Tap one to change its share of each person’s pay." },
   { sel: "#tabs", title: "The other tabs", text: "Net worth is what you own and owe. Spending is where the bills money goes. Goals and Investments show what your saving adds up to." },
   { sel: "#menuBtn", title: "Settings live here", text: "Your account, household members and roles, switching households, downloads, and this tour again." },
 ];

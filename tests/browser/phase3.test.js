@@ -7,7 +7,7 @@ import { createRequire } from "node:module";
 import { RICH_V3 } from "../fixtures.js";
 import { migrate } from "../../js/model/migrate.js";
 import { toStored } from "../../js/model/schema.js";
-import { setup, skip, SHOTS, open, settle, fake, goTab, setField, publishNewVersion } from "./helpers.js";
+import { setup, skip, SHOTS, open, settle, fake, goTab, setField, publishNewVersion, editPerson } from "./helpers.js";
 
 setup();
 const require = createRequire(import.meta.url);
@@ -40,9 +40,9 @@ for (const [name, device] of [["iPhone", IPHONE], ["Android", PIXEL]]) {
       if (name === "iPhone") await page.screenshot({ path: join(SHOTS, `phone-${tab}.png`), fullPage: true });
     }
     await goTab(page, "budget");
-    // Tables are cards: no column headings, each row is its own box
-    assert.equal(await page.isVisible(".w-acc thead"), false);
-    assert.equal(await page.locator(".w-acc tbody tr").first().evaluate(el => getComputedStyle(el).display), "block");
+    // Budget is compact rows now, not a table
+    assert.equal(await page.locator("#app table").count(), 0);
+    assert.ok(await page.locator(".alloc-row").count() > 3);
     assert.deepEqual(errors, []);
     await ctx.close();
   });
@@ -106,13 +106,15 @@ test("offline: the app opens with no connection, edits are kept, and they sync w
   assert.match(await page.textContent("#conn"), /You’re offline/);
   assert.equal(await page.textContent("#saveText"), "Offline");
   assert.equal(await page.inputValue('[data-f="note"]'), "Test budget", "the budget comes from this phone");
-  await setField(page, '[data-l="pp"][data-i="j"][data-f="pay"]', "2500");
+  await editPerson(page, "j");
+  await setField(page, '#sheet [data-l="pp"][data-i="j"][data-f="pay"]', "2500");
   await page.waitForFunction(() => document.querySelector("#saveText").textContent === "Offline");
   await page.screenshot({ path: join(SHOTS, "phone-offline.png") });
   // Close and reopen while still offline: the edit is still there
   await page.reload();
   await page.waitForSelector("#app .viewas");
-  assert.equal(await page.inputValue('[data-l="pp"][data-i="j"][data-f="pay"]'), "2,500");
+  await editPerson(page, "j");
+  assert.equal(await page.inputValue('#sheet [data-l="pp"][data-i="j"][data-f="pay"]'), "2,500");
   // Back online: the app reconnects and sends the edit
   await ctx.setOffline(false);
   await page.waitForFunction(() => window.__fake && window.__fake.rpcCalls.some(c => c.name === "apply_budget_ops"), null, { timeout: 15000 });

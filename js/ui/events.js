@@ -26,6 +26,19 @@ function setPath(obj, path, v) {
 const allGoals = () => [app.state.goals.ef, ...app.state.goals.joint, ...Object.values(app.state.goals.personal).flat()];
 const rowHasData = it => Object.entries(it).some(([k, v]) => !["id", "type", "period", "account", "due", "pos", "split", "owner", "role"].includes(k) && !blank(v) && v !== 0);
 
+/** Add a blank row to a list (accounts, net-worth accounts, spending, goals). Returns its id. */
+export function addRow(l) {
+  const L = list(l), id = uid(), pos = nextPos(L);
+  const defs = {
+    acc: { id, name: "", type: "Personal", owner: null, role: null, split: {}, pos },
+    nw: { id, name: "", type: "Savings", balance: null, pos },
+    sp: { id, name: "", type: "Flexible", amount: null, period: "Fortnight", notes: "", due: null, aside: null, pos },
+    gj: { id, name: "", target: null, saved: null, account: "", split: {}, deadline: "", pos },
+  };
+  L.push(defs[l] || { id, name: "", target: null, saved: null, account: "", pct: null, deadline: "", pos });
+  return id;
+}
+
 /** Which fields need the whole tab redrawn when they change (they add or remove columns or labels). */
 const REDRAW_ON_CHANGE = new Set(["type", "period", "note", "freq", "owner"]);
 
@@ -106,14 +119,7 @@ export function initEvents() {
 
     const ad = e.target.closest("[data-add]");
     if (ad) {
-      const l = ad.dataset.add, L = list(l), id = uid(), pos = nextPos(L);
-      const defs = {
-        acc: { id, name: "", type: "Personal", owner: null, role: null, split: {}, pos },
-        nw: { id, name: "", type: "Savings", balance: null, pos },
-        sp: { id, name: "", type: "Flexible", amount: null, period: "Fortnight", notes: "", due: null, aside: null, pos },
-        gj: { id, name: "", target: null, saved: null, account: "", split: {}, deadline: "", pos },
-      };
-      L.push(defs[l] || { id, name: "", target: null, saved: null, account: "", pct: null, deadline: "", pos });
+      const l = ad.dataset.add, id = addRow(l);
       changed({ full: true });
       const inp = $(`[data-l="${CSS.escape(l)}"][data-i="${id}"][data-f="name"]`); if (inp) inp.focus();
       return;
