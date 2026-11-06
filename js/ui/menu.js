@@ -5,6 +5,7 @@ import { applyUI } from "./render.js";
 import { exportCSV, exportJSON } from "./exports.js";
 import { openAccount, openHouseholdSettings } from "./settings.js";
 import { openHistory } from "./history.js";
+import { openInbox } from "./reminders.js";
 
 const ROLE = { owner: "Owner", editor: "Editor", viewer: "View only" };
 
@@ -14,6 +15,7 @@ export function mainMenu() {
   const hhs = app.households || [];
   const switcher = hhs.length > 1 ? `<div class="pop-h">Households</div>${hhs.map(h => `<button class="item hh-item" type="button" data-switch="${esc(h.id)}" aria-current="${app.household && h.id === app.household.id}">${esc(h.name)}<small>${ROLE[h.role] || ""}${app.household && h.id === app.household.id ? " · open now" : ""}</small></button>`).join("")}<hr>` : "";
   return `${s ? `<div class="who-me">Signed in as<b>${esc((me && me.display_name) || (s.user.user_metadata && s.user.user_metadata.name) || s.user.email)}</b>${esc(s.user.email)}</div><hr>${switcher}
+    <button class="item" type="button" data-act="reminders">Reminders<small>Gentle nudges, all optional. Choose yours.</small></button>
     <button class="item" type="button" data-act="history">History<small>Who changed what, and when. Undo or go back.</small></button>
     <button class="item" type="button" data-act="household">Household settings<small>${esc(app.household ? app.household.name : "")}: people, roles, invites</small></button>
     <button class="item" type="button" data-act="account">Account settings<small>Name, email, password, your data</small></button>
@@ -36,6 +38,7 @@ export function menuAct(b) {
   if (act === "import") { if (readOnly()) { toast("You have view-only access, so you can’t import."); return; } $("#importFile").click(); }
   if (act === "backup") exportJSON();
   if (act === "history") openHistory();
+  if (act === "reminders") openInbox();
   if (act === "household") openHouseholdSettings();
   if (act === "account") openAccount();
   if (act === "tour") { if (app.setup) { toast("Finish setting up first, then take the tour."); return; } app.startTour(); }

@@ -25,7 +25,8 @@ export const app = {
   setup: null,                   // the setup guide, while it's showing (ui/onboarding.js)
   snapshots: null,               // this household's snapshots for the Progress tab (ui/views/progress.js)
   compareId: null,               // the snapshot being compared with today
-  undoStack: [],                 // history entries for your changes this session, for the Undo button (ui/history.js)
+  undoStack: [],
+  reminders: null,               // your reminders in this household, newest first (ui/reminders.js)                 // history entries for your changes this session, for the Undo button (ui/history.js)
   store: null,                   // saving + live updates (sync/store.js)
   // filled in by render.js so other modules can ask for a redraw without importing it
   render: () => {}, refresh: () => {},

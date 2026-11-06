@@ -76,12 +76,12 @@
   }
 
   const households = (init.households || [{ id: "hh-1", name: "Test household", role: "owner", budget: init.budget || {}, seq: init.seq || 0 }])
-    .map(h => ({ seq: 0, backups: [], invites: [], snapshots: [], changes: [], ...copy(h), members: h.members ? copy(h.members) : [meMember(h.role || "owner")] }));
+    .map(h => ({ seq: 0, backups: [], invites: [], snapshots: [], changes: [], reminders: [], remPrefs: null, ...copy(h), members: h.members ? copy(h.members) : [meMember(h.role || "owner")] }));
   const user = { id: ME, email: "jarden@example.com", user_metadata: { name: init.myName || "Jarden" }, created_at: "2026-01-01T00:00:00Z" };
   let authCb = null;
 
   const fake = window.__fake = {
-    households, rpcCalls: [], authCalls: [], backups: [], listeners: [], failNext: 0, deleted: false,
+    households, rpcCalls: [], authCalls: [], backups: [], remUpdates: [], prefSaves: [], listeners: [], failNext: 0, deleted: false,
     get budget() { return households[0].budget; },
     get seq() { return households[0].seq; },
     hh: id => households.find(h => h.id === id),
@@ -105,7 +105,7 @@
   const NET = { data: null, error: { message: "TypeError: Failed to fetch" } };
 
   function query(table) {
-    const q = { eq: {}, is: {}, lt: {}, gt: {}, limit: Infinity, desc: false, update: null, del: false, cols: "" };
+    const q = { eq: {}, is: {}, lt: {}, gt: {}, in: {}, limit: Infinity, desc: false, update: null, upsert: null, del: false, cols: "" };
     const run = () => {
       if (offline()) return NET;
       const hid = q.eq.household_id || q.eq.id;
@@ -119,6 +119,16 @@
       }
       if (table === "budgets") { const h = fake.hh(hid); return { data: h ? { state: copy(h.budget), seq: h.seq, updated_by: ME, updated_at: new Date().toISOString() } : null, error: null }; }
       if (table === "budget_snapshots") return { data: copy((fake.hh(hid) || { snapshots: [] }).snapshots), error: null };
+      if (table === "reminders") {
+        const all = households.flatMap(h => h.reminders);
+        if (q.update) { const ids = q.in.id || [q.eq.id]; all.filter(r => ids.includes(r.id)).forEach(r => Object.assign(r, q.update)); fake.remUpdates.push({ ids: copy(ids), ...copy(q.update) }); return { data: null, error: null }; }
+        let rows = copy((fake.hh(hid) || { reminders: [] }).reminders).sort((a, b) => b.created_at.localeCompare(a.created_at));
+        return { data: rows.slice(0, q.limit), error: null };
+      }
+      if (table === "reminder_prefs") {
+        if (q.upsert) { const h = fake.hh(q.upsert.household_id); h.remPrefs = copy(q.upsert); fake.prefSaves.push(copy(q.upsert)); return { data: null, error: null }; }
+        return { data: copy((fake.hh(hid) || {}).remPrefs || null), error: null };
+      }
       if (table === "budget_changes") {
         let rows = copy((fake.hh(hid) || { changes: [] }).changes).filter(r => (q.lt.id === undefined || r.id < q.lt.id) && (q.gt.id === undefined || r.id > Number(q.gt.id)));
         if (q.desc) rows.reverse();
@@ -134,6 +144,7 @@
     const b = {
       select(cols) { q.cols = cols || ""; return b; }, eq(k, v) { q.eq[k] = v; return b; }, is(k, v) { q.is[k] = v; return b; },
       order(_c, o) { q.desc = !!(o && o.ascending === false); return b; }, lt(k, v) { q.lt[k] = Number(v); return b; }, gt(k, v) { q.gt[k] = Number(v); return b; }, limit(n) { q.limit = n; return b; },
+      in(k, v) { q.in[k] = v; return b; }, upsert(v) { q.upsert = v; return b; },
       update(v) { q.update = v; return b; }, delete() { q.del = true; return b; }, maybeSingle() { return b; },
       then(res, rej) { return Promise.resolve(run()).then(res, rej); },
     };
@@ -202,7 +213,7 @@
         return { data: { state: copy(target), seq: hh.seq, updated_at: new Date().toISOString(), updated_by: ME, change_id }, error: null };
       }
       case "create_household": {
-        const h = { id: "hh-" + (households.length + 1), name: a.p_name, budget: {}, seq: 0, backups: [], invites: [], members: [meMember("owner")] };
+        const h = { id: "hh-" + (households.length + 1), name: a.p_name, budget: {}, seq: 0, backups: [], invites: [], snapshots: [], changes: [], reminders: [], remPrefs: null, members: [meMember("owner")] };
         households.push(h); return { data: h.id, error: null };
       }
       case "invite_member":

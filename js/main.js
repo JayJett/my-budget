@@ -11,6 +11,7 @@ import { initSetupEvents } from "./ui/onboarding.js";
 import "./ui/tour.js";
 import { initProgress } from "./ui/views/progress.js";
 import { initHistory } from "./ui/history.js";
+import { initReminders } from "./ui/reminders.js";
 
 applyUI();
 initTooltips();
@@ -21,6 +22,7 @@ initSettings();
 initSetupEvents();
 initProgress();
 initHistory();
+initReminders();
 
 // Ctrl/Cmd+S saves straight away; leaving the page saves anything pending.
 document.addEventListener("keydown", e => {

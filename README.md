@@ -87,6 +87,24 @@ Every change to a budget is recorded in `budget_changes`: who made it, when, and
 - Clean-up: a nightly job (`budget-history-cleanup`) deletes history older than 90 days, keeps at most 5,000
   changes per household, and keeps the newest 20 "before a replace" backups per household.
 
+## Reminders
+
+Gentle, optional reminders, shown under the bell 🔔 (⋯ → Reminders to choose them). Everything is off until each
+person switches it on, separately for each household: monthly balance review, yearly bill due soon or behind,
+goal reached, goal deadline at risk, and allocation not at 100%.
+
+- The rules and wording are in `js/model/reminders.js`. Each reminder has a key that decides how often it can
+  repeat (monthly, once per due date, at most weekly while a problem lasts, once per goal reached).
+- Every morning at about 8:30 NZ time, the database (`start_reminder_run`, via pg_cron) makes a one-time pass
+  and calls the Supabase Edge Function `supabase/functions/send-reminders`. The function uses only the public
+  anon key: the pass lets it fetch the budgets of people with reminders on and hand back their reminders. The
+  pass works once, for 15 minutes. No secret keys are involved.
+- The function runs the app's own maths: `node tools/sync-function.mjs` copies `js/model/` into it. **Run that
+  after changing anything in `js/model/`** (a test fails if the copy is out of date), then redeploy the function.
+- Clean-up: inbox items older than 60 days go (at most 200 per person). What's been sent is remembered for
+  400 days, so a goal is never celebrated twice.
+- Email reminders aren't set up; `supabase/functions/send-reminders/run.js` has notes on adding them later.
+
 ## Households and roles
 
 One login can be in several households (switch from the ⋯ menu). In each household you're an

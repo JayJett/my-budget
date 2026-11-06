@@ -7,6 +7,7 @@ import { blankBudget } from "../model/schema.js";
 import { startSetup, endSetup } from "./onboarding.js";
 import { loadSnapshots, ensureMonthly } from "./views/progress.js";
 import { rememberChange, resetUndo, updateUndo, historyNoticeRemote } from "./history.js";
+import { loadReminders, resetReminders } from "./reminders.js";
 
 const here = () => location.origin + location.pathname;
 const brand = `<div class="auth-brand"><div class="logo" aria-hidden="true">$</div><div class="brand">My Budget<small>Plan where every dollar goes, together</small></div></div>`;
@@ -173,6 +174,7 @@ async function openHH(id) {
   app.loaded = true;
   app.offline = !!loaded.offline;
   app.snapshots = null; app.compareId = null;
+  resetReminders();
   resetUndo(); // Undo only steps back through changes made in this household, this session
   saveOfflineProfile();
   if (loaded.state) { app.state = loaded.state; app.hasData = true; app.store.saveCache(); }
@@ -187,6 +189,7 @@ async function openHH(id) {
   else if (loaded.offline) { setStatus("Offline", "offline", "You’re offline. Changes are kept on this phone and will sync when you’re back online."); showConn(OFFLINE_MSG); }
   else showSaved(loaded.meta && { by: loaded.meta.updated_by, at: loaded.meta.updated_at });
   loadSnapshots();
+  loadReminders();
   if (app.offline) return; // live updates start when the app reconnects
   ensureMonthly();
   app.store.subscribe(status => {
@@ -230,7 +233,7 @@ function teardown() {
   if (app.store) { app.store.stop(); app.store = null; }
   endSetup();
   app.household = null; app.households = []; app.members = []; app.meId = null; app.hasData = false; app.loaded = false; app.role = null;
-  resetUndo();
+  resetUndo(); resetReminders();
   app.state = blankBudget();
   $("#app").innerHTML = ""; showConn(""); closePop();
   const d = $("#sheet"); if (d.open) d.close();
