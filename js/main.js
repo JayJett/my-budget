@@ -6,12 +6,17 @@ import { applyUI } from "./ui/render.js";
 import { initEvents } from "./ui/events.js";
 import { initImport } from "./ui/exports.js";
 import { initAuth, showAuth } from "./ui/auth.js";
+import { initSettings } from "./ui/settings.js";
+import { initSetupEvents } from "./ui/onboarding.js";
+import "./ui/tour.js";
 
 applyUI();
 initTooltips();
 initPop();
 initEvents();
 initImport();
+initSettings();
+initSetupEvents();
 
 // Ctrl/Cmd+S saves straight away; leaving the page saves anything pending.
 document.addEventListener("keydown", e => {

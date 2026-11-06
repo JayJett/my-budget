@@ -8,6 +8,7 @@ import { addPerson, removePerson, renamePerson, nextPos, moveItem, MAX_PEOPLE } 
 import { uid, ymd, n, blank } from "../model/util.js";
 import { pct, possessive } from "../model/format.js";
 import { mainMenu, menuAct } from "./menu.js";
+import { startSetup } from "./onboarding.js";
 
 function readVal(el) {
   const t = el.dataset.t, raw = el.value;
@@ -65,6 +66,7 @@ export function initEvents() {
     const tb = e.target.closest("[data-tab]");
     if (tb) { const h = TAB_HASH[tb.dataset.tab]; if (location.hash !== "#" + h) location.hash = h; else { app.tab = tb.dataset.tab; render(); } window.scrollTo({ top: 0 }); return; }
     if (e.target.closest('[data-act="import"]')) { $("#importFile").click(); return; }
+    if (e.target.closest('[data-act="setup"]') && !readOnly()) { startSetup(); render(); window.scrollTo({ top: 0 }); return; }
     if (e.target.closest("#menuBtn")) { if (!pop.hidden) { closePop(); return; } openPop(e.target.closest("#menuBtn"), mainMenu(), menuAct); return; }
     if (readOnly()) return;
 

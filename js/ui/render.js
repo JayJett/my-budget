@@ -59,15 +59,17 @@ const viewAsBar = () => {
   return `<div class="viewas"><span>Show amounts per</span><div class="seg" role="group" aria-label="Show amounts per">${VIEWS.map(k => `<button type="button" data-viewas="${k}" aria-pressed="${k === v}">${WORDS[k].noun[0].toUpperCase() + WORDS[k].noun.slice(1)}</button>`).join("")}</div><small>Applies to everyone in the household.</small></div>`;
 };
 
-const welcomeBox = () => `<div class="welcome"><h3>Start your budget</h3><p>Nothing has been saved here yet. Fill in the tinted fields to begin, or bring in the numbers from a file you saved from an earlier version.</p><button class="btn soft" type="button" data-act="import">Import a saved file</button></div>`;
+const welcomeBox = () => `<div class="welcome"><h3>Start your budget</h3><p>Nothing has been saved here yet. Fill in the tinted fields to begin, use the setup guide, or bring in a file you saved earlier.</p><button class="btn primary" type="button" data-act="setup">Use the setup guide</button> <button class="btn soft" type="button" data-act="import">Import a saved file</button></div>`;
 
 export function render() {
   if (!VIEWS_BY_TAB[app.tab]) app.tab = "budget";
   applyUI();
+  if (app.setup) { renderBrand(); app.setup.render(); return; } // the setup guide has the page to itself
   app.C = compute(app.state, app.today);
   app.colours = accountColours(app.state);
   $("#tabs").innerHTML = TABS(app.state).map(([k, l]) => `<button class="tab" role="tab" type="button" data-tab="${k}" aria-selected="${k === app.tab}">${ICONS[k]}${esc(l)}<span class="mark" data-mark="${k}"></span></button>`).join("");
-  $("#app").innerHTML = (app.loaded && !app.hasData && app.canWrite ? welcomeBox() : "") + viewAsBar() + VIEWS_BY_TAB[app.tab].view();
+  const note = !app.canWrite && app.household ? `<div class="welcome ro-note"><h3>You’re viewing ${esc(app.household.name)}</h3><p>You can look around, but changes are switched off. An owner can make you an editor in Household settings.</p></div>` : "";
+  $("#app").innerHTML = note + (app.loaded && !app.hasData && app.canWrite ? welcomeBox() : "") + viewAsBar() + VIEWS_BY_TAB[app.tab].view();
   refresh();
   const ro = readOnly();
   document.body.classList.toggle("readonly", ro);

@@ -21,7 +21,8 @@ export const app = {
   today: startOfDay(new Date()),
   C: null,                       // the latest calculations (see model/calc.js)
   loaded: false, hasData: false, canWrite: true,
-  sb: null, session: null, household: null, members: [], meId: null,
+  sb: null, session: null, household: null, households: [], role: null, members: [], meId: null,
+  setup: null,                   // the setup guide, while it's showing (ui/onboarding.js)
   store: null,                   // saving + live updates (sync/store.js)
   // filled in by render.js so other modules can ask for a redraw without importing it
   render: () => {}, refresh: () => {},

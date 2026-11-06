@@ -34,12 +34,7 @@
 <main id="app"></main>
 <div class="pop" id="pop" hidden></div>
 <div class="tt" id="tt" role="tooltip"></div>
-<dialog id="hh" class="hh"><h3>Your household</h3><p id="hhLead"></p><ul class="hh-list" id="hhMembers"></ul>
-  <h3 style="font-size:.92rem;margin-bottom:8px">Invite someone</h3>
-  <form class="hh-form" id="hhForm"><input type="email" id="hhEmail" placeholder="their@email.com" autocomplete="email" required aria-label="Email to invite"><button class="btn primary" type="submit">Invite</button></form>
-  <p style="font-size:.8rem;margin:0 0 14px">They create an account with that exact email, confirm it, and join automatically when they sign in.</p>
-  <div class="msg" id="hhMsg"></div><ul class="hh-list" id="hhInvites"></ul>
-  <div class="acts"><button class="btn" type="button" id="hhSignOut">Sign out</button><button class="btn primary" type="button" id="hhClose">Done</button></div></dialog>
+<dialog id="sheet" class="sheet" aria-label="Settings"></dialog>
 <dialog id="dlg"><h3 id="dlgT"></h3><p id="dlgP"></p><div class="acts"><button class="btn" type="button" id="dlgNo">Keep it</button><button class="btn danger" type="button" id="dlgYes">Remove</button></div></dialog>
 <input type="file" id="importFile" accept=".html,.htm,.json" hidden>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
