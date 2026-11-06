@@ -80,13 +80,12 @@ Supabase joins sign-in methods into one account **only when the emails match and
 
 Invitations work the same way: they're accepted when someone signs in with **the email address they were invited at**. An Apple "Hide My Email" address won't match an invitation, so the inviter would need to invite that address instead.
 
-## Possible later improvement (not applied): make "create household" refuse duplicates in the database
+## The database refuses duplicate households too (applied)
 
-The app now never makes a second household by accident:
-- It reacts to one tap at a time.
-- It checks for an existing household before creating one.
-- If an answer is lost, it checks again instead of re-sending.
+The app never makes a second household by accident: one tap at a time, a check for an existing household first, and if an answer is lost it checks again rather than re-sending. The database now guards this as well (migration `20261111000800_create_household_once.sql`, applied with the owner's OK):
 
-But the database itself would still accept two quick requests from two different browser tabs at the same moment. A small change to `create_household` would close that gap: "if you already created a household in the last 2 minutes, return that one instead of making another".
+- Requests from the same person are handled one at a time, even from two browser tabs.
+- The same household name again within 2 minutes returns the household just made instead of creating another.
+- A different name, or the same name later, makes a new household as before.
 
-This is a database change, so it hasn't been made. Say the word and I'll prepare it with tests for your OK.
+Tests: `tests/sql/households.test.js`.
