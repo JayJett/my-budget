@@ -63,6 +63,23 @@ There's **no build step**. GitHub Pages serves these files exactly as they are.
   recorded from the old screen with a fixed date, for six situations (under, over, exactly on budget,
   no budget, no expenses, and the full test budget).
 
+### Net worth tab (UI phase 3)
+
+- A net worth card first (net worth, assets, what's owed, and a bar of what you own by type), then
+  "Goal money in savings" (in savings / for goals / not earmarked). Goal money is a slice of the savings
+  balance, never added on top of it. Then when balances were last reviewed, then the accounts.
+- Accounts are grouped on screen as Cash (Operating + Savings), Investments and super, and Debt. That's
+  only a heading: each account keeps its stored type, order and id. Tapping one opens the account sheet
+  (the same `data-l="nw"` boxes as before): balance first, then name, type, and for savings accounts how
+  much goals have earmarked and which goals they are.
+- Goals still find their account by its name. Renaming an account in the sheet updates those goals, as
+  before. Deleting an account that goals use says which goals; they keep their saved amounts and you
+  pick another account for them on the Goals tab. Nothing is deleted with the account.
+- Account type colours are `--nw-op`, `--nw-sav`, `--nw-inv`, `--nw-sup` and `--nw-debt`; they never
+  follow the accent.
+- `tests/browser/networth-ui.test.js` checks every figure against `tests/browser/nwgoals-baseline.json`,
+  recorded from the old screen with a fixed date (the same file holds the Goals tab's figures).
+
 ## How saving works
 
 The whole budget lives in one row (`budgets.state`), but the app never overwrites it. Each edit is

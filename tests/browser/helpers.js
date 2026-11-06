@@ -103,3 +103,9 @@ export async function setExpense(page, id, field, value) {
   await setField(page, `#sheet [data-l="sp"][data-i="${id}"][data-f="${field}"]`, value);
   await closeSheet(page);
 }
+
+/* Net worth tab (UI phase 3): accounts are edited in a sheet. */
+export async function editNetWorth(page, id) {
+  await page.click(`[data-edit-nw="${id}"]`);
+  await page.waitForSelector(`#sheet .bsheet [data-l="nw"][data-i="${id}"][data-f="balance"]`);
+}

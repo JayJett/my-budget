@@ -10,6 +10,7 @@
   --c-slate:#4A6574; --c-slate-tint:#EEF3F5; --c-slate-edge:#C5D3DA;
   --joint:#2C846B; --invest:#7A5AB0;
   --cat-fixed:#3E5A63; --cat-flex:var(--joint); --cat-sink:var(--invest);   /* expense types (never the accent) */
+  --nw-op:var(--c-blue); --nw-sav:var(--joint); --nw-inv:var(--invest); --nw-sup:var(--c-gold); --nw-debt:var(--c-coral);   /* account types (never the accent) */
   --ok:#2E7A4B; --ok-soft:#E3F2E8; --warn:#A8650F; --warn-soft:#FBEEDA; --bad:#BE3A2C; --bad-soft:#FBE5E1;
   --attn:#E2672C; --unalloc:#D7DCD2;
   --shadow:0 1px 2px rgba(31,38,34,.05);
@@ -1104,3 +1105,57 @@ textarea.bs-in{ resize:vertical; min-height:64px; font:inherit; font-size:16px; 
   .sp-head .amt{ font-size:1.85rem; }
   .bs-two{ grid-template-columns:1fr; }
 }
+
+/* ============ UI phase 3: Net worth ============ */
+.nw-page section{ margin-top:0; }
+.nw-side, .nw-main{ display:flex; flex-direction:column; gap:var(--sp-3); min-width:0; }
+.nw-page{ display:flex; flex-direction:column; gap:var(--sp-3); }
+.nw-head{ margin:6px 0 4px; }
+.nw-head .amt{ font:700 var(--fs-hero)/1.05 var(--display); letter-spacing:-.03em; }
+.nw-head.neg .amt{ color:var(--bad); }
+.nw-ad{ display:flex; flex-wrap:wrap; gap:4px 18px; margin:0 0 12px; font-size:var(--fs-sm); color:var(--muted); }
+.nw-ad b{ color:var(--ink); font-weight:650; margin-left:4px; white-space:nowrap; }
+.nw-ad .dot{ display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; vertical-align:1px; }
+.nw-bar[hidden]{ display:none; }
+.nw-gm{ margin-top:14px; padding-top:12px; border-top:1px solid var(--line); }
+.nw-gm .sp-figs{ margin:8px 0 0; }
+.nw-over{ display:none; margin:8px 0 0; font-size:var(--fs-sm); color:var(--bad); background:var(--bad-soft); border-radius:12px; padding:10px 12px; }
+.nw-over.on{ display:block; }
+.nw-review{ padding:12px 14px; }
+.nw-rv-top{ display:flex; align-items:flex-start; gap:12px; }
+.nw-rv-ic{ width:34px; height:34px; border-radius:11px; flex:none; display:grid; place-items:center; color:var(--accent); background:var(--accent-soft); }
+.nw-rv-ic svg{ width:18px; height:18px; }
+.nw-rv-txt{ flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+.nw-rv-txt b{ font-weight:650; font-size:var(--fs-md); }
+.nw-rv-txt small{ color:var(--muted); font-size:var(--fs-xs); }
+.nw-rv-txt .chip{ margin-top:4px; }
+.nw-rv-act{ display:flex; align-items:flex-start; flex-wrap:wrap; gap:4px 14px; margin-top:10px; padding-left:46px; }
+.nw-rv-act .btn{ min-height:40px; }
+.nw-rv-date{ margin-top:0; }
+.nw-rv-date summary{ min-height:40px; }
+.nw-rv-date input{ max-width:220px; margin-bottom:4px; }
+.ex-amt.owed{ color:var(--nw-debt); }
+.ex-prog.nw-em span{ background:var(--nw-sav); }
+.ex-prog.nw-em.over span{ background:var(--bad); }
+.seg-radio.wrap{ flex-wrap:wrap; }
+.seg-radio.wrap label{ flex:1 1 30%; min-width:max-content; }
+.nw-em-figs{ display:flex; gap:10px; flex-wrap:wrap; }
+.nw-em-figs span{ flex:1 1 0; min-width:max-content; display:flex; flex-direction:column; }
+.nw-em-figs small{ color:var(--muted); font-size:var(--fs-xs); font-weight:600; }
+.nw-em-figs b{ font:650 1.05rem/1.25 var(--display); white-space:nowrap; }
+.nw-em-box .chip{ margin-top:2px; }
+.nw-em-box details.more{ margin-top:4px; }
+.unit.nw-bal{ justify-content:flex-start; min-height:52px; border-radius:12px; background:var(--surface-2); }
+.unit.nw-bal:focus-within{ background:var(--surface); }
+.unit.nw-bal i{ font:650 1.15rem var(--display); color:var(--muted); }
+.unit.nw-bal input{ width:100%; text-align:left; font:650 1.25rem/1.2 var(--display); }
+.nw-goals{ list-style:none; margin:0 0 6px; padding:0; }
+.nw-goals li{ display:flex; justify-content:space-between; gap:10px; padding:7px 0; font-size:var(--fs-sm); }
+.nw-goals li + li{ border-top:1px solid var(--line); }
+.nw-goals b{ font-weight:650; white-space:nowrap; }
+@media (min-width:1000px){
+  .nw-page{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.2fr); align-items:start; max-width:1180px; gap:var(--sp-4); }
+  .nw-side{ position:sticky; top:130px; }
+}
+@media (max-width:760px){ .nw-head .amt{ font-size:2.1rem; } }
+@media (max-width:360px){ .nw-head .amt{ font-size:1.85rem; } .nw-rv-act{ padding-left:0; } }
