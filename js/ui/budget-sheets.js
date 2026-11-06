@@ -163,7 +163,21 @@ export function openPersonSheet(id, { focusName } = {}) {
 }
 
 /* ---------- clicks ---------- */
+/* Focus goes back to the card or row that opened a sheet when it closes (the tab is redrawn, so the
+   original element is replaced): keyboard and screen-reader users carry on where they were. */
+const TRIGGERS = "[data-edit-acc], [data-edit-sp], [data-edit-nw], [data-edit-goal], [data-edit-person], [data-iv-edit]";
+let opener = null;
+function rememberOpener(el) {
+  const keys = ["data-edit-acc", "data-edit-sp", "data-edit-nw", "data-edit-goal", "data-edit-person", "data-iv-edit", "data-i"];
+  opener = keys.filter(k => el.hasAttribute(k)).map(k => `[${k}="${CSS.escape(el.getAttribute(k))}"]`).join("");
+}
+function restoreFocus() {
+  const sel = opener; opener = null; if (!sel) return;
+  requestAnimationFrame(() => { const a = document.activeElement; if (a && a !== document.body && !a.closest("#sheet")) return; const el = document.querySelector(sel); if (el) el.focus({ preventScroll: true }); });
+}
+
 export function initBudgetSheets() {
+  document.addEventListener("click", e => { const t = e.target.closest && e.target.closest(TRIGGERS); if (t && !t.disabled) rememberOpener(t); }, true);
   // After every full redraw: keep an open sheet in step (a new type, a new colour, a person removed…)
   app.beforeRefresh = () => { if (UI.sheet && isOurs()) draw(); else if (UI.sheet) UI.sheet = null; };
   // Closing a sheet redraws the tab, so names and labels typed in it show in the list too.
@@ -172,6 +186,7 @@ export function initBudgetSheets() {
   $("#sheet").addEventListener("close", () => {
     const was = UI.sheet, fresh = UI.fresh; UI.sheet = null; UI.fresh = null;
     if (!was || !app.household) return;
+    restoreFocus();
     if (fresh && fresh.id === was.id && !readOnly()) {
       const L = was.kind === "goal" ? list(was.l) : was.kind === "sp" ? app.state.spend : was.kind === "acc" ? app.state.accounts : was.kind === "nw" ? app.state.nw.accounts : null, i = L ? L.findIndex(x => x.id === fresh.id) : -1;
       const x = i >= 0 ? L[i] : null;

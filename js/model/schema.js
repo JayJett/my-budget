@@ -87,6 +87,8 @@ export function renamePerson(state, pid, name) {
 }
 
 /* ---------- a fresh budget ---------- */
+/** A new, empty budget for one person. (Phase 6: its starting accounts are named plainly, not "Joint …",
+    since there's only one person; existing budgets keep whatever names they have.) */
 export function blankBudget({ name = "" } = {}) {
   const me = makePerson({ name, colour: "blue", pos: 1 });
   const acc = (id, name, type, role, pos, owner = null) => ({ id, name, type, owner, role, split: {}, pos });
@@ -94,10 +96,10 @@ export function blankBudget({ name = "" } = {}) {
     version: VERSION, note: "", viewAs: "fortnight",
     people: [me],
     accounts: [
-      acc("js", "Joint Spending", "Joint", "spending", 1),
+      acc("js", "Spending", "Joint", "spending", 1),
       acc("ef", "Emergency Fund", "Joint", "emergency", 2),
-      acc("jg", "Joint Goals", "Joint", "goals", 3),
-      acc("ji", "Joint Investments", "Investment", "invest", 4),
+      acc("jg", "Goals", "Joint", "goals", 3),
+      acc("ji", "Investments", "Investment", "invest", 4),
       acc(uid(), personalGoalsName(name), "Personal", "personalGoals", 5, me.id),
     ],
     nw: { reviewed: "", accounts: [] },

@@ -220,12 +220,12 @@ export function issues(S, C) {
     const t = C.tot.pct[p.id];
     if (p.annual > 0 && !is100(t)) I.budget.push(`${possessive(p.name || "Someone")} allocation adds up to ${(t * 100).toFixed(1).replace(/\.0$/, "")}%, not 100%.`);
   });
-  if (C.reviewDue) I.networth.push("Balances haven’t been reviewed in over 30 days.");
+  if (C.reviewDue && S.nw.accounts.length) I.networth.push("Balances haven’t been reviewed in over 30 days."); // (phase 6) not before there are any accounts
   [...C.dup].forEach(k => { const a = S.nw.accounts.find(x => (x.name || "").trim().toLowerCase() === k); I.networth.push(`“${a.name}” is used for more than one account, so goals tagged to it count twice.`); });
   S.nw.accounts.forEach(a => { if (a.type === "Savings" && C.earmark[a.id] > n(a.balance) && n(a.balance) > 0) I.networth.push(`${a.name} is over-earmarked by ${m0(C.earmark[a.id] - n(a.balance))}.`); });
-  if (C.spBuffer < -0.01) I.spending.push(`Joint spending is ${money(C.v(-C.spBuffer))} ${w.per.replace("per ", "a ")} over the pool.`);
+  if (C.spBuffer < -0.01) I.spending.push(`${C.multi ? "Joint spending" : "Spending"} is ${money(C.v(-C.spBuffer))} ${w.per.replace("per ", "a ")} over budget.`); // wording only (phase 6): "Joint" only when it is
   C.sp.forEach(s => { if (s.sink && s.sink.behind) I.spending.push(`${s.name} is behind by ${m0(s.sink.behind)}. Put aside ${money(s.sink.need)}${w.short} to be ready by ${monthYear(s.sink.next)}.`); });
-  if (n(S.goals.ef.saved) > 0 && C.mCommitted > 0 && n(S.goals.ef.saved) / C.mCommitted < 3) I.goals.push("The emergency fund covers less than 3 months of committed joint costs.");
+  if (n(S.goals.ef.saved) > 0 && C.mCommitted > 0 && n(S.goals.ef.saved) / C.mCommitted < 3) I.goals.push(`The emergency fund covers less than 3 months of committed ${C.multi ? "joint " : ""}costs.`);
   const chk = (list, A, label) => {
     list.forEach((g, i) => {
       const st = goalStatus(g, A.eff[i], false, C.today, C.view);
@@ -234,7 +234,7 @@ export function issues(S, C) {
     });
     if (A.spare > 0.01) I.goals.push(`${money(C.v(A.spare))}${w.short} of ${label} isn’t going to any goal, because every goal is finished.`);
   };
-  chk(S.goals.joint, C.gj, "the joint goals fund");
+  chk(S.goals.joint, C.gj, C.multi ? "the joint goals fund" : "the goals fund");
   C.people.forEach(p => chk(S.goals.personal[p.id] || [], C.gp[p.id], `${possessive(p.name || "Someone")} goals pool`));
   const efSt = goalStatus(S.goals.ef, C.pool.emergency, true, C.today, C.view);
   if (efSt.c === "bad") I.goals.push(`Emergency fund: ${efSt.t.toLowerCase()}.`);

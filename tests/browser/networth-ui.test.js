@@ -142,7 +142,7 @@ test("no accounts: a friendly empty state with one way to add, and no empty brea
   assert.equal(await page.locator(".sp-empty [data-nw-new]").count(), 1);
   assert.equal(await page.locator(".nw-gm, .ex-group").count(), 0);
   assert.equal(await page.isVisible("#nwBar"), false);
-  assert.equal(await text(page, "nw.rev.when"), "Not reviewed yet");
+  assert.equal(await page.locator(".nw-review").count(), 0, "no 'review your balances' before there are any");
   assert.doesNotMatch(await page.textContent("#app"), /NaN|Infinity|undefined/);
   await goTab(page, "goals"); await goTab(page, "invest");
   assert.deepEqual(errors, []); await ctx.close();

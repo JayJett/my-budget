@@ -152,6 +152,8 @@ async function loadHouseholds() {
 async function openHH(id) {
   if (app.store) { await app.store.stop(); app.store = null; }
   endSetup();
+  // Forget the last household's history views straight away, so nothing from it can show while this one loads
+  app.snapshots = null; app.compareId = null; app.pgSel = null; app.snapshotsOffline = false;
   const hh = app.households.find(h => h.id === id) || app.households[0];
   app.household = { id: hh.id, name: hh.name };
   app.role = hh.role;
@@ -163,6 +165,7 @@ async function openHH(id) {
     getState: () => app.state,
     setState: s => { app.state = s; },
     onStatus: (st, info) => {
+      app.saveStatus = st;
       if (st === "saving") setStatus("Saving…", "wait");
       else if (st === "saved") showSaved(info);
       else if (st === "offline") setStatus("Offline", "offline", "You’re offline. Changes are kept on this phone and will sync when you’re back online.");
@@ -237,6 +240,7 @@ function teardown() {
   endSetup();
   app.household = null; app.households = []; app.members = []; app.meId = null; app.hasData = false; app.loaded = false; app.role = null;
   resetUndo(); resetReminders();
+  app.snapshots = null; app.compareId = null; app.pgSel = null; // nothing of the last person's history stays in memory
   app.state = blankBudget();
   $("#app").innerHTML = ""; showConn(""); closePop();
   const d = $("#sheet"); if (d.open) d.close();

@@ -141,6 +141,12 @@ There's **no build step**. GitHub Pages serves these files exactly as they are.
   colour would blur that), and a personal "show amounts per" default (that setting belongs to the
   household's budget, so changing it per person would change it for everyone).
 
+### Phase 6 audit
+
+The closing audit's findings, fixes and remaining items are in `docs/phase6-audit.md`. Regression tests:
+`tests/phase6.test.js`, `tests/browser/phase6-ui.test.js`, and the status and people colour contrast test in
+`tests/accent.test.js`.
+
 ## How saving works
 
 The whole budget lives in one row (`budgets.state`), but the app never overwrites it. Each edit is

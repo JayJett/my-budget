@@ -37,3 +37,15 @@ test("accents never touch member, status or chart colours", () => {
   assert.ok(blocks.length >= 18);
   for (const b of blocks) assert.deepEqual(Object.keys(vars(b)).sort(), ["accent", "accent-hover", "accent-soft", "on-accent"]);
 });
+
+test("status and people's colours are readable too (phase 6 audit: warning chips and the gold person colour)", () => {
+  for (const [mode, b] of Object.entries(base)) {
+    assert.ok(ratio(b.warn, b["warn-soft"]) >= 4.5, `${mode}: warning text on its chip is ${ratio(b.warn, b["warn-soft"]).toFixed(2)}:1`);
+    assert.ok(ratio(b.bad, b["bad-soft"]) >= 4.5, `${mode}: problem text on its chip is ${ratio(b.bad, b["bad-soft"]).toFixed(2)}:1`);
+    assert.ok(ratio(b.ok, b["ok-soft"]) >= 4.5, `${mode}: good-news text on its chip is ${ratio(b.ok, b["ok-soft"]).toFixed(2)}:1`);
+    for (const c of ["blue", "gold", "coral", "rose", "slate"]) {
+      assert.ok(ratio(b[`c-${c}`], b.surface) >= 4.5, `${mode}: ${c} person colour on cards is ${ratio(b[`c-${c}`], b.surface).toFixed(2)}:1`);
+      assert.ok(ratio(b[`c-${c}`], b[`c-${c}-tint`]) >= 4.5, `${mode}: ${c} on its tint is ${ratio(b[`c-${c}`], b[`c-${c}-tint`]).toFixed(2)}:1`);
+    }
+  }
+});
