@@ -74,7 +74,7 @@ export function initEvents() {
 
   document.addEventListener("click", async e => {
     const pop = $("#pop"), path = e.composedPath();
-    if (!path.includes(pop) && !e.target.closest("#menuBtn") && !e.target.closest("[data-fill]")) closePop();
+    if (!path.includes(pop) && !e.target.closest("#menuBtn") && !e.target.closest("[data-fill]") && !e.target.closest('[data-goal-new="pick"]')) closePop();
     if (path.includes(pop)) return;
     const tb = e.target.closest("[data-tab]");
     if (tb) { const h = TAB_HASH[tb.dataset.tab]; if (location.hash !== "#" + h) location.hash = h; else { app.tab = tb.dataset.tab; render(); } window.scrollTo({ top: 0 }); return; }

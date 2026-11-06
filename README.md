@@ -80,6 +80,26 @@ There's **no build step**. GitHub Pages serves these files exactly as they are.
 - `tests/browser/networth-ui.test.js` checks every figure against `tests/browser/nwgoals-baseline.json`,
   recorded from the old screen with a fixed date (the same file holds the Goals tab's figures).
 
+### Goals tab (UI phase 3)
+
+- A summary card first: how much is saved across goals (each goal's Saved amount, never the plan), the
+  total of the targets, and what's going to each fund each period (from the Budget tab).
+- Then the emergency fund, the joint goals (just "Goals" for one person) and each person's goals, as
+  cards: saved of target, a progress bar, what's going to it each period and its estimate or status.
+  A person's section only shows when they have goals or money going to their goals pool; "+ Add goal"
+  can add to any list. Reached goals say "Reached" (not just a colour) and where their share went.
+- Tapping a card opens the goal sheet (the same `data-l="ef" / "gj" / "gp:<id>"` boxes as before):
+  name, target, saved, the account it's kept in (linking only; no money moves), each person's % (joint)
+  or the % of the pool (personal), and the deadline. The emergency fund has no name box, % or delete;
+  its share comes from the Budget tab, and its sheet keeps the months-of-cover message and the
+  3- and 6-month suggested targets.
+- Priority: "Reorder" swaps the cards for a numbered list with up/down buttons. Finished goals still pass
+  their share down exactly as calc.js `allocGoals` decides.
+- Goal icons are the goal's first letter (the emergency fund has a shield). Custom icons would need a new
+  field on goals, so they're left for the personalisation phase.
+- `tests/browser/goals-ui.test.js` checks every figure against `tests/browser/nwgoals-baseline.json`, plus
+  edge cases, editing, add/cancel/delete, reorder, cross-tab effects, widths and viewers.
+
 ## How saving works
 
 The whole budget lives in one row (`budgets.state`), but the app never overwrites it. Each edit is
