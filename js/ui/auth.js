@@ -10,6 +10,7 @@ import { rememberChange, resetUndo, updateUndo, historyNoticeRemote } from "./hi
 import { loadReminders, resetReminders, openFromHash } from "./reminders.js";
 import { disablePush } from "./push.js";
 import { useAccentOf, resetAccent } from "./accent.js";
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "../config.js";
 
 const here = () => location.origin + location.pathname;
 const brand = `<div class="auth-brand"><div class="logo" aria-hidden="true">$</div><div class="brand">My Budget<small>Plan where every dollar goes, together</small></div></div>`;
@@ -36,6 +37,54 @@ function saveOfflineProfile() {
   try { localStorage.setItem(OFFLINE, JSON.stringify({ user: { id: u.id, email: u.email, user_metadata: u.user_metadata || {} }, households: app.households, members })); } catch (_) {}
 }
 const lastHHKey = () => `mb-household-${app.meId}`;
+
+/* ---------- small helpers (Phase 7A) ---------- */
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+/** Give up waiting after `ms` (the request may still finish: callers check before doing anything twice). */
+const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(Object.assign(new Error("Timed out"), { timeout: true })), ms))]);
+/** The sign-in itself is no longer valid (expired, revoked, or the database didn't see one). */
+const isAuthError = e => !!e && (e.status === 401 || /jwt|not signed in|refresh token|session (has )?expired|invalid claim/i.test((e.message || "") + " " + (e.code || "")));
+
+/* ---------- "check your email" in progress: remembered on this device, so a refresh doesn't lose it ----------
+   Only the email address and which kind of code it is (never a code or a token). Cleared once you're signed in. */
+const PENDING = "mb-verify";
+const DAY_MS = 864e5;
+function pending() { try { const p = JSON.parse(localStorage.getItem(PENDING) || "null"); return p && p.email && Date.now() - p.at < DAY_MS ? p : null; } catch (_) { return null; } }
+function setPending(p) { try { localStorage.setItem(PENDING, JSON.stringify({ ...pending(), ...p, at: (pending() && pending().at) || Date.now() })); } catch (_) {} }
+function startPending(email, kind) { try { localStorage.setItem(PENDING, JSON.stringify({ email, kind, at: Date.now() })); } catch (_) {} }
+function clearPending() { try { localStorage.removeItem(PENDING); } catch (_) {} }
+
+/* ---------- Google / Apple: only shown when this Supabase project has them switched on ----------
+   The project's public auth settings say which providers are enabled, so a button never appears
+   for a provider that would just fail. Nothing secret is involved. */
+const PROVIDERS = { google: "Google", apple: "Apple" };
+let providers = []; // e.g. ["apple", "google"], once known
+async function loadProviders() {
+  try {
+    const r = await withTimeout(fetch(`${SUPABASE_URL.trim().replace(/\/$/, "")}/auth/v1/settings`, { headers: { apikey: SUPABASE_ANON_KEY.trim() } }), 8000);
+    if (!r.ok) return;
+    const ext = (await r.json()).external || {};
+    providers = Object.keys(PROVIDERS).filter(k => ext[k] === true).sort();
+    const shown = $("#auth"); if (!shown.hidden && shown.querySelector("[data-oauth-slot]")) shown.querySelector("[data-oauth-slot]").outerHTML = oauthButtons();
+  } catch (_) { /* unknown: show no provider buttons */ }
+}
+const ICON = {
+  apple: '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M11.2 8.5c0-1.6 1.3-2.3 1.4-2.4-.8-1.1-1.9-1.3-2.3-1.3-1-.1-1.9.6-2.4.6-.5 0-1.3-.6-2.1-.5-1.1 0-2.1.6-2.6 1.6-1.1 2-.3 4.9.8 6.5.5.8 1.2 1.6 2 1.6s1.1-.5 2.1-.5 1.2.5 2.1.5c.9 0 1.4-.8 1.9-1.6.6-.9.8-1.7.8-1.8 0 0-1.6-.6-1.7-2.7zM9.6 3.6c.4-.5.7-1.2.6-1.9-.6 0-1.4.4-1.8.9-.4.4-.7 1.1-.6 1.8.7.1 1.4-.3 1.8-.8z"/></svg>',
+  google: '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="#4285F4" d="M15.4 8.2c0-.5 0-1-.1-1.5H8v2.8h4.2c-.2 1-.7 1.8-1.5 2.3v1.9h2.4c1.4-1.3 2.3-3.2 2.3-5.5z"/><path fill="#34A853" d="M8 15.6c2 0 3.7-.7 5-1.8l-2.4-1.9c-.7.5-1.5.7-2.6.7-2 0-3.6-1.3-4.2-3.1H1.3v1.9C2.5 13.9 5 15.6 8 15.6z"/><path fill="#FBBC05" d="M3.8 9.5c-.3-.9-.3-1.9 0-2.8V4.8H1.3a7.6 7.6 0 0 0 0 6.6z"/><path fill="#EA4335" d="M8 3.4c1.1 0 2.1.4 2.9 1.1l2.1-2.1A7.3 7.3 0 0 0 1.3 4.8l2.5 1.9C4.4 4.8 6 3.4 8 3.4z"/></svg>',
+};
+const oauthButtons = () => `<div class="auth-alt" data-oauth-slot>${providers.length ? `<div class="auth-or"><span>or</span></div>${providers.map(p => `<button class="btn block oauth" type="button" data-oauth="${p}">${ICON[p]}Continue with ${PROVIDERS[p]}</button>`).join("")}` : ""}</div>`;
+
+/* ---------- coming back from an email link or Google/Apple with an error ---------- */
+function callbackError() {
+  const raw = (location.hash || "").replace(/^#/, "") + "&" + (location.search || "").replace(/^\?/, "");
+  const q = new URLSearchParams(raw), code = q.get("error_code") || q.get("error");
+  if (!code) return null;
+  // Remove it from the address bar (and any other sign-in leftovers), keeping only the app's own address
+  try { history.replaceState(null, "", location.pathname); } catch (_) {}
+  if (/otp_expired|expired/i.test(code + (q.get("error_description") || ""))) return "That link has expired or was already used. If you opened it before, your email is confirmed: sign in. Otherwise request a new code.";
+  if (/access_denied/i.test(code)) return "Sign-in was cancelled. Choose how you’d like to sign in.";
+  return "That sign-in didn’t work. Please try again.";
+}
 
 /* ---------- save status in the header ---------- */
 function setStatus(text, cls, tip) {
@@ -83,18 +132,36 @@ export function showAuth(mode, msg, kind) {
     <div class="who-chip"><span>${esc(me.email)}</span><button class="linkish" type="button" data-auth="notme">Not ${me.name ? esc(me.name) : "you"}?</button></div>
     <label class="field"><span>Password</span><input type="password" name="password" autocomplete="current-password" required></label>
     <input type="text" name="username" value="${esc(me.email)}" autocomplete="username" hidden>
-    <button class="btn primary block" type="submit">Sign in</button></form>
-    <div class="auth-foot"><button class="linkish" type="button" data-auth="forgot">Forgot your password?</button></div>`;
+    <button class="btn primary block" type="submit">Sign in</button></form>${oauthButtons()}
+    <div class="auth-foot"><button class="linkish" type="button" data-auth="forgot">Forgot your password?</button><button class="linkish" type="button" data-auth="codein">Email me a sign-in code instead</button></div>`;
   else if (mode === "signin") body = `<h2>Welcome</h2><p class="lead">Sign in to see your budget.</p>${tabs}${m}
     <form id="fSignin"><label class="field"><span>Email</span><input type="email" name="email" autocomplete="email" required></label>
     <label class="field"><span>Password</span><input type="password" name="password" autocomplete="current-password" required></label>
-    <button class="btn primary block" type="submit">Sign in</button></form>
-    <div class="auth-foot"><button class="linkish" type="button" data-auth="forgot">Forgot your password?</button></div>`;
+    <button class="btn primary block" type="submit">Sign in</button></form>${oauthButtons()}
+    <div class="auth-foot"><button class="linkish" type="button" data-auth="forgot">Forgot your password?</button><button class="linkish" type="button" data-auth="codein">Email me a sign-in code instead</button></div>`;
   else if (mode === "signup") body = `<h2>Create your account</h2><p class="lead">One account each. You can share a budget once you’re in the same household.</p>${tabs}${m}
     <form id="fSignup"><label class="field"><span>Your first name</span><input type="text" name="name" autocomplete="given-name" required></label>
     <label class="field"><span>Email</span><input type="email" name="email" autocomplete="email" required></label>
     <label class="field"><span>Password</span><input type="password" name="password" autocomplete="new-password" minlength="8" required><small>At least 8 characters.</small></label>
-    <button class="btn primary block" type="submit">Create account</button></form>`;
+    <button class="btn primary block" type="submit">Create account</button></form>${oauthButtons()}`;
+  else if (mode === "codein") body = `<h2>Sign in with a code</h2><p class="lead">We’ll email you a code. No password needed.</p>${m}
+    <form id="fCodeIn"><label class="field"><span>Email</span><input type="email" name="email" autocomplete="email" inputmode="email" value="${esc((pending() && pending().email) || (me && me.email) || "")}" required></label>
+    <button class="btn primary block" type="submit">Email me a code</button></form>
+    <div class="auth-foot"><button class="linkish" type="button" data-auth="signin">Sign in with a password</button></div>`;
+  else if (mode === "verify") {
+    const p = pending() || {}, wait = Math.max(0, Math.ceil(((p.until || 0) - Date.now()) / 1000));
+    body = `<h2>Check your email</h2><p class="lead">We sent an email to <b>${esc(p.email || "")}</b>. Enter the code from it here, or open the link in it. It can take a minute to arrive.</p>${m}
+    <form id="fVerify" novalidate><label class="field"><span>Code from the email</span>
+      <input class="otp" type="text" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="10" required aria-describedby="otpHelp" spellcheck="false"></label>
+      <small class="field-help" id="otpHelp">Numbers only. You can paste the whole code.</small>
+      <button class="btn primary block" type="submit">Verify</button></form>
+    <div class="auth-foot"><button class="linkish" type="button" data-auth="resend"${wait ? " disabled" : ""}>${wait ? `Send a new code (${wait}s)` : "Send a new code"}</button>
+      <button class="linkish" type="button" data-auth="${p.kind === "email" ? "codein" : "signup"}" data-forget="1">Use a different email</button>
+      <button class="linkish" type="button" data-auth="signin" data-forget="1">${p.kind === "signup" ? "Already confirmed? Sign in" : "Back to sign in"}</button></div>`;
+  }
+  else if (mode === "loadfail") body = `<h2>Something went wrong</h2>${m}
+    <button class="btn primary block" type="button" data-auth="recheck">Try again</button>
+    <div class="auth-foot"><button class="linkish" type="button" data-auth="signout">Sign out</button></div>`;
   else if (mode === "forgot") body = `<h2>Reset your password</h2><p class="lead">We’ll email you a link to choose a new one.</p>${m}
     <form id="fForgot"><label class="field"><span>Email</span><input type="email" name="email" autocomplete="email" value="${esc((me && me.email) || "")}" required></label>
     <button class="btn primary block" type="submit">Send reset link</button></form>
@@ -105,7 +172,8 @@ export function showAuth(mode, msg, kind) {
     <button class="btn primary block" type="submit">Save password</button></form>`;
   else if (mode === "household") {
     const email = app.session ? app.session.user.email : "";
-    const nm = (app.session && app.session.user.user_metadata && app.session.user.user_metadata.name) || "";
+    const md = (app.session && app.session.user.user_metadata) || {};
+    const nm = md.name || (md.full_name || "").trim().split(/\s+/)[0] || ""; // Google/Apple may give a full name, or none at all
     body = `<h2>Welcome${nm ? ", " + esc(nm) : ""}!</h2><p class="lead">A household holds one budget. Give yours a name, and we’ll help you set it up.</p>${m}
     <form id="fHousehold"><label class="field"><span>Household name</span><input type="text" name="name" value="${esc(nm ? nm + "’s budget" : "Our budget")}" required></label>
     <button class="btn primary block" type="submit">Create household</button></form>
@@ -114,6 +182,7 @@ export function showAuth(mode, msg, kind) {
   else if (mode === "loading") body = `<p class="lead" style="margin:0">Loading…</p>`;
   el.innerHTML = `<div class="auth-card">${brand}${body}</div>`;
   const first = el.querySelector('form input:not([type="hidden"]):not([hidden])'); if (first) first.focus();
+  if (mode === "verify") tickResend(); // a wait from an earlier "send a new code" carries on after a refresh
 }
 const authMsg = (text, kind) => { const m = $("#authMsg"); if (m) { m.className = "msg " + (kind || "err"); m.textContent = text; } };
 export function friendly(err) {
@@ -124,6 +193,10 @@ export function friendly(err) {
   if (/rate limit|too many/i.test(t)) return "Too many attempts for now. Wait a few minutes and try again.";
   if (/failed to fetch|network/i.test(t)) return "Can’t reach the server. Check your connection and try again.";
   if (/should be different from the old/i.test(t)) return "That’s your current password. Choose a different one.";
+  if (/token has expired|otp_expired|invalid.*(otp|token)|token.*invalid/i.test(t)) return "That code didn’t work, or it has expired. Check it, or request a new one.";
+  if (/after \d+ seconds?/i.test(t)) return "Please wait a moment before asking for another code.";
+  if (isAuthError(err)) return "Your session has expired. Please sign in again.";
+  if (/provider is not enabled|unsupported provider/i.test(t)) return "That way of signing in isn’t available right now. Use your email instead.";
   return t;
 }
 async function busy(form, fn) {
@@ -207,10 +280,13 @@ async function openHH(id) {
 /** Re-read which households you're in (after creating, leaving or being removed), then open one. */
 async function reloadHouseholds(preferId) {
   const list = await loadHouseholds();
-  if (!list.length) { teardown(); showAuth("household"); return; }
+  if (!list.length) { closeHousehold(); showAuth("household"); return; }
+  await openHH(pickHousehold(list, preferId));
+}
+/** Which household to open: the one asked for, else the one open now, else the last one used here, else the first. */
+function pickHousehold(list, preferId) {
   let last = null; try { last = localStorage.getItem(lastHHKey()); } catch (_) {}
-  const pick = [preferId, app.household && app.household.id, last].find(id => id && list.some(h => h.id === id)) || list[0].id;
-  await openHH(pick);
+  return [preferId, app.household && app.household.id, last].find(id => id && list.some(h => h.id === id)) || list[0].id;
 }
 
 async function switchHousehold(id) {
@@ -230,21 +306,32 @@ async function enterApp() {
     await sb.rpc("sync_my_profile"); // keep your name/email current in every household (harmless if it fails)
     rememberMe();
     if (recovering) { showAuth("newpass"); return; }
+    clearPending(); // signed in: any "check your email" step is done
     await reloadHouseholds();
-  } catch (e) { showAuth("signin", friendly(e)); }
+  } catch (e) {
+    if (isAuthError(e)) showAuth("signin", "Your session has expired. Please sign in again.");
+    else showAuth("loadfail", isNetworkError(e) ? "We couldn’t connect. Check your connection and try again." : "We couldn’t load your household. Try again.");
+  }
   finally { entering = false; }
 }
 
-function teardown() {
+/** Close whatever household is open (its budget, history, reminders), but stay signed in.
+    Phase 7A fix: this used to also forget who you are (app.meId), so a brand-new person on the
+    "Create household" screen had no id: after creating a household the app looked for "households
+    belonging to nobody", found none, and showed the same screen again (and a second tap made a
+    second household). Only signing out forgets who you are now. */
+function closeHousehold() {
   if (app.store) { app.store.stop(); app.store = null; }
   endSetup();
-  app.household = null; app.households = []; app.members = []; app.meId = null; app.hasData = false; app.loaded = false; app.role = null;
+  app.household = null; app.households = []; app.members = []; app.hasData = false; app.loaded = false; app.role = null;
   resetUndo(); resetReminders();
   app.snapshots = null; app.compareId = null; app.pgSel = null; // nothing of the last person's history stays in memory
   app.state = blankBudget();
   $("#app").innerHTML = ""; showConn(""); closePop();
   const d = $("#sheet"); if (d.open) d.close();
 }
+/** Signing out: close the household and forget who was signed in. */
+function teardown() { closeHousehold(); app.meId = null; }
 export async function signOut() {
   if (app.store) await app.store.flushNow();
   if (app.store && app.store.hasUnsaved() && !confirm("Some changes haven’t reached the server yet (you may be offline). Sign out anyway and lose them?")) return;
@@ -253,6 +340,102 @@ export async function signOut() {
   clearDeviceCopies();
   await disablePush(); // this device stops getting your notifications
   await app.sb.auth.signOut();
+}
+
+/* ---------- creating your first household (Phase 7A) ----------
+   One tap, one household. Before creating, it checks whether you already have one (an earlier tap may
+   have worked even though we never heard back), and after creating it confirms the household is really
+   there and opens it. Every path ends in the setup guide or a clear message: never an endless spinner.
+   create_household() makes the household, your owner membership and its empty budget in one database
+   transaction, so there's never half a household. */
+let creating = false;
+async function loadHouseholdsWithin(ms) { return withTimeout(loadHouseholds(), ms); }
+/** Look for your household(s) and open one. true if one was opened. */
+async function openIfAny(preferId, tries = 3) {
+  for (let i = 0; i < tries; i++) {
+    try {
+      const list = await loadHouseholdsWithin(15000);
+      if (list.length) { await openHH(pickHousehold(list, preferId)); return true; }
+    } catch (e) { if (isAuthError(e)) throw e; }
+    if (i < tries - 1) await sleep(700 * (i + 1));
+  }
+  return false;
+}
+async function createHousehold(form, name) {
+  if (creating) return;
+  creating = true;
+  const b = form.querySelector('button[type="submit"]'), label = b.textContent;
+  b.disabled = true; b.textContent = "Creating your household…"; authMsg("", "info");
+  try {
+    if (await openIfAny(null, 1)) return; // already have one: open it, don't make another
+    let res;
+    try { res = await withTimeout(app.sb.rpc("create_household", { p_name: name }), 20000); } catch (e) { res = { error: e }; }
+    if (res.error) {
+      if (isAuthError(res.error)) { showAuth("signin", "Your session has expired. Please sign in again."); return; }
+      if (res.error.timeout || isNetworkError(res.error)) {
+        authMsg("Checking whether your household was created…", "info");
+        if (await openIfAny(null)) return;
+        authMsg("We couldn’t reach the server, so your household may not have been created. Check your connection, then tap Create household again.");
+        return;
+      }
+      authMsg(friendly(res.error)); return;
+    }
+    if (await openIfAny(res.data)) return; // created, and it's there: on to the setup guide
+    authMsg("Your household was created, but we couldn’t open it yet. Tap “check again” below.");
+  } catch (e) {
+    if (isAuthError(e)) showAuth("signin", "Your session has expired. Please sign in again.");
+    else authMsg("We couldn’t finish setting up your household. Please try again.");
+  } finally {
+    creating = false;
+    if (b.isConnected) { b.disabled = false; b.textContent = label; }
+  }
+}
+
+/* ---------- email codes (Phase 7A) ----------
+   kind "signup": confirming a new account (the same email also has a link).
+   kind "email": signing in with a code instead of a password (existing accounts only).
+   Supabase checks the code; we only move on once it has signed you in. */
+let verifying = false;
+async function verifyCode(form, token) {
+  const p = pending(); if (!p) { showAuth("signin"); return; }
+  if (verifying) return;
+  if (token.length < 6) { authMsg("Enter the whole code from the email."); return; }
+  verifying = true;
+  const b = form.querySelector('button[type="submit"]'); b.disabled = true; b.textContent = "Checking…";
+  try {
+    const { data, error } = await withTimeout(app.sb.auth.verifyOtp({ email: p.email, token, type: p.kind === "email" ? "email" : "signup" }), 20000);
+    if (error) {
+      authMsg(p.kind === "signup" && /expired|invalid/i.test(error.message || "") ? friendly(error) + " If you already opened the link in the email, your email is confirmed: sign in instead." : friendly(error));
+      const inp = form.querySelector(".otp"); if (inp) { inp.select(); }
+      return;
+    }
+    if (data && data.session) { clearPending(); showAuth("loading"); } // signed in: the app opens from here
+  } catch (e) { authMsg(e && e.timeout ? "We couldn’t connect. Check your connection and try again." : friendly(e)); }
+  finally { verifying = false; if (b.isConnected) { b.disabled = false; b.textContent = "Verify"; } }
+}
+/** Ask for another code. Any waiting time comes from Supabase's own limit, never a guess. */
+async function resendCode(btn) {
+  const p = pending(); if (!p || btn.disabled) return;
+  btn.disabled = true; btn.textContent = "Sending…";
+  const opts = { emailRedirectTo: here() };
+  const { error } = p.kind === "email"
+    ? await app.sb.auth.signInWithOtp({ email: p.email, options: { ...opts, shouldCreateUser: false } })
+    : await app.sb.auth.resend({ type: "signup", email: p.email, options: opts });
+  const wait = error && /after (\d+) seconds?/i.exec(error.message || "");
+  if (wait) setPending({ until: Date.now() + Number(wait[1]) * 1000 });
+  showAuth("verify", error && !(p.kind === "email" && /signups? not allowed|not found/i.test(error.message || "")) ? friendly(error) : "A new code is on its way. It can take a minute to arrive.", error && !/signups? not allowed|not found/i.test(error.message || "") ? "err" : "info");
+  if (wait) tickResend();
+}
+let tick = null;
+function tickResend() {
+  clearInterval(tick);
+  tick = setInterval(() => {
+    const p = pending(), b = document.querySelector('[data-auth="resend"]');
+    if (!p || !b) { clearInterval(tick); return; }
+    const left = Math.max(0, Math.ceil(((p.until || 0) - Date.now()) / 1000));
+    b.disabled = left > 0; b.textContent = left ? `Send a new code (${left}s)` : "Send a new code";
+    if (!left) clearInterval(tick);
+  }, 1000);
 }
 
 /** Opened with no connection and no usable sign-in: use the copy kept on this device. */
@@ -279,19 +462,42 @@ export function initAuth(sb) {
     if (f.id === "fSignup") await busy(f, async () => {
       const { data, error } = await sb.auth.signUp({ email: v.email.trim(), password: v.password, options: { data: { name: v.name.trim() }, emailRedirectTo: here() } });
       if (error) return authMsg(friendly(error));
-      if (!data.session) showAuth("check", `We’ve sent a confirmation link to ${v.email.trim()}. Open it on this device to finish creating your account.`);
+      if (!data.session) { startPending(v.email.trim(), "signup"); showAuth("verify"); }
     });
     if (f.id === "fForgot") await busy(f, async () => { const { error } = await sb.auth.resetPasswordForEmail(v.email.trim(), { redirectTo: here() }); if (error) return authMsg(friendly(error)); showAuth("check", `If there’s an account for ${v.email.trim()}, a reset link is on its way.`); });
     if (f.id === "fNewpass") await busy(f, async () => { const { error } = await sb.auth.updateUser({ password: v.password }); if (error) return authMsg(friendly(error)); recovering = false; toast("Password updated"); enterApp(); });
-    if (f.id === "fHousehold") await busy(f, async () => { const { data, error } = await sb.rpc("create_household", { p_name: v.name }); if (error) return authMsg(friendly(error)); await reloadHouseholds(data); });
+    if (f.id === "fHousehold") await createHousehold(f, v.name);
+    if (f.id === "fVerify") await verifyCode(f, (v.code || "").replace(/\D/g, ""));
+    if (f.id === "fCodeIn") await busy(f, async () => {
+      const email = v.email.trim();
+      const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: false, emailRedirectTo: here() } });
+      // Never say whether an account exists: "no such user" looks the same as success. Rate limits and connection problems are real, so say those.
+      if (error && (/rate limit|too many|after \d+ seconds|failed to fetch|network/i.test(error.message || ""))) return authMsg(friendly(error));
+      startPending(email, "email"); showAuth("verify", `If there’s an account for ${email}, a code is on its way.`, "info");
+    });
   });
   document.addEventListener("click", e => {
     const a = e.target.closest("[data-auth]"); if (!a) return;
     const m = a.dataset.auth;
+    if (a.dataset.forget) clearPending();
+    if (m === "resend") { resendCode(a); return; }
     if (m === "signout") signOut();
     else if (m === "recheck") enterApp();
     else if (m === "notme") { forgetMe(); showAuth("signin"); }
     else showAuth(m);
+  });
+  // Google / Apple: leaves for the provider and comes back here signed in (or with an error, handled on return)
+  document.addEventListener("click", async e => {
+    const b = e.target.closest("[data-oauth]"); if (!b || b.disabled) return;
+    b.disabled = true; const old = b.innerHTML; b.textContent = "Opening " + PROVIDERS[b.dataset.oauth] + "…";
+    const { error } = await sb.auth.signInWithOAuth({ provider: b.dataset.oauth, options: { redirectTo: here() } });
+    if (error) { b.disabled = false; b.innerHTML = old; authMsg(friendly(error)); }
+  });
+  // Pasting or auto-filling the whole code (iPhone offers it from Mail/Messages) verifies straight away
+  document.addEventListener("input", e => {
+    const el = e.target; if (!el.matches || !el.matches("#fVerify .otp")) return;
+    const digits = el.value.replace(/\D/g, "").slice(0, 10); if (digits !== el.value) el.value = digits;
+    if (digits.length >= 6 && e.inputType !== "insertText" && e.inputType !== "deleteContentBackward") el.form.requestSubmit();
   });
 
   window.addEventListener("offline", () => { if (app.household) showConn(OFFLINE_MSG); });
@@ -302,6 +508,8 @@ export function initAuth(sb) {
   });
 
   if (/type=recovery/.test(location.hash)) recovering = true;
+  const cbErr = callbackError();
+  loadProviders();
   showAuth("loading");
   sb.auth.onAuthStateChange((event, s) => {
     // Work is deferred so it never runs inside Supabase's own callback.
@@ -312,6 +520,8 @@ export function initAuth(sb) {
         if (event !== "INITIAL_SESSION") return;
         const prof = offlineProfile();
         if (navigator.onLine === false && prof) { enterOffline(prof); return; }
+        if (cbErr) { showAuth("signin", cbErr); return; }
+        if (pending()) { showAuth("verify"); return; } // refreshed (or came back) while waiting for the email code
         showAuth("signin"); return;
       }
       const wasSignedIn = !!app.session; app.session = s;

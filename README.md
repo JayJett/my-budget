@@ -147,6 +147,23 @@ The closing audit's findings, fixes and remaining items are in `docs/phase6-audi
 `tests/phase6.test.js`, `tests/browser/phase6-ui.test.js`, and the status and people colour contrast test in
 `tests/accent.test.js`.
 
+### Sign-in and first household (Phase 7A)
+
+- **Create household** now always ends somewhere clear:
+  - It reacts to one tap at a time.
+  - It checks for an existing household first (an earlier tap may have worked).
+  - It confirms the new one is there, then opens the setup guide.
+  - Requests that hang time out, a lost answer is checked rather than re-sent, and every outcome gets a plain message.
+  - Root cause of the stuck screen: closing the empty household view also forgot who was signed in (`app.meId`), so the app looked for "nobody's" households after creating one. `closeHousehold()` now keeps that; only `teardown()` (sign-out) clears it.
+- **Email codes**: after sign-up the app shows a code screen.
+  - It remembers the address on this device for 24h, so a refresh keeps the screen.
+  - You can paste or auto-fill the code.
+  - "Send a new code" follows Supabase's own wait.
+  - "Email me a sign-in code instead" signs existing accounts in with `shouldCreateUser: false`, and says the same thing whether or not the email has an account.
+- **Google / Apple** buttons appear only when the project's public auth settings say they're switched on.
+- **Returning from a link with an error** (expired or cancelled) shows a plain message and tidies the address bar.
+- Setup steps for the dashboards: `docs/auth-setup.md`. Tests: `tests/browser/auth-7a.test.js`.
+
 ## How saving works
 
 The whole budget lives in one row (`budgets.state`), but the app never overwrites it. Each edit is

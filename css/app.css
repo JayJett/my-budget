@@ -1438,3 +1438,19 @@ body.compact .sp-head .amt, body.compact .nw-head .amt{ font-size:2rem; }
 details.help summary, details.more summary, .iv-years summary, .ico-box summary{ min-height:44px; }
 #sheet .sheet-head .btn, #sheet .sheet-head .btn.icon{ min-height:44px; min-width:44px; }
 .note-input{ font-size:16px; }   /* under 16px, iPhone and iPad Safari zoom the page when you tap it */
+
+/* ============ Phase 7A: sign-in additions ============ */
+.otp{ font:650 1.6rem/1 var(--display); letter-spacing:.45em; text-align:center; padding-left:.45em; font-variant-numeric:tabular-nums; min-height:56px; }
+.field-help{ display:block; color:var(--muted); font-size:var(--fs-xs); margin:-6px 0 12px; }
+.auth-foot{ flex-wrap:wrap; row-gap:6px; }
+.auth-foot .linkish{ min-height:44px; }
+.auth-foot .linkish:disabled{ color:var(--muted); cursor:default; text-decoration:none; }
+.auth-or{ display:flex; align-items:center; gap:10px; margin:16px 0 10px; color:var(--muted); font-size:var(--fs-xs); }
+.auth-or::before, .auth-or::after{ content:""; flex:1; height:1px; background:var(--line); }
+.btn.oauth{ min-height:46px; justify-content:center; gap:10px; margin-top:8px; font-weight:650; }
+.btn.oauth svg{ width:18px; height:18px; }
+.auth-alt:empty{ display:none; }
+.auth-card{ box-sizing:border-box; min-width:0; }
+.auth-card .lead, .auth-card .who-chip span, .auth-card .msg{ overflow-wrap:anywhere; }
+@media (max-width:360px){ .auth-card{ padding:22px 18px 18px; } .otp{ letter-spacing:.3em; padding-left:.3em; } }
+.auth-tabs button{ min-height:44px; }
