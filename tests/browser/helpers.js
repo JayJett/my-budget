@@ -103,3 +103,15 @@ export async function setExpense(page, id, field, value) {
   await setField(page, `#sheet [data-l="sp"][data-i="${id}"][data-f="${field}"]`, value);
   await closeSheet(page);
 }
+
+/* Net worth tab (UI phase 3): accounts are edited in a sheet. */
+export async function editNetWorth(page, id) {
+  await page.click(`[data-edit-nw="${id}"]`);
+  await page.waitForSelector(`#sheet .bsheet [data-l="nw"][data-i="${id}"][data-f="balance"]`);
+}
+
+/* Goals tab (UI phase 3): goals are edited in a sheet. key: "ef", "gj" or "gp:<personId>". */
+export async function editGoal(page, key, id) {
+  await page.click(`[data-edit-goal="${key}"][data-i="${id}"]`);
+  await page.waitForSelector(`#sheet .bsheet [data-l="${key}"][data-i="${id}"][data-f="target"]`);
+}

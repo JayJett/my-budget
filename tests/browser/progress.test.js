@@ -29,17 +29,18 @@ const HISTORY = [past(3, 10000, 7000, 0), past(2, 11000, 6500, 0), past(1, 11760
 const withHistory = (role = "owner", extra = {}) => ({ households: [{ id: "hh-1", name: "Test household", role, budget: V4, snapshots: HISTORY,
   members: [{ user_id: "u-me", display_name: "Jarden", email: "jarden@example.com", role, joined_at: "2026-01-01" }, { user_id: "u-madi", display_name: "Madi", email: "madi@example.com", role: "owner", joined_at: "2026-01-01" }] }], ...extra });
 
-test("empty state explains snapshots, and 'Save a snapshot now' starts the charts", { skip }, async () => {
+test("empty state explains snapshots, and saving the first one starts the story (no chart from one point)", { skip }, async () => {
   const { page, errors, ctx } = await open(null, { init: { budget: V4, noAutoSnapshot: true } });
   await settle(page);
   await goTab(page, "progress");
-  await page.waitForSelector("text=Your progress will show here");
-  assert.match(await page.textContent(".pg-empty"), /1st of every month/);
+  await page.waitForSelector("text=Your journey starts here");
+  assert.match(await page.textContent(".pg-start"), /1st of every month/);
   assert.equal(await page.isVisible("#app .viewas"), false, "no 'show amounts per' on Progress");
   await page.screenshot({ path: join(SHOTS, "progress-empty.png"), fullPage: true });
   await page.click('[data-snap="save"]');
   await page.waitForSelector("text=Snapshot saved");
-  await page.waitForSelector("#pgNet svg");
+  await page.waitForSelector(".pg-sparse");
+  assert.equal(await page.locator("#pgNet").count(), 0, "one snapshot: no trend line is drawn");
   assert.equal(await page.locator(".pg-list li").count(), 1);
   assert.match(await page.textContent(".pg-list"), /Saved by you/);
   assert.match(await page.textContent("#pgNotes"), /starting point/);
@@ -59,9 +60,11 @@ test("trends: net worth chart, the mix, goals, and plain-language notes", { skip
   assert.match(notes, /Net worth is up \$440 since/);
   assert.match(notes, /You’ve paid \$200 off your debts since/);
   assert.equal(await page.locator("#pgNet circle").count(), 5, "4 months + today");
+  await page.click("#pgMixBox summary");
+  await page.waitForSelector("#pgMix rect");
   assert.ok(await page.locator("#pgMix rect").count() >= 10, "stacked bars for each month");
-  assert.match(await page.textContent("#pgGoals"), /New couch/);
-  assert.match(await page.textContent("#pgGoals"), /10% there, up \$100 this month/);
+  assert.match(await page.textContent(".pg-gl"), /New couch/);
+  assert.match(await page.textContent(".pg-gl"), /10% there, up \$100 this month/);
   await page.screenshot({ path: join(SHOTS, "progress.png"), fullPage: true });
   assert.deepEqual(errors, []);
   await ctx.close();
@@ -74,14 +77,15 @@ test("compare any snapshot with today", { skip }, async () => {
   await page.waitForSelector(".pg-list li");
   await page.click(`[data-compare="101"]`);
   await page.waitForSelector("#pgCompare");
-  const row = label => page.locator("#pgCompare tr", { has: page.locator("td.c-name b", { hasText: label }) }).first();
-  assert.equal((await row("Net worth").locator("td").last().textContent()).trim(), "+$440");
-  assert.equal((await row("Debt").locator("td").last().textContent()).trim(), "−$200");
+  const row = label => page.locator("#pgCompare li", { has: page.locator(".pg-cmp-n b", { hasText: label }) }).first();
+  assert.equal((await row("Net worth").locator(".chip").textContent()).trim(), "+$440");
+  assert.equal((await row("Debt").locator(".chip").textContent()).trim(), "$200 less owed");
   assert.match(await row("Debt").locator(".chip").getAttribute("class"), /ok/, "less debt shows as good news");
-  assert.equal((await row("Joint Savings").locator("td").last().textContent()).trim(), "+$240");
+  assert.equal((await row("Joint Savings").locator(".chip").textContent()).trim(), "+$240");
+  assert.match(await page.textContent(".pg-cmp-h"), /Then[\s\S]*Now\s*Today/, "both sides are labelled");
   await page.screenshot({ path: join(SHOTS, "progress-compare.png"), fullPage: true });
   await page.click('[data-compare="close"]');
-  assert.equal(await page.isVisible("#pgCompare"), false);
+  assert.equal(await page.locator("#pgCompare .pg-cmp-l").count(), 0);
   assert.deepEqual(errors, []);
   await ctx.close();
 });
@@ -90,7 +94,7 @@ test("viewers can see progress but not save snapshots", { skip }, async () => {
   const { page, errors, ctx } = await open(null, { init: withHistory("viewer") });
   await goTab(page, "progress");
   await page.waitForSelector("#pgNet svg");
-  assert.equal(await page.isDisabled('[data-snap="save"]'), true);
+  assert.equal(await page.locator('[data-snap="save"]').first().isDisabled(), true);
   assert.match(await page.textContent(".pg-save"), /Only owners and editors/);
   assert.deepEqual(errors, []);
   await ctx.close();
@@ -106,7 +110,7 @@ test("offline: Progress shows the copy saved on this device", { skip }, async ()
   await page.waitForSelector("#app .viewas");
   await goTab(page, "progress");
   await page.waitForSelector("#pgNet svg circle");
-  assert.equal(await page.isDisabled('[data-snap="save"]'), true);
+  assert.equal(await page.locator('[data-snap="save"]').first().isDisabled(), true);
   assert.match(await page.textContent(".pg-save"), /needs a connection/);
   await page.screenshot({ path: join(SHOTS, "phone-progress-offline.png"), fullPage: true });
   assert.deepEqual(errors.filter(e => !/ERR_INTERNET_DISCONNECTED|Failed to fetch/.test(e)), []);

@@ -172,8 +172,8 @@ test("every tab draws without errors, and goals/spending follow the view period"
   assert.match(await page.textContent('[data-k="sp.s2.per"]'), /\/mo/);
   assert.equal(await page.textContent('[data-k="sp.s2.v"]'), "$180", "Power is billed monthly");
   await goTab(page, "goals");
-  assert.ok(await page.locator("text=Jarden’s personal goals").count());
-  assert.ok(await page.locator("text=Madi’s personal goals").count());
+  assert.ok(await page.locator(".gl-group h3", { hasText: "Jarden’s goals" }).count());
+  assert.ok(await page.locator(".gl-group h3", { hasText: "Madi’s goals" }).count());
   await page.screenshot({ path: join(SHOTS, "tab-goals-month.png"), fullPage: true });
   assert.deepEqual(errors, []);
   await ctx.close();

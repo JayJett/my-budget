@@ -10,7 +10,7 @@
    (the tests fail if you forget, so an old copy can never be served by mistake). */
 
 // --- generated: start ---
-const VERSION = "d4b804c52d85";
+const VERSION = "fd63ab024fd4";
 const FILES = [ "./", "./css/app.css", "./icons/apple-touch-icon.png", "./icons/favicon-32.png", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/icon.svg", "./icons/maskable-512.png", "./index.html", "./js/config.js", "./js/main.js", "./js/model/calc.js", "./js/model/format.js", "./js/model/history.js", "./js/model/migrate.js", "./js/model/onboarding.js", "./js/model/periods.js", "./js/model/reminders.js", "./js/model/schema.js", "./js/model/snapshots.js", "./js/model/util.js", "./js/sync/ops.js", "./js/sync/store.js", "./js/ui/accent-list.js", "./js/ui/accent.js", "./js/ui/auth.js", "./js/ui/budget-sheets.js", "./js/ui/charts.js", "./js/ui/ctx.js", "./js/ui/dom.js", "./js/ui/events.js", "./js/ui/exports.js", "./js/ui/history.js", "./js/ui/inputs.js", "./js/ui/menu.js", "./js/ui/onboarding.js", "./js/ui/push.js", "./js/ui/reminders.js", "./js/ui/render.js", "./js/ui/settings.js", "./js/ui/tour.js", "./js/ui/views/budget.js", "./js/ui/views/goals.js", "./js/ui/views/invest.js", "./js/ui/views/labels.js", "./js/ui/views/networth.js", "./js/ui/views/progress.js", "./js/ui/views/spending.js", "./manifest.webmanifest", "./vendor/supabase-js-2.45.4/591.supabase.js", "./vendor/supabase-js-2.45.4/supabase.js" ];
 // --- generated: end ---
 

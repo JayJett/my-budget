@@ -63,6 +63,62 @@ There's **no build step**. GitHub Pages serves these files exactly as they are.
   recorded from the old screen with a fixed date, for six situations (under, over, exactly on budget,
   no budget, no expenses, and the full test budget).
 
+### Net worth tab (UI phase 3)
+
+- A net worth card first (net worth, assets, what's owed, and a bar of what you own by type), then
+  "Goal money in savings" (in savings / for goals / not earmarked). Goal money is a slice of the savings
+  balance, never added on top of it. Then when balances were last reviewed, then the accounts.
+- Accounts are grouped on screen as Cash (Operating + Savings), Investments and super, and Debt. That's
+  only a heading: each account keeps its stored type, order and id. Tapping one opens the account sheet
+  (the same `data-l="nw"` boxes as before): balance first, then name, type, and for savings accounts how
+  much goals have earmarked and which goals they are.
+- Goals still find their account by its name. Renaming an account in the sheet updates those goals, as
+  before. Deleting an account that goals use says which goals; they keep their saved amounts and you
+  pick another account for them on the Goals tab. Nothing is deleted with the account.
+- Account type colours are `--nw-op`, `--nw-sav`, `--nw-inv`, `--nw-sup` and `--nw-debt`; they never
+  follow the accent.
+- `tests/browser/networth-ui.test.js` checks every figure against `tests/browser/nwgoals-baseline.json`,
+  recorded from the old screen with a fixed date (the same file holds the Goals tab's figures).
+
+### Goals tab (UI phase 3)
+
+- A summary card first: how much is saved across goals (each goal's Saved amount, never the plan), the
+  total of the targets, and what's going to each fund each period (from the Budget tab).
+- Then the emergency fund, the joint goals (just "Goals" for one person) and each person's goals, as
+  cards: saved of target, a progress bar, what's going to it each period and its estimate or status.
+  A person's section only shows when they have goals or money going to their goals pool; "+ Add goal"
+  can add to any list. Reached goals say "Reached" (not just a colour) and where their share went.
+- Tapping a card opens the goal sheet (the same `data-l="ef" / "gj" / "gp:<id>"` boxes as before):
+  name, target, saved, the account it's kept in (linking only; no money moves), each person's % (joint)
+  or the % of the pool (personal), and the deadline. The emergency fund has no name box, % or delete;
+  its share comes from the Budget tab, and its sheet keeps the months-of-cover message and the
+  3- and 6-month suggested targets.
+- Priority: "Reorder" swaps the cards for a numbered list with up/down buttons. Finished goals still pass
+  their share down exactly as calc.js `allocGoals` decides.
+- Goal icons are the goal's first letter (the emergency fund has a shield). Custom icons would need a new
+  field on goals, so they're left for the personalisation phase.
+- `tests/browser/goals-ui.test.js` checks every figure against `tests/browser/nwgoals-baseline.json`, plus
+  edge cases, editing, add/cancel/delete, reorder, cross-tab effects, widths and viewers.
+
+### Invest and Progress tabs (UI phase 4)
+
+- **Invest** leads with the forecast for the years chosen (5, 10, 20 or 30), what you put in and the growth
+  after fees, and the chart. Tapping, dragging or the arrow keys pick a year; its figures show under the
+  chart. All of it comes from `C.inv.years` (`projectInvestments`, unchanged): choosing years or picking a
+  point never recalculates or saves anything. Starting investments (Net worth) and the amount going in
+  (Budget) link to their tabs. The three assumptions are adjusted in a sheet with the same saved fields.
+  Milestones pick the years; the yearly breakdown (all 30 years, every column) is folded away.
+- **Progress** leads with net worth today and the change since last month's snapshot, then the history
+  chart: a solid dot per recorded month (the latest snapshot that month, as before), placed by date and
+  joined by straight lines, and a hollow "Today" dot joined by a dashed line. 6M / 1Y ranges appear
+  once there's more than six months of history; they only filter. With no snapshots there's a "journey
+  starts here" card; with one, two figures and no line. Assets & debt show today with the change worded
+  ("$200 less owed"); compare picks any snapshot; History lists them all. Nothing in `snapshots.js`
+  changed, and nothing here writes a snapshot except "Save snapshot".
+- Shared drawing: `drawGrowth` and `drawHistory` in `js/ui/charts.js`. Tests: `invest-ui.test.js`
+  (every figure checked against `invest-baseline.json`, recorded from the old screen) and
+  `progress-ui.test.js`.
+
 ## How saving works
 
 The whole budget lives in one row (`budgets.state`), but the app never overwrites it. Each edit is

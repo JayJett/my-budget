@@ -245,3 +245,75 @@ export function sparkline(values, target, color) {
   const d = values.map((v, i) => v === null ? "" : `${i && values[i - 1] !== null ? "L" : "M"}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join("");
   return `<svg class="spark" viewBox="0 0 ${W} ${H}" aria-hidden="true">${target ? `<line x1="2" x2="${W - 2}" y1="${y(target)}" y2="${y(target)}" style="stroke:var(--line-strong)" stroke-dasharray="3 3"/>` : ""}<path d="${d}" fill="none" style="stroke:${color}" stroke-width="2"/></svg>`;
 }
+
+/* ---------- UI phase 4: interactive charts (Invest forecast, Progress history) ----------
+   Drawing only. Every value comes from the caller (the existing projection or recorded snapshots);
+   nothing is worked out here except where to put it. Tapping, dragging or arrow keys pick a point and
+   call onPick(index): the caller shows the figures beside the chart (so nothing hides off-screen) and
+   nothing is saved. Lines join actual points with straight segments, so no value is invented between them. */
+const chartSize = el => { const W = Math.max(260, Math.round(el.clientWidth || 360)); return { W, H: W < 420 ? 200 : W < 700 ? 230 : 270 }; };
+function pickable(el, svg, count, xOf, sel, onPick) {
+  const pick = ev => {
+    const b = svg.getBoundingClientRect(), sx = (ev.clientX - b.left) * (svg.viewBox.baseVal.width / b.width);
+    let best = 0, d = Infinity;
+    for (let i = 0; i < count; i++) { const e = Math.abs(xOf(i) - sx); if (e < d) { d = e; best = i; } }
+    if (best !== sel.i) { sel.i = best; onPick(best); }
+  };
+  svg.addEventListener("pointerdown", ev => { pick(ev); svg.setPointerCapture && ev.pointerType === "mouse" && svg.setPointerCapture(ev.pointerId); });
+  svg.addEventListener("pointermove", ev => { if (ev.pointerType === "mouse" || ev.buttons || ev.pressure) pick(ev); });
+  el.onkeydown = ev => {
+    const k = { ArrowLeft: -1, ArrowDown: -1, ArrowRight: 1, ArrowUp: 1 }[ev.key];
+    let i = sel.i;
+    if (k) i = Math.max(0, Math.min(count - 1, i + k)); else if (ev.key === "Home") i = 0; else if (ev.key === "End") i = count - 1; else return;
+    ev.preventDefault(); if (i !== sel.i) { sel.i = i; onPick(i); }
+  };
+}
+
+/** The forecast: projected balance (filled) over money contributed (dashed), year 0 to `horizon`.
+    years: C.inv.years as worked out by projectInvestments. sel: the picked year. */
+export function drawGrowth(el, years, horizon, selYear, onPick) {
+  if (!el) return;
+  const { W, H } = chartSize(el), pl = 50, pr = 14, pt = 14, pb = 28, Y = years.slice(0, horizon + 1), n = Y.length - 1;
+  const max = niceMax(Math.max(...Y.map(d => Math.max(d.bal, d.contrib))));
+  const x = i => pl + (n ? i / n : 0) * (W - pl - pr), yv = v => pt + (1 - Math.max(0, v) / max) * (H - pt - pb);
+  const path = k => Y.map((d, i) => (i ? "L" : "M") + x(i).toFixed(1) + " " + yv(d[k]).toFixed(1)).join("");
+  let grid = "";
+  for (let i = 0; i <= 4; i++) { const v = max * i / 4; grid += `<line x1="${pl}" x2="${W - pr}" y1="${yv(v)}" y2="${yv(v)}"/><text x="${pl - 8}" y="${yv(v) + 4}" text-anchor="end">${short(v)}</text>`; }
+  const every = n <= 5 ? 1 : n <= 10 ? 2 : n <= 20 ? 5 : 10;
+  for (let i = 0; i <= n; i += every) grid += `<text x="${x(i)}" y="${H - 8}" text-anchor="middle">${i === 0 ? "Now" : i + "y"}</text>`;
+  const s = Math.min(selYear, n), d = Y[s];
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" class="ichart" aria-hidden="true">
+    <g class="axis">${grid}</g>
+    <path d="${path("bal")} L${x(n)} ${yv(0)} L${x(0)} ${yv(0)}Z" style="fill:var(--invest);opacity:.13"/>
+    <path d="${path("contrib")}" fill="none" style="stroke:var(--muted)" stroke-width="2" stroke-dasharray="5 4"/>
+    <path d="${path("bal")}" fill="none" style="stroke:var(--invest)" stroke-width="2.75" stroke-linejoin="round" stroke-linecap="round"/>
+    <line x1="${x(s)}" x2="${x(s)}" y1="${pt}" y2="${H - pb}" class="ich-sel"/>
+    <circle cx="${x(s)}" cy="${yv(d.contrib)}" r="4.5" style="fill:var(--surface);stroke:var(--muted)" stroke-width="2"/>
+    <circle cx="${x(s)}" cy="${yv(d.bal)}" r="6" style="fill:var(--invest);stroke:var(--surface)" stroke-width="2.5"/></svg>`;
+  pickable(el, $("svg", el), n + 1, x, { i: s }, onPick);
+}
+
+/** Recorded history: one dot per recorded point, placed by its real date, joined by straight lines.
+    The last point can be "now" (today's balances, not a snapshot): it's hollow and joined by a dashed line. */
+export function drawHistory(el, points, values, sel, onPick) {
+  if (!el) return;
+  const { W, H } = chartSize(el), pl = 54, pr = 16, pt = 14, pb = 28, n = points.length;
+  const t = points.map(p => +p.date), t0 = Math.min(...t), t1 = Math.max(...t);
+  const x = i => n === 1 || t1 === t0 ? (pl + W - pr) / 2 : pl + (t[i] - t0) / (t1 - t0) * (W - pl - pr);
+  const sc = scale(values, { zero: false });
+  const y = v => pt + (1 - (v - sc.lo) / (sc.hi - sc.lo)) * (H - pt - pb);
+  let g = "";
+  for (let v = sc.lo; v <= sc.hi + sc.step / 2; v += sc.step) g += `<line x1="${pl}" x2="${W - pr}" y1="${y(v)}" y2="${y(v)}"/><text x="${pl - 8}" y="${y(v) + 4}" text-anchor="end">${money0(v)}</text>`;
+  // Date labels only where they don't collide: always the last (today), then from the start
+  const keep = new Set([n - 1]); let lastX = -1e9;
+  for (let i = 0; i < n - 1; i++) { const xi = x(i); if (xi - lastX > 58 && x(n - 1) - xi > 50) { keep.add(i); lastX = xi; } }
+  keep.forEach(i => { const p = points[i]; g += `<text x="${x(i)}" y="${H - 8}" text-anchor="${n > 1 && i === 0 ? "start" : n > 1 && i === n - 1 ? "end" : "middle"}"${p.now ? ' style="font-weight:700"' : ""}>${esc(p.label)}</text>`; });
+  const rec = points.map((p, i) => [x(i), y(values[i]), p]).filter(q => !q[2].now);
+  const nowI = points[n - 1] && points[n - 1].now ? n - 1 : -1;
+  const solid = rec.length > 1 ? `<path d="${rec.map((q, i) => (i ? "L" : "M") + q[0].toFixed(1) + " " + q[1].toFixed(1)).join("")}" fill="none" style="stroke:var(--accent)" stroke-width="2.5" stroke-linejoin="round"/>` : "";
+  const dash = nowI > 0 && rec.length ? `<path d="M${rec[rec.length - 1][0]} ${rec[rec.length - 1][1]}L${x(nowI)} ${y(values[nowI])}" fill="none" style="stroke:var(--accent)" stroke-width="2" stroke-dasharray="4 4"/>` : "";
+  const dots = points.map((p, i) => `<circle cx="${x(i)}" cy="${y(values[i])}" r="${i === sel ? 7 : 4.5}" style="fill:${p.now ? "var(--surface)" : "var(--accent)"};stroke:var(--accent)" stroke-width="${i === sel ? 3 : 2}"/>`).join("");
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" class="ichart" aria-hidden="true"><g class="axis">${g}</g>${sc.lo < 0 ? `<line x1="${pl}" x2="${W - pr}" y1="${y(0)}" y2="${y(0)}" style="stroke:var(--line-strong)"/>` : ""}
+    <line x1="${x(sel)}" x2="${x(sel)}" y1="${pt}" y2="${H - pb}" class="ich-sel"/>${solid}${dash}${dots}</svg>`;
+  pickable(el, $("svg", el), n, x, { i: sel }, onPick);
+}
