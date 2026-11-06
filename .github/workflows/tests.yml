@@ -49,7 +49,7 @@ jobs:
         with:
           node-version: 22
       - name: Install Playwright (test-only, not part of the app)
-        run: npm install --no-save playwright@1.48.2 && npx playwright install --with-deps chromium
+        run: npm install --no-save playwright@1.63.0 && npx playwright install --with-deps chromium
       - name: Click through the app
         run: TZ=Pacific/Auckland npm run test:browser
       - name: Keep screenshots

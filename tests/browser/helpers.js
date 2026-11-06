@@ -20,7 +20,7 @@ let swExtra = "";
 export const publishNewVersion = () => { swExtra += `\n// new version ${Date.now()}`; };
 
 /** Call once per test file: starts the web server and browser before the tests, stops them after. */
-export function setup() {
+export function setup(launchOptions = {}) {
 before(async () => {
   if (skip) return;
   server = http.createServer(async (req, res) => {
@@ -37,7 +37,7 @@ before(async () => {
     catch { res.writeHead(404); res.end("not found"); }
   }).listen(0);
   base = `http://127.0.0.1:${server.address().port}/`;
-  browser = await chromium.launch();
+  browser = await chromium.launch(launchOptions);
   await mkdir(SHOTS, { recursive: true });
 });
 after(async () => { if (browser) await browser.close(); if (server) server.close(); });

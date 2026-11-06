@@ -5,12 +5,13 @@
 import { app, TAB_HASH } from "./ctx.js";
 import { $, esc, toast } from "./dom.js";
 import { remindersFor, REMINDER_TYPES, DEFAULT_PREFS, DUE_WEEKS } from "../model/reminders.js";
+import { pushSupport, currentSubscription, enablePush, disablePush, myDevices, removeDevice, sendTest } from "./push.js";
 
 export const REM_CACHE = "mb-rem-v1-";
 const COLS = "id, kind, title, body, tab, created_at, read_at";
 const friendly = e => app.friendly ? app.friendly(e) : (e && e.message) || "Something went wrong.";
 const offline = () => !!app.offline || navigator.onLine === false;
-const R = { view: null, prefs: null };
+const R = { view: null, prefs: null, device: null };
 
 /* ---------- loading and the bell ---------- */
 /** This person's reminders in the open household: the copy on this device first, then the latest. */
@@ -85,7 +86,50 @@ export async function openReminderSettings() {
   if (!isOpen() || R.view !== "settings") return;
   if (error) { sheet("Reminder settings", `<div class="msg err">${esc(friendly(error))}</div>`); return; }
   R.prefs = { ...DEFAULT_PREFS, ...(data || {}) };
+  R.device = null;
   drawSettings();
+  loadDevice();
+}
+
+/* ---------- this device: phone or computer notifications ---------- */
+async function loadDevice() {
+  let list = [], sub = null;
+  try { [list, sub] = await Promise.all([myDevices(), currentSubscription()]); } catch (_) {}
+  R.device = { list, endpoint: sub ? sub.endpoint : null, on: !!(sub && list.some(x => x.endpoint === sub.endpoint)), busy: false, msg: R.device && R.device.msg };
+  if (isOpen() && R.view === "settings") drawSettings();
+}
+
+function deviceHTML() {
+  const D = R.device, s = pushSupport();
+  const anyOn = REMINDER_TYPES.some(t => R.prefs[t.pref]);
+  let body;
+  if (!D) body = `<p class="set-note">Checking this device…</p>`;
+  else if (!s.ok) body = `<p class="set-note">${{
+    "ios-home": "On iPhone and iPad, notifications only work in the installed app (iOS 16.4 or later). In Safari, tap the Share button, then <b>Add to Home Screen</b>. Open My Budget from your Home Screen, then turn them on here.",
+    unsupported: "This browser can’t show notifications. Try Chrome, Edge, Firefox or Safari, or the installed app.",
+    denied: "Notifications are blocked for this app on this device. Allow them in your device or browser settings, then come back here.",
+  }[s.why]}</p>`;
+  else if (D.on) body = `<p class="push-on"><span class="chip ok">On for this device</span> Your new reminders arrive here as a notification, around 8:30am.</p>
+    <div class="rem-acts"><button class="btn small" type="button" data-push="test"${D.busy ? " disabled" : ""}>Send a test</button><button class="btn small" type="button" data-push="off"${D.busy ? " disabled" : ""}>Turn off for this device</button></div>`;
+  else body = `<p class="set-note">Get your reminders as a notification on this ${/iPhone|Android.*Mobile/.test(navigator.userAgent) ? "phone" : "device"} too, around 8:30am. Only the reminders you’ve switched on above are sent${anyOn ? "" : ", so switch one on first"}.</p>
+    <div class="rem-acts"><button class="btn primary" type="button" data-push="on"${D.busy ? " disabled" : ""}>Turn on for this device</button></div>`;
+  const others = D ? D.list.filter(x => x.endpoint !== D.endpoint) : [];
+  const list = others.length ? `<p class="set-note" style="margin-top:12px">Also on:</p><ul class="push-devices">${others.map(x => `<li><span>${esc(x.label || "A device")}<small>since ${esc(new Date(x.created_at).toLocaleDateString("en-NZ", { day: "numeric", month: "short" }))}</small></span><button class="btn small" type="button" data-push="remove" data-id="${x.id}">Remove</button></li>`).join("")}</ul>` : "";
+  const msg = D && D.msg ? `<div class="msg ${D.msg.kind}" style="margin-top:10px">${esc(D.msg.text)}</div>` : "";
+  return `<section class="set push-set"><h4>Notifications on this device</h4>${body}${msg}${list}</section>`;
+}
+
+async function pushAction(act, id) {
+  const D = R.device; if (!D || D.busy) return;
+  D.busy = true; D.msg = null; drawSettings();
+  try {
+    if (act === "on") { await enablePush(); D.msg = { kind: "ok", text: "Notifications are on for this device. Try “Send a test” to check." }; }
+    if (act === "off") { await disablePush(); D.msg = { kind: "info", text: "Notifications are off for this device. Reminders still appear under the bell." }; }
+    if (act === "test") D.msg = { kind: "info", text: await sendTest() };
+    if (act === "remove") await removeDevice(id);
+  } catch (e) { D.msg = { kind: "err", text: (e && e.message) || "Something went wrong." }; }
+  D.busy = false;
+  await loadDevice();
 }
 
 function drawSettings() {
@@ -100,6 +144,7 @@ function drawSettings() {
       <input type="checkbox" role="switch" data-pref="${t.pref}"${P[t.pref] ? " checked" : ""}></label>${P[t.pref] && extra[t.pref] ? extra[t.pref] : ""}</li>`).join("")}</ul>
     <div class="msg" id="mRem"></div>
     <section class="set rem-preview"><h4>With your budget today, you’d get</h4>${previewHTML()}</section>
+    ${deviceHTML()}
     <p class="set-note">Email reminders aren’t available yet.</p>
     <div class="rem-foot"><button class="btn" type="button" data-rem="inbox">Back to reminders</button></div>`);
   $("#sheet").scrollTop = y;
@@ -144,6 +189,7 @@ export function initReminders() {
       if (TAB_HASH[r.tab]) location.hash = TAB_HASH[r.tab];
     }
   });
+  d.addEventListener("click", e => { const b = e.target.closest("[data-push]"); if (b && !b.disabled) pushAction(b.dataset.push, Number(b.dataset.id)); });
   d.addEventListener("change", e => {
     const t = e.target;
     if (t.dataset.pref) savePref(t.dataset.pref, t.checked);
@@ -152,4 +198,12 @@ export function initReminders() {
   document.addEventListener("click", e => { if (e.target.closest("#bellBtn")) openInbox(); });
   // Back to the app after a while (e.g. the next morning): fetch any new reminders.
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && app.household) loadReminders(); });
+  // A notification for several reminders opens the app at #reminders: show the inbox.
+  window.addEventListener("hashchange", openFromHash);
+  app.openInbox = openInbox;
+}
+export function openFromHash() {
+  if (location.hash !== "#reminders" || !app.household) return;
+  history.replaceState(null, "", "#" + (TAB_HASH[app.tab] || "budget"));
+  openInbox();
 }

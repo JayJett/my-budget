@@ -7,7 +7,8 @@ import { blankBudget } from "../model/schema.js";
 import { startSetup, endSetup } from "./onboarding.js";
 import { loadSnapshots, ensureMonthly } from "./views/progress.js";
 import { rememberChange, resetUndo, updateUndo, historyNoticeRemote } from "./history.js";
-import { loadReminders, resetReminders } from "./reminders.js";
+import { loadReminders, resetReminders, openFromHash } from "./reminders.js";
+import { disablePush } from "./push.js";
 
 const here = () => location.origin + location.pathname;
 const brand = `<div class="auth-brand"><div class="logo" aria-hidden="true">$</div><div class="brand">My Budget<small>Plan where every dollar goes, together</small></div></div>`;
@@ -190,6 +191,7 @@ async function openHH(id) {
   else showSaved(loaded.meta && { by: loaded.meta.updated_by, at: loaded.meta.updated_at });
   loadSnapshots();
   loadReminders();
+  openFromHash();
   if (app.offline) return; // live updates start when the app reconnects
   ensureMonthly();
   app.store.subscribe(status => {
@@ -244,6 +246,7 @@ export async function signOut() {
   // A signed-out device keeps no copy of your budgets (the "Welcome back" name stays).
   try { localStorage.removeItem(OFFLINE); } catch (_) {}
   clearDeviceCopies();
+  await disablePush(); // this device stops getting your notifications
   await app.sb.auth.signOut();
 }
 

@@ -66,4 +66,9 @@ if (canUseSW) {
     document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") reg.update().catch(() => {}); });
   }).catch(() => { /* not available (e.g. private browsing): the app still works online */ });
   navigator.serviceWorker.addEventListener("controllerchange", () => { if (updating) location.reload(); });
+  // Tapped a notification while the app was already open: go to the right place.
+  navigator.serviceWorker.addEventListener("message", e => {
+    const m = e.data || {}; if (m.type !== "open" || !m.hash) return;
+    if (m.hash === "#reminders") { if (app.openInbox) app.openInbox(); } else location.hash = m.hash;
+  });
 }

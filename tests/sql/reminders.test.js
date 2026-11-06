@@ -33,7 +33,7 @@ let HH, EHH;
 /** A Supabase client stand-in that calls functions as an anonymous visitor, like the live function. */
 const anonClient = { rpc: async (name, args) => {
   try {
-    const params = Object.entries(args).map(([k, v]) => `${k} => ${typeof v === "string" ? `'${v}'` : lit(v) + "::jsonb"}`).join(", ");
+    const params = Object.entries(args).map(([k, v]) => `${k} => ${typeof v === "string" ? `'${v}'` : Array.isArray(v) && v.every(x => typeof x === "number") ? `'{${v.join(",")}}'::bigint[]` : lit(v) + "::jsonb"}`).join(", ");
     return { data: JSON.parse(as(null, `select to_jsonb(public.${name}(${params}))`)), error: null };
   } catch (e) { return { data: null, error: { message: String(e.stderr || e.message) } }; }
 } };
@@ -108,7 +108,7 @@ test("no repeats: running again the same day adds nothing new", { skip }, async 
 test("a pass can't be used to put reminders in a stranger's inbox", { skip }, () => {
   const t = one(`select public.start_reminder_run(true)`);
   const items = [{ user_id: EVE, household_id: HH, kind: "x", key: "sneaky", title: "Hi" }, { user_id: BEN, household_id: HH, kind: "x", key: "sneaky", title: "Hi" }];
-  assert.equal(as(null, `select public.reminder_run_save('${t}', ${lit(items)}::jsonb)`), "0", "Eve isn't in the household; Ben has no reminders set up");
+  assert.equal(JSON.parse(as(null, `select public.reminder_run_save('${t}', ${lit(items)}::jsonb)`)).created, 0, "Eve isn't in the household; Ben has no reminders set up");
 });
 
 test("the morning run only starts at 8am NZ time, and once a day", { skip }, () => {
@@ -151,6 +151,7 @@ test("leaving a household: your reminders and settings there are cleaned up", { 
 
 test("the keep-alive ping still works, and the 4C migration can run twice", { skip }, () => {
   assert.doesNotThrow(() => as(null, `select public.ping()`));
-  run("20261109000600_reminders.sql");
+  // Run step 1 and every later migration again, in order (as a fresh copy of the database would)
+  files.filter(f => f >= "20261109000600_reminders.sql").forEach(run);
   assert.equal(as(ANA, `select count(*) from reminder_prefs`), "1");
 });
