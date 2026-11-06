@@ -291,7 +291,15 @@ export function initAuth(sb) {
   });
 
   window.addEventListener("offline", () => { if (app.household) showConn(OFFLINE_MSG); });
+  // Once the page is on its way out (reloading or closing), "online" is ignored. While a page
+  // reloads, the browser can briefly report "online" even though there's still no connection;
+  // reloading again then would race the reload already under way and could leave the page stuck.
+  let leaving = false;
+  window.addEventListener("beforeunload", () => { leaving = true; setTimeout(() => { leaving = false; }, 1000); }); // reset if you choose to stay
+  window.addEventListener("pagehide", () => { leaving = true; });
+  window.addEventListener("pageshow", () => { leaving = false; });
   window.addEventListener("online", () => {
+    if (leaving || navigator.onLine === false) return;
     if (app.session && app.session.offline) { location.reload(); return; } // sign in properly now; offline edits are kept and sent
     if (app.offline && app.household) { app.offline = false; reloadHouseholds(app.household.id).then(updateUndo); return; } // fetch the latest, merge offline edits
     showConn("");
