@@ -74,7 +74,7 @@ export function initEvents() {
 
   document.addEventListener("click", async e => {
     const pop = $("#pop"), path = e.composedPath();
-    if (!path.includes(pop) && !e.target.closest("#menuBtn") && !e.target.closest("[data-fill]")) closePop();
+    if (!path.includes(pop) && !e.target.closest("#menuBtn") && !e.target.closest("[data-fill]") && !e.target.closest('[data-goal-new="pick"]')) closePop();
     if (path.includes(pop)) return;
     const tb = e.target.closest("[data-tab]");
     if (tb) { const h = TAB_HASH[tb.dataset.tab]; if (location.hash !== "#" + h) location.hash = h; else { app.tab = tb.dataset.tab; render(); } window.scrollTo({ top: 0 }); return; }
@@ -127,7 +127,11 @@ export function initEvents() {
     const dl = e.target.closest("[data-del]");
     if (dl) {
       const L = list(dl.dataset.del), i = L.findIndex(x => x.id === dl.dataset.i); if (i < 0) return;
-      if (rowHasData(L[i]) && !(await confirmDel(`Remove “${L[i].name || "this row"}”?`, "Its numbers will be cleared for everyone in the household."))) return;
+      // A net-worth account that goals point at: say which goals, and what happens to them (nothing is deleted with it)
+      const used = dl.dataset.del === "nw" && !blank(L[i].name) ? allGoals().filter(g => !blank(g.name) && g.account === L[i].name).map(g => g.name) : [];
+      const msg = used.length ? `${used.length === 1 ? `The goal “${used[0]}” uses` : `${used.length} goals (${used.join(", ")}) use`} this account. ${used.length === 1 ? "It keeps its" : "They keep their"} saved amounts, but you’ll need to pick another savings account on the Goals tab. The balance will be cleared for everyone in the household.`
+        : "Its numbers will be cleared for everyone in the household.";
+      if ((rowHasData(L[i]) || used.length) && !(await confirmDel(`Remove “${L[i].name || "this row"}”?`, msg))) return;
       L.splice(i, 1); changed({ full: true }); return;
     }
     const mv = e.target.closest("[data-move]");

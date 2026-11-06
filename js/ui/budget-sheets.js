@@ -14,8 +14,14 @@ import { addRow } from "./events.js";
 import { BILL_PERIODS } from "../model/periods.js";
 import { tipq } from "./inputs.js";
 import { SP_TYPES, typeIcon } from "./views/spending.js";
+import { NW_TYPES, nwIcon, nwType } from "./views/networth.js";
+import { goalSheet, goalGroups } from "./views/goals.js";
+import { list } from "./render.js";
+import { openPop, closePop } from "./dom.js";
+import { money } from "../model/format.js";
+import { blank } from "../model/util.js";
 
-// sheet: { kind: "acc" | "person" | "sp", id, tab }; fresh: a row just added (removed again if left blank)
+// sheet: { kind: "acc" | "person" | "sp" | "nw" | "goal", id, tab, l (goal list key) }; fresh: a row just added (removed again if left blank)
 const UI = { reorder: false, reorderTab: null, open: new Set(), sheet: null, fresh: null };
 /** What the Budget and Spending views need to know: reorder mode is per tab. */
 export const budgetUI = () => ({ reorder: UI.reorder && UI.reorderTab === app.tab, open: UI.open });
@@ -78,6 +84,29 @@ function expenseSheet(x) {
     ${readOnly() ? "" : `<button class="btn danger-soft block" type="button" data-del="sp" data-i="${esc(x.id)}">Delete expense</button>`}`;
 }
 
+/** Goals whose Saved money is tagged to this account (matched by name, the same way the totals are). */
+export const goalsIn = a => blank(a.name) ? [] : [app.state.goals.ef, ...app.state.goals.joint, ...Object.values(app.state.goals.personal).flat()].filter(g => !blank(g.name) && g.account === a.name);
+
+function networthSheet(a) {
+  const t = nwType(a.type), types = NW_TYPES.map(x => x.key), linked = goalsIn(a);
+  if (a.type && !types.includes(a.type)) types.push(a.type); // keep any older type as it is
+  const savings = a.type === "Savings" && !blank(a.name);
+  const goalBox = !savings ? `<p class="bs-note">${K(`nw.${a.id}.st`, "chip")}</p>`
+    : `<div class="sk-box nw-em-box"><div class="nw-em-figs"><span><small>For goals</small><b>${K(`nw.${a.id}.em`)}</b></span><span><small>Not earmarked</small><b>${K(`nw.${a.id}.buf`)}</b></span></div>
+        <div class="ex-prog big nw-em" aria-hidden="true"><span data-k="nw.${esc(a.id)}.bar"></span></div>${K(`nw.${a.id}.st`, "chip")}
+        ${linked.length ? `<details class="more"><summary>${linked.length === 1 ? "1 goal uses" : `${linked.length} goals use`} this account</summary><ul class="nw-goals">${linked.map(g => `<li><span>${esc(g.name)}</span><b>${money(Number(g.saved) || 0)}</b></li>`).join("")}</ul>
+          <p class="bs-note">Change which account a goal uses on the Goals tab.</p></details>` : `<p class="bs-note">No goals use this account yet. Pick it as a goal’s account on the Goals tab.</p>`}</div>`;
+  return `<div class="bs-hero"><span class="ex-ic big" style="--cat:${t.col}" aria-hidden="true">${nwIcon(a.type)}</span><div><div class="bs-amt">${K(`nw.${a.id}.v`)}</div><small>${esc(t.label)}${a.type === "Debt" ? ", owed" : ""}</small></div></div>
+    <label class="bs-field"><span>${a.type === "Debt" ? "Amount owed" : "Balance"}</span><span class="unit wide nw-bal"><i>$</i><input type="text" inputmode="decimal" ${attrs("nw", a.id, "balance", "num")} value="${fmtNum(a.balance)}" aria-label="${a.type === "Debt" ? "Amount owed" : "Balance"}"${dis()}></span>
+      <small class="bs-sub">${a.type === "Debt" ? "Enter what you owe as a positive number. It’s taken off your assets." : "What’s in the account right now, from your banking app."}</small></label>
+    <label class="bs-field"><span>Name</span><input class="bs-in" type="text" ${attrs("nw", a.id, "name", "text")} value="${esc(a.name)}" placeholder="e.g. Everyday account" autocomplete="off"${dis()}>
+      <small class="bs-sub">Goals find this account by its name, so give each account a different one.</small></label>
+    <fieldset class="bs-field"><legend>Type ${tipq(NW_TYPES.map(x => `${x.key}: ${x.help}`).join(" "))}</legend><div class="seg seg-radio wrap">${types.map(k => `<label><input type="radio" name="nwtype-${esc(a.id)}" value="${esc(k)}" ${attrs("nw", a.id, "type", "text")}${a.type === k ? " checked" : ""}${dis()}><span>${esc(nwType(k).label)}</span></label>`).join("")}</div>
+      <small class="bs-sub">${esc(t.help)}</small></fieldset>
+    ${goalBox}
+    ${readOnly() ? "" : `<button class="btn danger-soft block" type="button" data-del="nw" data-i="${esc(a.id)}">Delete account</button>`}`;
+}
+
 function personSheet(p) {
   const S = app.state, multi = S.people.length > 1;
   return `<div class="bs-hero ${pc(p)}"><span class="av lg">${esc((p.name || "?").charAt(0).toUpperCase())}</span><div><div class="bs-amt">${K(`inc.${p.id}.v`)}</div><small>${esc(WORDS[S.viewAs].per)}</small></div></div>
@@ -96,12 +125,12 @@ function personSheet(p) {
 /** Draw (or redraw) the open sheet from the current budget, keeping the cursor where it was. */
 function draw() {
   const s = UI.sheet; if (!s) return;
-  const S = app.state, item = (s.kind === "acc" ? S.accounts : s.kind === "sp" ? S.spend : S.people).find(x => x.id === s.id);
+  const S = app.state, item = (s.kind === "goal" ? list(s.l) || [] : s.kind === "acc" ? S.accounts : s.kind === "sp" ? S.spend : s.kind === "nw" ? S.nw.accounts : S.people).find(x => x.id === s.id);
   if (!item || app.tab !== s.tab) { close(); return; } // deleted (here or by someone else), or left the tab
   const ae = document.activeElement, keep = ae && ae.closest && ae.closest("#sheet") && ae.dataset && ae.dataset.f ? { l: ae.dataset.l, i: ae.dataset.i, f: ae.dataset.f, v: ae.type === "radio" ? ae.value : null, s: ae.selectionStart } : null;
   const y = $("#sheet").scrollTop;
-  const title = item.name || { acc: "New allocation", sp: "New expense", person: "Person" }[s.kind];
-  show(title, s.kind === "acc" ? accountSheet(item) : s.kind === "sp" ? expenseSheet(item) : personSheet(item));
+  const title = item.name || { acc: "New allocation", sp: "New expense", nw: "New account", goal: "New goal", person: "Person" }[s.kind];
+  show(title, s.kind === "goal" ? goalSheet(s.l, item) : s.kind === "acc" ? accountSheet(item) : s.kind === "sp" ? expenseSheet(item) : s.kind === "nw" ? networthSheet(item) : personSheet(item));
   $("#sheet").scrollTop = y;
   if (keep) {
     const sel = `#sheet [data-l="${CSS.escape(keep.l)}"][data-i="${CSS.escape(keep.i)}"][data-f="${CSS.escape(keep.f)}"]${keep.v ? `[value="${CSS.escape(keep.v)}"]` : ""}`;
@@ -115,6 +144,12 @@ function openSheet(kind, id, focusName) {
   if (focusName) { const el = $(`#sheet [data-f="name"]`); if (el) el.focus(); }
 }
 export const openExpenseSheet = (id, o = {}) => openSheet("sp", id, o.focusName);
+export const openNetWorthSheet = (id, o = {}) => openSheet("nw", id, o.focusName);
+export function openGoalSheet(l, id, { focusName } = {}) {
+  UI.sheet = { kind: "goal", l, id, tab: app.tab }; draw(); app.refresh();
+  if (focusName) { const el = $(`#sheet [data-f="name"]`); if (el) el.focus(); }
+}
+function newGoal(l) { const id = addRow(l); UI.fresh = { id }; changed({ full: true }); openGoalSheet(l, id, { focusName: true }); }
 export function openAccountSheet(id, { focusName } = {}) {
   UI.sheet = { kind: "acc", id, tab: app.tab }; draw(); app.refresh();
   if (focusName) { const el = $(`#sheet [data-f="name"]`); if (el) el.focus(); }
@@ -135,9 +170,12 @@ export function initBudgetSheets() {
     const was = UI.sheet, fresh = UI.fresh; UI.sheet = null; UI.fresh = null;
     if (!was || !app.household) return;
     if (fresh && fresh.id === was.id && !readOnly()) {
-      const L = was.kind === "sp" ? app.state.spend : was.kind === "acc" ? app.state.accounts : null, i = L ? L.findIndex(x => x.id === fresh.id) : -1;
+      const L = was.kind === "goal" ? list(was.l) : was.kind === "sp" ? app.state.spend : was.kind === "acc" ? app.state.accounts : was.kind === "nw" ? app.state.nw.accounts : null, i = L ? L.findIndex(x => x.id === fresh.id) : -1;
       const x = i >= 0 ? L[i] : null;
-      const blankRow = x && !String(x.name || "").trim() && (was.kind === "sp" ? x.amount == null && !String(x.notes || "").trim() && x.aside == null && x.due == null : !Object.values(x.split || {}).some(v => v != null));
+      const blankRow = x && !String(x.name || "").trim() && (was.kind === "sp" ? x.amount == null && !String(x.notes || "").trim() && x.aside == null && x.due == null
+        : was.kind === "nw" ? x.balance == null
+        : was.kind === "goal" ? x.target == null && x.saved == null && !x.deadline && x.pct == null && !Object.values(x.split || {}).some(v => v != null)
+        : !Object.values(x.split || {}).some(v => v != null));
       if (blankRow) { L.splice(i, 1); changed({ full: true }); return; }
     }
     app.render();
@@ -147,6 +185,8 @@ export function initBudgetSheets() {
     const t = e.target;
     const ea = t.closest("[data-edit-acc]"); if (ea && !ea.disabled) { openAccountSheet(ea.dataset.editAcc); return; }
     const es = t.closest("[data-edit-sp]"); if (es && !es.disabled) { openExpenseSheet(es.dataset.editSp); return; }
+    const en = t.closest("[data-edit-nw]"); if (en && !en.disabled) { openNetWorthSheet(en.dataset.editNw); return; }
+    const eg = t.closest("[data-edit-goal]"); if (eg && !eg.disabled) { openGoalSheet(eg.dataset.editGoal, eg.dataset.i); return; }
     const ep = t.closest("[data-edit-person]"); if (ep) { openPersonSheet(ep.dataset.editPerson); return; }
     if (readOnly()) return;
     if (t.closest("[data-reorder]")) { const on = !(UI.reorder && UI.reorderTab === app.tab); UI.reorder = on; UI.reorderTab = app.tab; app.render(); return; }
@@ -156,6 +196,20 @@ export function initBudgetSheets() {
       const id = addRow("sp"), x = app.state.spend.find(e => e.id === id);
       if (SP_TYPES.some(ty => ty.key === sn.dataset.spNew)) x.type = sn.dataset.spNew; // added from a group: start with that type
       UI.fresh = { id }; changed({ full: true }); openExpenseSheet(id, { focusName: true }); return;
+    }
+    const nn = t.closest("[data-nw-new]");
+    if (nn) {
+      const id = addRow("nw"), x = app.state.nw.accounts.find(e => e.id === id);
+      if (NW_TYPES.some(ty => ty.key === nn.dataset.nwNew)) x.type = nn.dataset.nwNew; // added from a group: start with that type
+      UI.fresh = { id }; changed({ full: true }); openNetWorthSheet(id, { focusName: true }); return;
+    }
+    const gn = t.closest("[data-goal-new]");
+    if (gn) {
+      if (gn.dataset.goalNew !== "pick") { newGoal(gn.dataset.goalNew); return; }
+      // Which list? (joint, or one person's own goals)
+      const opts = goalGroups(app.state).filter(g => g.kind !== "ef");
+      openPop(gn, `<div class="pop-h">Add a goal to</div>${opts.map(g => `<button class="item" type="button" data-pick-goal="${esc(g.key)}">${esc(g.title)}</button>`).join("")}`, b => { closePop(); newGoal(b.dataset.pickGoal); });
+      return;
     }
     if (t.closest("[data-person-new]")) {
       if (app.state.people.length >= MAX_PEOPLE) return;

@@ -87,7 +87,7 @@ test("setup guide: saving for something creates the goal", { skip }, async () =>
   await page.click('[data-obact="finish"]');
   await page.click('[data-tab="goals"]');
   await page.waitForSelector('[data-tab="goals"][aria-selected="true"]');
-  assert.ok(await page.locator('input[value="Trip to Japan"]').count());
+  assert.ok(await page.locator('.gl-name', { hasText: "Trip to Japan" }).count());
   assert.deepEqual(errors, []);
   await ctx.close();
 });

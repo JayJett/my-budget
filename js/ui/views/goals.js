@@ -1,63 +1,135 @@
-/* Goals tab: emergency fund, joint goals and each person's own goals, funded in priority order. */
-import { app } from "../ctx.js";
+/* Goals tab: emergency fund, joint goals and each person's own goals, funded in priority order.
+
+   Layout only. Every figure comes from compute() (model/calc.js) through fill(), exactly as before:
+   what each goal gets (including shares passed down from finished goals), its status and finish
+   date, and the emergency fund's months of cover. Every edit goes through the same boxes
+   (data-l="ef" / "gj" / "gp:<id>" …) and handlers, in the goal sheet (goalSheet below, opened by
+   ui/budget-sheets.js).
+
+   Words matter here: "saved" is money already put aside (the goal's Saved amount, typed in by you);
+   "a fortnight" amounts are the plan from the Budget tab, never counted as saved. */
+import { app, readOnly } from "../ctx.js";
 import { esc } from "../dom.js";
-import { K, TH, tipq, tIn, pIn, $In, dIn, gAcc, grip, del, pc, attnBox } from "../inputs.js";
+import { K, tipq, attrs, fmtNum, pc } from "../inputs.js";
 import { goalStatus } from "../../model/calc.js";
-import { WORDS } from "../../model/periods.js";
+import { WORDS, VIEWS } from "../../model/periods.js";
 import { money, m0, pct, possessive } from "../../model/format.js";
 import { n, blank } from "../../model/util.js";
 import { jointGoalsLabel } from "./labels.js";
+import { budgetUI } from "../budget-sheets.js";
 
-/** key: list key for inputs ("ef", "gj", or "gp:<personId>"). kind: "ef" | "joint" | person object. */
-function goalTable(key, goals, kind) {
-  const S = app.state, w = WORDS[S.viewAs], savings = app.C.savingsNames;
-  const isJoint = kind === "joint", isEF = kind === "ef", person = isJoint || isEF ? null : kind;
-  const tone = person ? pc(person) : "";
-  const P = S.people;
-  const pctCols = isJoint ? P.map(p => TH(`<span class="who ${pc(p)}">${esc(p.name || "Unnamed")}</span>%`, `Share of ${possessive(p.name || "this person")} part of the joint goals fund.`, "num")).join("")
-    : isEF ? "" : TH("% of fund", "Share of this person’s goals pool.", "num");
-  const head = `<tr>${isEF ? "" : "<th></th>"}${TH("Goal", "What you’re saving for. Higher in the list = higher priority.")}${TH("Target", "How much the goal needs in total.", "num")}${TH("Saved", "How much is already put aside for it.", "num")}${TH("Account", "The savings account this money lives in. Only Savings accounts from Net worth are listed.")}
-    ${pctCols}${TH(`Per ${w.noun}`, `Money going to this goal each ${w.noun}, including any share passed down from finished goals above it.`, "num")}${TH("Remaining", "Target minus saved.", "num")}${TH("Deadline", "Optional. Leave blank to see an estimated finish date instead.")}${TH("Status", "Done, on track, or what’s needed to catch up.")}${isEF ? "" : "<th></th>"}</tr>`;
-  const body = goals.map(g => `<tr>
-    ${isEF ? "" : `<td class="c-grip">${grip(key, g.id)}</td>`}
-    <td class="c-name" data-label="Goal">${isEF ? `<b>${esc(g.name)}</b>` : tIn(key, g.id, "name", g.name, "name", "Goal name")}</td>
-    <td class="num" data-label="Target">${$In(key, g.id, "target", g.target, tone, "Target")}</td>
-    <td class="num" data-label="Saved">${$In(key, g.id, "saved", g.saved, tone, "Saved")}</td>
-    <td data-label="Account"><div>${gAcc(key, g, savings)}${K(`g.${g.id}.acw`, "acw")}</div></td>
-    ${isJoint ? P.map(p => `<td class="num" data-label="${esc(p.name)} %">${pIn(key, g.id, `split.${p.id}`, g.split[p.id], pc(p), `${p.name} share`)}</td>`).join("") : isEF ? "" : `<td class="num" data-label="% of fund">${pIn(key, g.id, "pct", g.pct, tone, "Share of fund")}</td>`}
-    <td class="num" data-label="Per ${w.noun}"><div><div>${K(`g.${g.id}.fn`)}</div><div class="sub" data-k="g.${esc(g.id)}.roll" data-base="sub"></div></div></td>
-    <td class="num" data-label="Remaining">${K(`g.${g.id}.rem`)}</td>
-    <td data-label="Deadline">${dIn(key, g.id, "deadline", g.deadline)}</td>
-    <td class="c-status"><div class="status-cell">${K(`g.${g.id}.st`, "chip")}<div class="prog"><span class="bar">${K(`g.${g.id}.bar`)}</span>${K(`g.${g.id}.pc`)}</div></div></td>
-    ${isEF ? "" : `<td class="c-del">${del(key, g.id)}</td>`}</tr>`).join("");
-  let foot = "", extra = "";
-  if (isJoint) foot = `<tfoot><tr><td></td><td>Totals</td><td></td><td></td><td></td>${P.map(p => `<td class="num">${K(`gj.t.${p.id}`)}</td>`).join("")}<td class="num">${K("gj.tv")}</td><td></td><td></td><td></td><td></td></tr>
-    <tr class="check"><td></td><td colspan="4">${P.length > 1 ? "Each person’s column" : "The % column"} should total 100% to use the full fund</td>${P.map(p => `<td class="num">${K(`gj.c.${p.id}`, "chip")}</td>`).join("")}<td colspan="5"></td></tr></tfoot>`;
-  else if (isEF) extra = `<div class="ef-suggest" id="efSuggest"></div>`;
-  else foot = `<tfoot><tr><td></td><td>Totals</td><td></td><td></td><td></td><td class="num">${K(`gp.${person.id}.tp`)}</td><td class="num">${K(`gp.${person.id}.tv`)}</td><td></td><td></td><td></td><td></td></tr>
-    <tr class="check"><td></td><td colspan="4">The % column should total 100% to use the full pool</td><td colspan="2" class="num">${K(`gp.${person.id}.c`, "chip")}</td><td colspan="4"></td></tr></tfoot>`;
-  return `<div class="panel ${isEF ? "" : "scroll"} w-goal cards"><div class="${isEF ? "scroll" : ""}"><table><thead>${head}</thead><tbody>${body}</tbody>${foot}</table></div>${extra}${isEF ? "" : `<button class="add" type="button" data-add="${esc(key)}">+ Add a goal</button>`}</div>`;
+const CHEV = '<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5L10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const CHECK = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7"/></svg>';
+const SHIELD = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.8l5 2v4c0 3.1-2.1 5.4-5 6.4-2.9-1-5-3.3-5-6.4v-4z"/><path d="M5.8 8.2l1.6 1.6 3-3.2"/></svg>';
+const TARGET = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6.2"/><circle cx="8" cy="8" r="3.4"/><circle cx="8" cy="8" r=".9" fill="currentColor"/></svg>';
+
+/** A goal is "reached" exactly as the model decides it (calc.js allocGoals / goalStatus). */
+export const isDone = g => !blank(g.name) && !blank(g.target) && Math.max(n(g.target) - n(g.saved), 0) === 0;
+/** The goal lists on this tab: [{ key, kind: "ef" | "joint" | person, title, goals }]. */
+export function goalGroups(S) {
+  return [
+    { key: "ef", kind: "ef", title: "Emergency fund", goals: [S.goals.ef] },
+    { key: "gj", kind: "joint", title: jointGoalsLabel(S), goals: S.goals.joint },
+    ...S.people.map(p => ({ key: "gp:" + p.id, kind: p, title: `${possessive(p.name || "Unnamed")} goals`, goals: S.goals.personal[p.id] || [] })),
+  ];
+}
+export const groupOf = (S, key) => goalGroups(S).find(g => g.key === key);
+/** A small round badge: the shield for the emergency fund, otherwise the goal's first letter. */
+const badge = (g, grp, big = "") => grp.kind === "ef" ? `<span class="gl-ic ef ${big}" aria-hidden="true">${SHIELD}</span>`
+  : `<span class="gl-ic ${big}" aria-hidden="true">${blank(g.name) ? TARGET : esc(String(g.name).trim().charAt(0).toUpperCase())}</span>`;
+
+function card(g, grp, ui, i) {
+  const done = isDone(g), named = !blank(g.name);
+  const mv = ui.reorder && grp.kind !== "ef" ? `<span class="mv-row"><button class="mv-btn" type="button" data-move="up" data-l="${esc(grp.key)}" data-i="${esc(g.id)}" aria-label="Move ${esc(g.name || "this goal")} up"${i === 0 ? " disabled" : ""}>↑</button><button class="mv-btn" type="button" data-move="down" data-l="${esc(grp.key)}" data-i="${esc(g.id)}" aria-label="Move ${esc(g.name || "this goal")} down"${i === grp.goals.length - 1 ? " disabled" : ""}>↓</button></span>` : "";
+  if (ui.reorder) return `<li class="gl-li"><div class="gl-card compact">${badge(g, grp)}<span class="gl-name">${i + 1}. ${esc(g.name || "Unnamed goal")}</span></div>${mv}</li>`;
+  return `<li class="gl-li"><button class="gl-card${done ? " done" : ""}" type="button" data-edit-goal="${esc(grp.key)}" data-i="${esc(g.id)}" aria-label="${esc(g.name || "Unnamed goal")}: edit">
+      <span class="gl-top">${badge(g, grp)}<span class="gl-name">${esc(g.name || "Unnamed goal")}</span>${done ? `<span class="gl-done">${CHECK}Reached</span>` : `<span class="gl-pc">${K(`g.${g.id}.pc`)}</span>`}${CHEV}</span>
+      <span class="gl-amt">${K(`g.${g.id}.amt`)}</span>
+      <span class="gl-bar" aria-hidden="true"><span data-k="g.${esc(g.id)}.bar"></span></span>
+      <span class="gl-foot"><span class="gl-line">${K(`g.${g.id}.line`)}</span>${grp.kind === "ef" ? K("ef.cover", "chip") : ""}${done ? "" : K(`g.${g.id}.st`, "chip")}${named ? K(`g.${g.id}.accflag`, "chip") : ""}</span>
+    </button></li>`;
+}
+
+/** Which person-groups to show: anyone with goals, or with money going to their goals pool. */
+const shown = (S, grp) => grp.kind === "ef" || grp.kind === "joint" || grp.goals.length > 0 || (app.C && app.C.pool.personalGoals[grp.kind.id] > 0);
+
+function section(S, grp, ui, ro) {
+  const isPerson = grp.kind !== "ef" && grp.kind !== "joint", P = S.people;
+  const pool = grp.kind === "ef" ? K("g.ef.fn") : grp.kind === "joint" ? K("gp.jg") : K(`gpool.${grp.kind.id}`);
+  const addBtn = ro || grp.kind === "ef" ? "" : `<button class="icon-add" type="button" data-goal-new="${esc(grp.key)}" aria-label="Add a goal to ${esc(grp.title)}">+</button>`;
+  // How much of each pool is shared out between the goals (unchanged checks: 100%, % left, over)
+  const alloc = ui.reorder || !grp.goals.length ? "" : grp.kind === "joint"
+    ? `<p class="gl-alloc"><span>Shared out</span>${P.map(p => `<span class="${pc(p)}">${P.length > 1 ? `<i class="gl-dot"></i>${esc(p.name || "Unnamed")} ` : ""}${K(`gj.c.${p.id}`, "chip")}</span>`).join("")}${tipq("Each goal gets a % of the fund. Below 100%, the rest stays in reserve; over 100%, goals are promised more than the fund has.")}</p>`
+    : isPerson ? `<p class="gl-alloc"><span>Shared out</span>${K(`gp.${grp.kind.id}.c`, "chip")}</p>` : "";
+  const spare = grp.kind === "joint" ? `<p class="gl-spare" data-k="gl.gj.spare" data-base="gl-spare"></p>` : isPerson ? `<p class="gl-spare" data-k="gl.${esc(grp.kind.id)}.spare" data-base="gl-spare"></p>` : "";
+  const body = grp.goals.length ? `<ul class="gl-list">${grp.goals.map((g, i) => card(g, grp, ui, i)).join("")}</ul>`
+    : `<div class="card gl-none"><p>No goals yet.</p>${ro ? "" : `<button class="btn small soft" type="button" data-goal-new="${esc(grp.key)}">+ Add a goal</button>`}</div>`;
+  return `<section class="gl-group ${isPerson ? pc(grp.kind) : grp.kind === "ef" ? "ef" : "joint"}">
+    <div class="ex-gh"><span class="ex-dot" aria-hidden="true"></span><h3>${esc(grp.title)}</h3>${grp.kind === "ef" ? "" : `<small>${grp.goals.length}</small>`}
+      <span class="ex-gt">${pool}<small class="per">${K("gl.per")}</small></span>${ui.reorder ? "" : addBtn}</div>
+    ${alloc}${spare}${body}</section>`;
 }
 
 export function view() {
-  const S = app.state, G = S.goals, w = WORDS[S.viewAs], P = S.people;
-  return `${attnBox()}
-  <div class="stat-row">
-    <div class="stat big"><div class="k">${jointGoalsLabel(S)} fund, ${w.per}</div><div class="v">${K("gp.jg")}</div><div class="s">${K("gp.jg.s")}</div></div>
-    ${P.map(p => `<div class="stat big ${pc(p)}"><div class="k" style="color:var(--pc)">${esc(possessive(p.name || "Unnamed"))} goals pool</div><div class="v">${K(`gpool.${p.id}`)}</div><div class="s">${K(`gpool.${p.id}.s`)}</div></div>`).join("")}
-  </div>
-  ${K("ef.banner", "banner")}
-
-  <section><div class="sec-head"><h2>Emergency fund</h2>${tipq("A safety net for job loss, car repairs or surprise bills. A common rule of thumb is 3–6 months of essential costs.")}<span class="sec-note">Your safety net for when life happens.</span></div>${goalTable("ef", [G.ef], "ef")}</section>
-  <section><div class="sec-head"><h2>${jointGoalsLabel(S)}</h2>${tipq("Goals are funded in priority order, top to bottom. When a goal is finished, its share automatically moves to the next unfinished goal below it.")}<span class="sec-note">Top of the list is the highest priority. Drag to reorder; a finished goal passes its share down.</span></div>${goalTable("gj", G.joint, "joint")}</section>
-  ${P.map(p => `<section class="${pc(p)}"><div class="sec-head"><h2 style="color:var(--pc)">${esc(possessive(p.name || "Unnamed"))} personal goals</h2><span class="sec-note">${K(`gp.${p.id}.note`)}</span></div>${goalTable("gp:" + p.id, G.personal[p.id] || [], p)}</section>`).join("")}
-
-  <details class="help"><summary>How it works</summary><ul>
-    <li>Each goal lives in a real savings account. Several goals can share one account; Net worth checks the totals add up.</li>
-    ${P.length > 1 ? "<li>Joint goals have a separate % for each person, so you can fund them unevenly.</li>" : ""}
-    <li>When a goal reaches its target, its share flows to the next unfinished goal below it (or above, if it’s last). If every goal is done, the money is flagged as spare so you can add a new goal.</li>
+  const S = app.state, ro = readOnly(), ui = budgetUI(), groups = goalGroups(S).filter(g => shown(S, g));
+  const seg = `<div class="viewas seg-wrap"><div class="seg" role="group" aria-label="Show amounts per">${VIEWS.map(k => `<button type="button" data-viewas="${k}" aria-pressed="${k === S.viewAs}">${WORDS[k].noun[0].toUpperCase() + WORDS[k].noun.slice(1)}</button>`).join("")}</div></div>`;
+  const pools = groups.map(g => `<li class="${g.kind !== "ef" && g.kind !== "joint" ? pc(g.kind) : g.kind}"><i class="gl-dot"></i><span>${esc(g.title)}</span><b>${g.kind === "ef" ? K("g.ef.fn") : g.kind === "joint" ? K("gp.jg") : K(`gpool.${g.kind.id}`)}</b></li>`).join("");
+  const summary = `<section class="card gl-sum" aria-live="polite">
+    <div class="b-row"><span class="eyebrow">Goals</span>${seg}</div>
+    <div class="sp-head"><span class="amt">${K("gl.saved")}</span><span class="lab">saved so far</span></div>
+    <p class="gl-sub">${K("gl.saved.sub")}</p>
+    <div class="gl-bar big" aria-hidden="true"><span data-k="gl.bar"></span></div>
+    <div class="gl-pools"><span class="eyebrow">Going to goals ${K("gl.perword")} ${tipq("The plan from the Budget tab. It isn’t counted as saved until you update a goal’s Saved amount.")}</span><ul>${pools}</ul></div>
+  </section>`;
+  const head = `<div class="b-row sec"><h2>Your goals</h2>${ro ? "" : `<button class="btn small ghost" type="button" data-reorder aria-pressed="${ui.reorder}">${ui.reorder ? "Done" : "Reorder"}</button>`}</div>
+    ${ui.reorder ? `<p class="dim small-note">Goals higher in a list are funded first. When one is reached, its share moves to the next unfinished goal below it (or above, if it’s last).</p>` : ""}`;
+  const sections = groups.filter(g => !ui.reorder || g.kind !== "ef").map(g => section(S, g, ui, ro)).join("");
+  const hidden = goalGroups(S).filter(g => !shown(S, g));
+  const addAny = ro || ui.reorder ? "" : `<button class="add-row" type="button" data-goal-new="${groups.length + hidden.length > 2 ? "pick" : "gj"}">+ Add goal</button>`;
+  const help = `<details class="help"><summary>How goals are funded</summary><ul>
+    <li>The Budget tab decides how much goes to the emergency fund, ${S.people.length > 1 ? "the joint goals fund and each person’s goals pool" : "and to your goals"}. Each goal gets a % of its fund.</li>
+    <li>Goals higher in a list are funded first. When a goal is reached, its share moves to the next unfinished goal below it (or above, if it’s last). If every goal is reached, the money shows as spare.</li>
+    <li>Saved is money already put aside, in the account you pick. Picking an account doesn’t move any money. The Net worth tab checks the goals in each savings account add up.</li>
     <li>Leave the deadline blank for an estimated finish date, or set one to see whether you’re on track.</li>
   </ul></details>`;
+  return `<div class="gl-page"><div class="gl-side">${summary}</div><div class="gl-main">${head}${sections}${addAny}${help}</div></div>`;
+}
+
+/* ---------- the goal sheet (opened from ui/budget-sheets.js) ---------- */
+export function goalSheet(key, g) {
+  const S = app.state, C = app.C, grp = groupOf(S, key), w = WORDS[S.viewAs], P = S.people, ro = readOnly(), dis = ro ? " disabled" : "";
+  const isEF = grp.kind === "ef", isJoint = grp.kind === "joint", person = !isEF && !isJoint ? grp.kind : null;
+  const money$ = (f, label, v) => `<span class="unit wide nw-bal"><i>$</i><input type="text" inputmode="decimal" ${attrs(key, g.id, f, "num")} value="${fmtNum(v)}" aria-label="${esc(label)}"${dis}></span>`;
+  const pctIn = (f, v, label) => `<span class="unit person"><input type="number" step="any" inputmode="decimal" ${attrs(key, g.id, f, "pct")} value="${blank(v) ? "" : +(v * 100).toFixed(4)}" aria-label="${esc(label)} percent"${dis}><i>%</i></span>`;
+  // the account picker: savings accounts from Net worth, by name (as before)
+  const savings = (C && C.savingsNames) || [], nwA = S.nw.accounts;
+  const opts = savings.map(x => `<option value="${esc(x)}"${x === g.account ? " selected" : ""}>${esc(x)}</option>`);
+  if (!blank(g.account) && !savings.includes(g.account)) opts.unshift(`<option value="${esc(g.account)}" selected>${esc(g.account)} (not a savings account)</option>`);
+  if (blank(g.account)) opts.unshift('<option value="" selected>Pick an account</option>');
+  const acct = nwA.find(a => a.type === "Savings" && !blank(a.name) && a.name === g.account);
+  const acctInfo = acct && C ? `<p class="bs-note">${esc(acct.name)} has ${money(n(acct.balance))}, and ${money(C.earmark[acct.id])} of it is earmarked by goals.</p>` : "";
+  const shares = isEF ? `<p class="bs-note">Set by the emergency fund’s share of pay on the Budget tab.</p>`
+    : isJoint ? `<ul class="bs-shares">${P.map(p => `<li class="${pc(p)}"><span class="bs-who">${P.length > 1 ? `<span class="av sm">${esc((p.name || "?").charAt(0).toUpperCase())}</span>${esc(p.name || "Unnamed")}` : "Share of the fund"}</span>${pctIn(`split.${p.id}`, g.split && g.split[p.id], `${p.name || "Their"} share`)}<small class="bs-sub">${P.length > 1 ? `${esc(possessive(p.name || "Their"))} part of the fund: ` : ""}${K(`gj.t.${p.id}`)} shared out ${K(`gj.c.${p.id}`, "chip")}</small></li>`).join("")}</ul>
+        <small class="bs-sub">Fund ${w.per}: ${K("gp.jg.s")}</small>`
+    : `<ul class="bs-shares"><li class="${pc(person)}"><span class="bs-who">Share of ${esc(possessive(person.name || "their"))} pool</span>${pctIn("pct", g.pct, "Share of pool")}<small class="bs-sub">${K(`gp.${person.id}.tp`)} shared out ${K(`gp.${person.id}.c`, "chip")}</small></li></ul>`;
+  return `<div class="bs-hero gl-hero ${person ? pc(person) : isEF ? "ef" : "joint"}">${badge(g, grp, "big")}<div><div class="bs-amt">${K(`g.${g.id}.amt`)}</div><small>${K(`g.${g.id}.pc`)} reached</small></div></div>
+    <div class="gl-bar big" aria-hidden="true"><span data-k="g.${esc(g.id)}.bar"></span></div>
+    <p class="gl-st">${K(`g.${g.id}.st`, "chip")}</p>
+    ${isEF ? `<p class="banner" data-k="ef.banner" data-base="banner"></p>` : `<label class="bs-field"><span>Name</span><input class="bs-in" type="text" ${attrs(key, g.id, "name", "text")} value="${esc(g.name)}" placeholder="e.g. Holiday" autocomplete="off"${dis}></label>`}
+    <label class="bs-field"><span>Target</span>${money$("target", "Target", g.target)}</label>
+    ${isEF ? `<div class="ef-suggest" id="efSuggest"></div>` : ""}
+    <h4 class="bs-h">Saved</h4>
+    <label class="bs-field"><span>Saved so far ${tipq("Money already put aside for this goal. Planned contributions aren’t added automatically: update this when you check your balances.")}</span>${money$("saved", "Saved so far", g.saved)}</label>
+    <label class="bs-field"><span>Kept in</span><select class="bs-in" ${attrs(key, g.id, "account", "text")} aria-label="Account"${dis}>${opts.join("")}</select>
+      <small class="bs-sub">The savings account the money sits in. Picking one doesn’t move any money.${savings.length ? "" : " Add a Savings account on the Net worth tab to pick one."}</small>
+      <small class="bs-warn">${K(`g.${g.id}.acw`)}</small></label>
+    ${acctInfo}
+    <h4 class="bs-h">Plan</h4>
+    <div class="gl-plan"><b>${K(`g.${g.id}.fn`)}</b> <span>${esc(w.per)}</span><small>${K(`g.${g.id}.roll`)}</small></div>
+    ${shares}
+    <label class="bs-field"><span>Deadline (optional)</span><input class="bs-in" type="date" ${attrs(key, g.id, "deadline", "date")} value="${esc(g.deadline || "")}"${dis}>
+      <small class="bs-sub">Leave it blank to see an estimated finish date.</small></label>
+    ${isEF || ro ? "" : `<button class="btn danger-soft block" type="button" data-del="${esc(key)}" data-i="${esc(g.id)}">Delete goal</button>`}`;
 }
 
 export function fill(D, C) {
@@ -76,7 +148,7 @@ export function fill(D, C) {
   else if (!mc) D["ef.banner"] = { t: "Add spending categories to see how many months your emergency fund covers.", c: "warn" };
   else { const mo = n(ef.saved) / mc; D["ef.banner"] = { t: `Emergency fund: ${m0(n(ef.saved))} saved, covering ${mo.toFixed(1)} months of committed costs (${m0(mc)}/month). The usual target is 3–6 months.`, c: mo >= 3 ? "ok" : "warn" }; }
   const es = document.querySelector("#efSuggest");
-  if (es) es.innerHTML = mc > 0 ? `<span>Suggested target, from committed costs of <b>${m0(mc)}</b>/month:</span><button class="btn small soft" type="button" data-ef="3">3 months, ${m0(mc * 3)}</button><button class="btn small soft" type="button" data-ef="6">6 months, ${m0(mc * 6)}</button>` : "<span>Add spending categories to get a suggested target.</span>";
+  if (es) es.innerHTML = mc > 0 ? `<span>Suggested target, from committed costs of <b>${m0(mc)}</b>/month:</span><button class="btn small soft" type="button" data-ef="3"${readOnly() ? " disabled" : ""}>3 months, ${m0(mc * 3)}</button><button class="btn small soft" type="button" data-ef="6"${readOnly() ? " disabled" : ""}>6 months, ${m0(mc * 6)}</button>` : "<span>Add spending categories to get a suggested target.</span>";
 
   const goalRow = (g, perYear, isEF, A, i) => {
     D[`g.${g.id}.fn`] = perYear === null ? "" : money(v(perYear));
@@ -92,6 +164,10 @@ export function fill(D, C) {
       else if (A.from[i].length) roll = { t: `incl. ${money(v(A.from[i].reduce((s, x) => s + x.v, 0)))} from ${A.from[i].map(x => x.name).join(", ")}`, c: "roll" };
     }
     D[`g.${g.id}.roll`] = roll;
+    // new: the card's "saved of target" line, its plan line, and a short flag for an account that isn't savings
+    D[`g.${g.id}.amt`] = blank(g.target) ? `${money(n(g.saved))} saved` : `${money(n(g.saved))} of ${money(n(g.target))}`;
+    D[`g.${g.id}.line`] = done ? (roll.t || "Target reached") : roll.t && A && A.from[i].length ? `${D[`g.${g.id}.fn`]}${w.short} · ${roll.t}` : perYear ? `${D[`g.${g.id}.fn`]}${w.short}` : blank(g.name) ? "Add a name to fund it" : "Nothing going to it yet";
+    D[`g.${g.id}.accflag`] = D[`g.${g.id}.acw`] ? { t: "Not in a savings account", c: "warn" } : { t: "", c: "" };
   };
   goalRow(ef, C.pool.emergency, true);
   S.goals.joint.forEach((g, i) => goalRow(g, C.gj.eff[i], false, C.gj, i));
@@ -105,4 +181,17 @@ export function fill(D, C) {
     const L = S.goals.personal[p.id] || [], tp = L.reduce((s, g) => s + n(g.pct), 0);
     D[`gp.${p.id}.tp`] = pct(tp); D[`gp.${p.id}.tv`] = money(v(C.gp[p.id].eff.reduce((s, x) => s + n(x), 0))); D[`gp.${p.id}.c`] = poolCheck(tp);
   });
+
+  // new: the summary card. Saved is what's already put aside (each goal's Saved), never the plan.
+  const all = goalGroups(S).flatMap(g => g.goals).filter(g => !blank(g.name));
+  const saved = all.reduce((s, g) => s + n(g.saved), 0), targets = all.filter(g => !blank(g.target)).reduce((s, g) => s + n(g.target), 0);
+  const reached = all.filter(isDone).length;
+  D["gl.saved"] = money(saved);
+  D["gl.saved.sub"] = !all.length ? "No goals yet" : `${targets > 0 ? `of ${money(targets)} in targets · ` : ""}${all.length} ${all.length === 1 ? "goal" : "goals"}${reached ? `, ${reached} reached` : ""}`;
+  D["gl.bar"] = { w: targets > 0 ? Math.min(1, saved / targets) : 0 };
+  D["gl.per"] = w.short; D["gl.perword"] = w.per.replace("per ", "each ");
+  // months of cover: the same sum as the emergency fund message above, shown short on the card
+  D["ef.cover"] = n(ef.saved) === 0 ? { t: "", c: "" } : !mc ? { t: "Cover unknown", c: "" } : { t: `${(n(ef.saved) / mc).toFixed(1)} months cover`, c: n(ef.saved) / mc >= 3 ? "ok" : "warn" };
+  D["gl.gj.spare"] = { t: C.gj.spare > 0.01 ? `${money(v(C.gj.spare))}${w.short} is spare: every goal here is reached. Add a goal to use it.` : "", c: C.gj.spare > 0.01 ? "on" : "" };
+  P.forEach(p => { const A = C.gp[p.id]; D[`gl.${p.id}.spare`] = { t: A.spare > 0.01 ? `${money(v(A.spare))}${w.short} is spare: every goal here is reached. Add a goal to use it.` : "", c: A.spare > 0.01 ? "on" : "" }; });
 }
