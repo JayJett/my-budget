@@ -192,7 +192,7 @@ do $$
 begin
   if exists (select 1 from pg_available_extensions where name = 'pg_cron') then
     if exists (select 1 from pg_available_extensions where name = 'pg_net') then
-      create extension if not exists pg_net;
+      create extension if not exists pg_net with schema extensions; -- Supabase keeps add-ons out of "public"
     end if;
     create extension if not exists pg_cron;
     if exists (select 1 from cron.job where jobname = 'daily-reminders') then perform cron.unschedule('daily-reminders'); end if;
