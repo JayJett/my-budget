@@ -20,9 +20,15 @@ export function initTooltips() {
     tt.style.left = x + "px"; tt.style.top = y + "px";
   };
   const hide = () => tt.classList.remove("on");
-  document.addEventListener("pointerover", e => { const el = e.target.closest("[data-tip]"); if (el && el.dataset.tip) show(el); });
-  document.addEventListener("pointerout", e => { if (e.target.closest("[data-tip]")) hide(); });
-  document.addEventListener("focusin", e => { const el = e.target.closest && e.target.closest("[data-tip]"); if (el && el.dataset.tip) show(el); });
+  // Mouse: show on hover. Keyboard: show on focus. Touch: tap a "?" to show, tap anywhere else to hide.
+  document.addEventListener("pointerover", e => { if (e.pointerType !== "mouse") return; const el = e.target.closest("[data-tip]"); if (el && el.dataset.tip) show(el); });
+  document.addEventListener("pointerout", e => { if (e.pointerType === "mouse" && e.target.closest("[data-tip]")) hide(); });
+  document.addEventListener("focusin", e => { const el = e.target.closest && e.target.closest("[data-tip]"); if (el && el.dataset.tip && el.matches(":focus-visible")) show(el); });
+  let tapped = null; // the "?" a finger last tapped: tap it again (or anywhere else) to hide
+  document.addEventListener("click", e => {
+    const q = e.target.closest(".qi[data-tip], .tip-t[data-tip]");
+    if (q && q !== tapped) { show(q); tapped = q; } else { hide(); tapped = null; }
+  });
   document.addEventListener("focusout", hide);
   window.addEventListener("scroll", hide, { passive: true });
 }

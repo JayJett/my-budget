@@ -21,15 +21,15 @@ export function view() {
 
   <section>
     <div class="sec-head"><h2>Accounts</h2><span class="sec-note">One row per real account. Goals on the Goals tab are tagged to these, so each name should be unique.</span></div>
-    <div class="panel scroll"><table>
+    <div class="panel scroll cards"><table>
       <thead><tr><th></th>${TH("Account name", "Use the same name you’d recognise in your banking app. Goals are matched to accounts by this name.")}${TH("Type", "Operating: everyday bills. Savings: where goal money lives. Investment: shares and funds. Super: retirement, like KiwiSaver. Debt: what you owe.")}${TH("Balance", "What’s in the account right now.", "num")}${TH("Earmarked", "How much of this balance is already promised to goals (their Saved amounts).", "num")}${TH("Buffer", "Balance minus earmarked: money in the account that no goal has claimed yet.", "num")}${TH("Status", "Whether goals and the balance line up.")}<th></th></tr></thead>
       <tbody>${L.map(a => `<tr>
         <td class="c-grip">${grip("nw", a.id)}</td>
-        <td>${tIn("nw", a.id, "name", a.name, "name", "Account name")}</td>
-        <td>${sIn("nw", a.id, "type", a.type, ["Operating", "Savings", "Investment", "Super", "Debt"])}</td>
-        <td class="num">${$In("nw", a.id, "balance", a.balance, "", "Balance")}</td>
-        <td class="num">${K(`nw.${a.id}.em`)}</td><td class="num">${K(`nw.${a.id}.buf`)}</td>
-        <td>${K(`nw.${a.id}.st`, "chip")}</td><td>${del("nw", a.id)}</td></tr>`).join("")}</tbody>
+        <td class="c-name">${tIn("nw", a.id, "name", a.name, "name", "Account name")}</td>
+        <td data-label="Type">${sIn("nw", a.id, "type", a.type, ["Operating", "Savings", "Investment", "Super", "Debt"])}</td>
+        <td class="num" data-label="Balance">${$In("nw", a.id, "balance", a.balance, "", "Balance")}</td>
+        <td class="num" data-label="Earmarked">${K(`nw.${a.id}.em`)}</td><td class="num" data-label="Buffer">${K(`nw.${a.id}.buf`)}</td>
+        <td data-label="Status">${K(`nw.${a.id}.st`, "chip")}</td><td class="c-del">${del("nw", a.id)}</td></tr>`).join("")}</tbody>
     </table><button class="add" type="button" data-add="nw">+ Add account</button></div>
   </section>
 

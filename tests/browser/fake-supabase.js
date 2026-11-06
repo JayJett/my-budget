@@ -46,10 +46,13 @@
   const mine = () => households.filter(h => h.members.some(m => m.user_id === ME));
   const roleIn = id => { const h = fake.hh(id); const m = h && h.members.find(x => x.user_id === ME); return m ? m.role : null; };
   const err = message => ({ data: null, error: { message } });
+  const offline = () => navigator.onLine === false;
+  const NET = { data: null, error: { message: "TypeError: Failed to fetch" } };
 
   function query(table) {
     const q = { eq: {}, is: {}, update: null, del: false, cols: "" };
     const run = () => {
+      if (offline()) return NET;
       const hid = q.eq.household_id || q.eq.id;
       if (table === "household_members") {
         if (q.eq.user_id === ME) return { data: mine().map(h => ({ household_id: h.id, role: roleIn(h.id), joined_at: "2026-01-01", households: { name: h.name } })), error: null };
@@ -76,8 +79,9 @@
   }
 
   async function rpc(name, a) {
-    fake.rpcCalls.push({ name, args: copy(a) });
     await new Promise(r => setTimeout(r, 30));
+    if (offline()) return NET;
+    fake.rpcCalls.push({ name, args: copy(a) });
     const id = a && a.p_household;
     switch (name) {
       case "accept_invites": case "sync_my_profile": return { data: 0, error: null };
@@ -121,7 +125,8 @@
     createClient() {
       return {
         auth: {
-          onAuthStateChange(cb) { authCb = cb; setTimeout(() => cb(init.signedOut ? "INITIAL_SESSION" : "INITIAL_SESSION", init.signedOut ? null : { user }), 0); return { data: { subscription: { unsubscribe() {} } } }; },
+          // Like the real client: with no connection and an expired sign-in, there's no session to give.
+          onAuthStateChange(cb) { authCb = cb; setTimeout(() => cb("INITIAL_SESSION", init.signedOut || offline() ? null : { user }), 0); return { data: { subscription: { unsubscribe() {} } } }; },
           async signOut() { fake.authCalls.push({ name: "signOut" }); setTimeout(() => authCb && authCb("SIGNED_OUT", null), 0); return { error: null }; },
           async signInWithPassword(c) { fake.authCalls.push({ name: "signIn", email: c.email }); setTimeout(() => authCb && authCb("SIGNED_IN", { user }), 0); return { error: null }; },
           async updateUser(c) {

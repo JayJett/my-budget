@@ -7,7 +7,7 @@ import { compute } from "../model/calc.js";
 import { WORDS, VIEWS } from "../model/periods.js";
 import { pct } from "../model/format.js";
 import { accountColours, personVar } from "./charts.js";
-import { TABS } from "./views/labels.js";
+import { TABS, SHORT } from "./views/labels.js";
 import * as budget from "./views/budget.js";
 import * as networth from "./views/networth.js";
 import * as spending from "./views/spending.js";
@@ -67,7 +67,7 @@ export function render() {
   if (app.setup) { renderBrand(); app.setup.render(); return; } // the setup guide has the page to itself
   app.C = compute(app.state, app.today);
   app.colours = accountColours(app.state);
-  $("#tabs").innerHTML = TABS(app.state).map(([k, l]) => `<button class="tab" role="tab" type="button" data-tab="${k}" aria-selected="${k === app.tab}">${ICONS[k]}${esc(l)}<span class="mark" data-mark="${k}"></span></button>`).join("");
+  $("#tabs").innerHTML = TABS(app.state).map(([k, l]) => `<button class="tab" role="tab" type="button" data-tab="${k}" aria-selected="${k === app.tab}">${ICONS[k]}<span class="tl">${esc(l)}</span><span class="ts">${esc(SHORT[k])}</span><span class="mark" data-mark="${k}"></span></button>`).join("");
   const note = !app.canWrite && app.household ? `<div class="welcome ro-note"><h3>You’re viewing ${esc(app.household.name)}</h3><p>You can look around, but changes are switched off. An owner can make you an editor in Household settings.</p></div>` : "";
   $("#app").innerHTML = note + (app.loaded && !app.hasData && app.canWrite ? welcomeBox() : "") + viewAsBar() + VIEWS_BY_TAB[app.tab].view();
   refresh();

@@ -39,18 +39,18 @@ export function view() {
   </div>
 
   <section>
-    <div class="sec-head"><h2>Allocation plan</h2>${tipq(multi ? "Each payday, you each split your own pay across these accounts. When every column reaches 100%, every dollar has a job." : "Each payday, split your pay across these accounts. When the column reaches 100%, every dollar has a job.")}<span class="sec-note">What % of ${multi ? "your own" : "your"} pay goes where. Drag rows by the handle to reorder.</span></div>
-    <div class="panel scroll w-acc"><table>
+    <div class="sec-head"><h2>Allocation plan</h2>${tipq(multi ? "Each payday, you each split your own pay across these accounts. When every column reaches 100%, every dollar has a job." : "Each payday, split your pay across these accounts. When the column reaches 100%, every dollar has a job.")}<span class="sec-note">What % of ${multi ? "your own" : "your"} pay goes where. Drag rows by the handle (or use the arrows on a phone) to reorder.</span></div>
+    <div class="panel scroll w-acc cards"><table>
       <thead><tr><th></th>${TH("Account", "The real bank account or bucket the money lands in.")}${TH("Type", "Joint is shared, Personal belongs to one person, Investment is long-term money that grows.")}
         ${P.map(p => TH(`<span class="who ${pc(p)}">${esc(p.name || "Unnamed")}</span>% of pay`, `The share of ${possessive(p.name || "this person")} pay that goes to this account.`, "num") + TH("$ to account", `${possessive(p.name || "Their")} % turned into dollars ${w.per}. The faint bar shows its size compared with their whole pay.`, "num")).join("")}
         ${multi ? TH("Total", `What lands in this account ${w.per} from everyone.`, "num") : ""}<th></th></tr></thead>
       <tbody>${A.map(a => `<tr>
         <td class="c-grip">${grip("acc", a.id)}</td>
-        <td><div class="name-wrap">${K(`acc.${a.id}.sw`, "swatch")}${tIn("acc", a.id, "name", a.name, "name", "Account name")}</div>${a.role ? `<div class="sub" title="${esc(ROLES[a.role])}">${esc(ROLES[a.role])}</div>` : ""}</td>
-        <td>${sIn("acc", a.id, "type", a.type, ["Joint", "Personal", "Investment"])}${multi && a.type === "Personal" && a.role !== "personalGoals" ? `<div style="margin-top:4px">${vIn("acc", a.id, "owner", a.owner || "", ownerOpts, "cell", "Whose account")}</div>` : ""}</td>
-        ${P.map(p => `<td class="num">${pIn("acc", a.id, `split.${p.id}`, a.split[p.id], pc(p), `${p.name} to ${a.name}`)}</td><td class="num pc">${K(`acc.${a.id}.b.${p.id}`, `pbar ${pc(p)}`)}<span class="pv">${K(`acc.${a.id}.v.${p.id}`)}</span></td>`).join("")}
-        ${multi ? `<td class="num pc">${K(`acc.${a.id}.tb`, "pbar t")}<b class="pv">${K(`acc.${a.id}.t`)}</b></td>` : ""}
-        <td>${a.role ? "" : del("acc", a.id)}</td></tr>`).join("")}</tbody>
+        <td class="c-name"><div class="name-wrap">${K(`acc.${a.id}.sw`, "swatch")}${tIn("acc", a.id, "name", a.name, "name", "Account name")}</div>${a.role ? `<div class="sub" title="${esc(ROLES[a.role])}">${esc(ROLES[a.role])}</div>` : ""}</td>
+        <td data-label="Type"><div class="stack">${sIn("acc", a.id, "type", a.type, ["Joint", "Personal", "Investment"])}${multi && a.type === "Personal" && a.role !== "personalGoals" ? `<div style="margin-top:4px">${vIn("acc", a.id, "owner", a.owner || "", ownerOpts, "cell", "Whose account")}</div>` : ""}</div></td>
+        ${P.map(p => `<td class="num" data-label="${esc(p.name || "Unnamed")} % of pay">${pIn("acc", a.id, `split.${p.id}`, a.split[p.id], pc(p), `${p.name} to ${a.name}`)}</td><td class="num pc" data-label="${esc(p.name || "Unnamed")} $">${K(`acc.${a.id}.b.${p.id}`, `pbar ${pc(p)}`)}<span class="pv">${K(`acc.${a.id}.v.${p.id}`)}</span></td>`).join("")}
+        ${multi ? `<td class="num pc" data-label="Total">${K(`acc.${a.id}.tb`, "pbar t")}<b class="pv">${K(`acc.${a.id}.t`)}</b></td>` : ""}
+        <td class="c-del">${a.role ? "" : del("acc", a.id)}</td></tr>`).join("")}</tbody>
       <tfoot><tr><td></td><td>Totals</td><td></td>${P.map(p => `<td class="num">${K(`tot.p.${p.id}`)}</td><td class="num">${K(`tot.a.${p.id}`)}</td>`).join("")}${multi ? `<td class="num">${K("tot.t")}</td>` : ""}<td></td></tr>
       <tr class="check"><td></td><td>${multi ? "Each column should total 100%" : "This should total 100%"}</td><td></td>${P.map(p => `<td class="num">${K(`tot.c.${p.id}`, "chip")}<span data-k="fill.${esc(p.id)}"></span></td><td></td>`).join("")}${multi ? "<td></td>" : ""}<td></td></tr></tfoot>
     </table><button class="add" type="button" data-add="acc">+ Add account</button></div>

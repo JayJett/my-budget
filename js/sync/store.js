@@ -8,7 +8,9 @@
      someone else's changes. Any edits you made *while* it was saving are put back on top
      ("rebasing"), so nothing you typed is lost.
    - When someone else saves, the live-update channel tells us, and we rebase the same way.
-   - Every save has a number (seq). Anything older than what we already have is ignored. */
+   - Every save has a number (seq). Anything older than what we already have is ignored.
+   - A copy of the budget, including edits not yet sent, is kept on this device (localStorage),
+     so the app opens offline and sends those edits when the connection comes back. */
 import { diff, applyOps, same } from "./ops.js";
 import { toStored, fromStored, VERSION } from "../model/schema.js";
 import { migrate } from "../model/migrate.js";
@@ -23,31 +25,60 @@ export function createStore({ sb, householdId, getState, setState, onStatus, onR
   const local = () => toStored(getState());
   const dirty = () => replaceReason !== null || diff(base, local()).length > 0;
 
+  /* ---------- the copy kept on this device ---------- */
+  const CACHE_KEY = CACHE_PREFIX + householdId;
+  function saveCache() {
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify({ base, seq, local: local(), replaceReason, at: Date.now() })); } catch (_) { /* full or blocked: carry on */ }
+  }
+  function readCache() { try { return JSON.parse(localStorage.getItem(CACHE_KEY) || "null"); } catch (_) { return null; } }
+  const goOnline = () => { if (dirty()) flush(); };
+  window.addEventListener("online", goOnline);
+
   /** Accept a newer server copy, put `pending` (our unsaved edits) on top, and show the result. */
   function adopt(serverDoc, serverSeq, pending, meta) {
     const before = local();
     base = serverDoc; seq = serverSeq;
     const merged = applyOps(serverDoc, pending);
     if (!same(merged, before)) { setState(fromStored(merged)); onRemote(meta); }
+    saveCache();
   }
 
-  /** Load the budget. Returns { state (null if nothing saved yet), upgraded, meta }. */
+  /** Load the budget. Returns { state (null if nothing saved yet), upgraded, offline, resumed, meta }.
+      offline: the database couldn't be reached, so this is the copy on this device.
+      resumed: edits made earlier on this device (e.g. offline) were put back on top and need saving. */
   async function load() {
+    const cached = readCache();
     const { data, error } = await sb.from("budgets").select("state, seq, updated_by, updated_at").eq("household_id", householdId).maybeSingle();
-    if (error) throw error;
+    if (error) {
+      if (!cached || !isNetworkError(error)) throw error;
+      base = cached.base || {}; seq = Number(cached.seq ?? -1); replaceReason = cached.replaceReason ?? null;
+      return { state: migrate(cached.local) || migrate(base), upgraded: false, offline: true, resumed: false, meta: null };
+    }
     const raw = (data && data.state) || {};
     base = raw; seq = data ? Number(data.seq ?? 0) : 0;
+    // Edits made on this device that never reached the database: put them on top of the latest copy.
+    if (cached && cached.local && raw.version === VERSION && !Array.isArray(raw.people)) {
+      const pending = cached.replaceReason ? diff(raw, cached.local) : diff(cached.base || {}, cached.local);
+      if (pending.length) {
+        const merged = applyOps(raw, pending);
+        if (!same(merged, raw)) {
+          replaceReason = cached.replaceReason || null; // e.g. a file imported while offline still saves with a backup
+          return { state: fromStored(merged), upgraded: false, offline: false, resumed: true, meta: data };
+        }
+      }
+    }
     const state = migrate(raw);
-    if (!state) return { state: null, upgraded: false, meta: data };
+    if (!state) { saveCache(); return { state: null, upgraded: false, offline: false, resumed: false, meta: data }; }
     const upgraded = raw.version !== VERSION || Array.isArray(raw.people);
     if (upgraded) replaceReason = `Upgrade from version ${raw.version ?? "?"} to version ${VERSION}`;
-    return { state, upgraded, meta: data };
+    return { state, upgraded, offline: false, resumed: false, meta: data };
   }
 
   function schedule() {
     chain = 0;
     clearTimeout(timer); clearTimeout(retryTimer);
-    onStatus("saving");
+    saveCache(); // keep the latest edits on this device straight away
+    onStatus(navigator.onLine === false ? "offline" : "saving");
     timer = setTimeout(() => { timer = null; flush(); }, 800);
   }
 
@@ -65,7 +96,9 @@ export function createStore({ sb, householdId, getState, setState, onStatus, onR
     const { data, error } = await sb.rpc("apply_budget_ops", { p_household: householdId, p_ops: ops });
     writing = false;
     if (error) {
-      if (!retried && !/not a member|permission|not signed in/i.test(error.message || "")) {
+      saveCache();
+      if (isNetworkError(error) && navigator.onLine === false) { onStatus("offline"); return; } // the "online" event will retry
+      if (!retried && !/not a member|permission|not signed in|view-only/i.test(error.message || "")) {
         await new Promise(r => setTimeout(r, 700 + Math.random() * 900));
         return flush(true);
       }
@@ -112,6 +145,7 @@ export function createStore({ sb, householdId, getState, setState, onStatus, onR
 
   async function stop() {
     clearTimeout(retryTimer);
+    window.removeEventListener("online", goOnline);
     if (timer) { clearTimeout(timer); timer = null; await flush(); }
     if (channel) { sb.removeChannel(channel); channel = null; }
   }
@@ -121,6 +155,16 @@ export function createStore({ sb, householdId, getState, setState, onStatus, onR
     flushNow: () => { if (timer) { clearTimeout(timer); timer = null; } return flush(); },
     busy: () => !!(timer || writing),
     hasUnsaved: () => !!(timer || writing) || dirty(),
-    replaceNext: reason => { replaceReason = reason; },
+    replaceNext: reason => { replaceReason = reason; saveCache(); },
+    saveCache,
   };
+}
+
+/* ---------- helpers shared with the rest of the app ---------- */
+export const CACHE_PREFIX = "mb-cache-v1-";
+/** True when a request failed because there's no connection (rather than being refused). */
+export const isNetworkError = e => navigator.onLine === false || /failed to fetch|network|load failed|fetch failed|offline/i.test((e && (e.message || e.details)) || "");
+/** Forget every budget copy kept on this device (used when signing out or deleting your account). */
+export function clearDeviceCopies() {
+  try { Object.keys(localStorage).filter(k => k.startsWith(CACHE_PREFIX)).forEach(k => localStorage.removeItem(k)); } catch (_) {}
 }

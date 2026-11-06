@@ -124,6 +124,14 @@ export function initEvents() {
       if (rowHasData(L[i]) && !(await confirmDel(`Remove “${L[i].name || "this row"}”?`, "Its numbers will be cleared for everyone in the household."))) return;
       L.splice(i, 1); changed({ full: true }); return;
     }
+    const mv = e.target.closest("[data-move]");
+    if (mv) {
+      const L = list(mv.dataset.l), i = L.findIndex(x => x.id === mv.dataset.i), j = i + (mv.dataset.move === "up" ? -1 : 1);
+      if (i < 0 || j < 0 || j >= L.length) return;
+      moveItem(L, i, j); changed({ full: true });
+      const again = $(`[data-move="${mv.dataset.move}"][data-l="${CSS.escape(mv.dataset.l)}"][data-i="${CSS.escape(mv.dataset.i)}"]`); if (again) again.focus();
+      return;
+    }
     const efb = e.target.closest("[data-ef]");
     if (efb) { app.state.goals.ef.target = Math.round(app.C.mCommitted * Number(efb.dataset.ef)); changed({ full: true }); toast(`Emergency fund target set to ${efb.dataset.ef} months`); return; }
     if (e.target.id === "noteX") { app.state.note = ""; changed({ full: true }); return; }
