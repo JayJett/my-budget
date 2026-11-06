@@ -59,6 +59,17 @@ node tools/sw-version.mjs
 It updates the list of files the service worker stores, and its version, so phones pick up the new version
 ("A new version is ready. Tap to refresh"). The tests fail if you forget. To redraw the icons and splash screens: `node tools/make-icons.mjs`.
 
+## Progress and snapshots
+
+The **Progress** tab charts how net worth, the cash / investments / KiwiSaver / debt mix and each goal change over time.
+It's built from **snapshots**: copies of the net-worth balances and goals, saved in `budget_snapshots`.
+
+- A scheduled database job (pg_cron, Supabase's built-in scheduler) runs daily just after midnight NZ time and saves each
+  household's snapshot for the month if it doesn't have one yet. The app also asks for it when opened, as a safety net.
+- Editors and owners can press **Save a snapshot now**. Only the newest 24 of those are kept per household;
+  monthly snapshots (about 2 KB each) are all kept.
+- Totals are worked out in the app (`js/model/snapshots.js`) with the same maths as the Net worth tab.
+
 ## Households and roles
 
 One login can be in several households (switch from the ⋯ menu). In each household you're an

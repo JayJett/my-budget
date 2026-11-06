@@ -33,7 +33,7 @@ for (const [name, device] of [["iPhone", IPHONE], ["Android", PIXEL]]) {
     const bar = await page.locator("#tabs").boundingBox();
     assert.ok(Math.abs(bar.y + bar.height - vh) < 2, "tab bar sits at the bottom of the screen");
     assert.equal(await page.isVisible("#tabs .ts >> text=Spending"), true, "short tab names");
-    for (const tab of ["budget", "networth", "spending", "goals", "invest"]) {
+    for (const tab of ["budget", "networth", "spending", "goals", "invest", "progress"]) {
       await goTab(page, tab);
       assert.equal(await sideways(page), false, `${tab}: no sideways scrolling`);
       assert.deepEqual(await tinyTargets(page), [], `${tab}: everything is big enough to tap`);

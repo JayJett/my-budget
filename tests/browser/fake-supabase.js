@@ -27,7 +27,7 @@
   }
 
   const households = (init.households || [{ id: "hh-1", name: "Test household", role: "owner", budget: init.budget || {}, seq: init.seq || 0 }])
-    .map(h => ({ seq: 0, backups: [], invites: [], ...copy(h), members: h.members ? copy(h.members) : [meMember(h.role || "owner")] }));
+    .map(h => ({ seq: 0, backups: [], invites: [], snapshots: [], ...copy(h), members: h.members ? copy(h.members) : [meMember(h.role || "owner")] }));
   const user = { id: ME, email: "jarden@example.com", user_metadata: { name: init.myName || "Jarden" }, created_at: "2026-01-01T00:00:00Z" };
   let authCb = null;
 
@@ -46,6 +46,11 @@
   const mine = () => households.filter(h => h.members.some(m => m.user_id === ME));
   const roleIn = id => { const h = fake.hh(id); const m = h && h.members.find(x => x.user_id === ME); return m ? m.role : null; };
   const err = message => ({ data: null, error: { message } });
+  // Snapshots, like the database's _snapshot_data / _nz_month
+  const nzMonth = () => { const p = new Intl.DateTimeFormat("en-CA", { timeZone: "Pacific/Auckland", year: "numeric", month: "2-digit" }).format(new Date()); return p.slice(0, 7) + "-01"; };
+  const snapData = b => !b || !b.people || Array.isArray(b.people) ? null : { version: b.version, nw: copy(b.nw || {}), goals: copy(b.goals || {}),
+    people: Object.fromEntries(Object.entries(b.people).map(([k, p]) => [k, { id: p.id, name: p.name, colour: p.colour, pos: p.pos }])) };
+  let snapId = 1000;
   const offline = () => navigator.onLine === false;
   const NET = { data: null, error: { message: "TypeError: Failed to fetch" } };
 
@@ -63,6 +68,7 @@
         Object.assign(h, q.update); return { data: [{ name: h.name }], error: null };
       }
       if (table === "budgets") { const h = fake.hh(hid); return { data: h ? { state: copy(h.budget), seq: h.seq, updated_by: ME, updated_at: new Date().toISOString() } : null, error: null }; }
+      if (table === "budget_snapshots") return { data: copy((fake.hh(hid) || { snapshots: [] }).snapshots), error: null };
       if (table === "budget_backups") return { data: copy((fake.hh(hid) || { backups: [] }).backups), error: null };
       if (table === "household_invites") {
         if (q.del) { households.forEach(h => { h.invites = h.invites.filter(i => i.id !== q.eq.id); }); return { data: null, error: null }; }
@@ -85,6 +91,23 @@
     const id = a && a.p_household;
     switch (name) {
       case "accept_invites": case "sync_my_profile": return { data: 0, error: null };
+      case "ensure_monthly_snapshot": {
+        const hh = fake.hh(id); if (!roleIn(id)) return err("Not a member of this household");
+        const d = snapData(hh.budget), m = nzMonth();
+        if (init.noAutoSnapshot || !d || hh.snapshots.some(x => x.kind === "monthly" && x.month === m)) return { data: false, error: null };
+        hh.snapshots.push({ id: ++snapId, month: m, kind: "monthly", taken_at: new Date().toISOString(), taken_by: null, data: d });
+        return { data: true, error: null };
+      }
+      case "save_snapshot_now": {
+        if (!["owner", "editor"].includes(roleIn(id))) return err("Only owners and editors can save a snapshot");
+        const hh = fake.hh(id), d = snapData(hh.budget);
+        if (!d) return err("There’s nothing to save yet: set up the budget first");
+        const row = { id: ++snapId, month: nzMonth(), kind: "manual", taken_at: new Date().toISOString(), taken_by: ME, data: d };
+        hh.snapshots.push(row);
+        const manual = hh.snapshots.filter(x => x.kind === "manual");
+        if (manual.length > 24) hh.snapshots = hh.snapshots.filter(x => x.kind !== "manual" || manual.slice(-24).includes(x));
+        return { data: copy(row), error: null };
+      }
       case "apply_budget_ops": {
         if (fake.failNext > 0) { fake.failNext--; return err("Failed to fetch"); }
         if (!roleIn(id)) return err("Not a member of this household");
