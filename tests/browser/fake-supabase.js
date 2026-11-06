@@ -82,7 +82,7 @@
 
   const fake = window.__fake = {
     households, rpcCalls: [], authCalls: [], backups: [], remUpdates: [], prefSaves: [], devices: copy(init.devices || []), fnCalls: [],
-    pushKey: init.pushKey === undefined ? "BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4" : init.pushKey, listeners: [], failNext: 0, deleted: false,
+    pushKey: init.pushKey === undefined ? "BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4" : init.pushKey, listeners: [], failNext: 0, deleted: false, createMode: init.createMode || null, invite: init.invite || null, failMembers: init.failMembers || 0, createDelay: init.createDelay || 0, resendWait: init.resendWait || 0,
     get budget() { return households[0].budget; },
     get seq() { return households[0].seq; },
     hh: id => households.find(h => h.id === id),
@@ -110,6 +110,7 @@
     const run = () => {
       if (offline()) return NET;
       const hid = q.eq.household_id || q.eq.id;
+      if (table === "household_members" && fake.failMembers > 0) { fake.failMembers--; return { data: null, error: { message: "Failed to fetch" } }; }
       if (table === "household_members") {
         if (q.eq.user_id === ME) return { data: mine().map(h => ({ household_id: h.id, role: roleIn(h.id), joined_at: "2026-01-01", households: { name: h.name } })), error: null };
         return { data: copy((fake.hh(hid) || { members: [] }).members), error: null };
@@ -162,7 +163,13 @@
     fake.rpcCalls.push({ name, args: copy(a) });
     const id = a && a.p_household;
     switch (name) {
-      case "accept_invites": case "sync_my_profile": return { data: 0, error: null };
+      case "sync_my_profile": return { data: 0, error: null };
+      case "accept_invites": { // an invitation waiting for this email (init.invite) becomes a membership, with the role it was given
+        if (!fake.invite) return { data: 0, error: null };
+        const v = fake.invite; fake.invite = null;
+        households.push({ id: v.id, name: v.name, budget: v.budget || {}, seq: 0, backups: [], invites: [], snapshots: [], changes: [], reminders: [], remPrefs: null, members: [meMember(v.role || "editor")] });
+        return { data: 1, error: null };
+      }
       case "save_push_subscription": {
         fake.devices = fake.devices.filter(d => d.endpoint !== a.p_endpoint);
         const row = { id: 900 + fake.devices.length + fake.rpcCalls.length, endpoint: a.p_endpoint, label: a.p_label, created_at: new Date().toISOString() };
@@ -225,8 +232,15 @@
         return { data: { state: copy(target), seq: hh.seq, updated_at: new Date().toISOString(), updated_by: ME, change_id }, error: null };
       }
       case "create_household": {
+        // Phase 7A test modes: "fail" (no connection, nothing made), "lost" (made, but the reply never arrives),
+        // "expired" (the sign-in has expired); createDelay: a slow connection.
+        if (fake.createDelay) await new Promise(r => setTimeout(r, fake.createDelay));
+        if (fake.createMode === "fail") return err("Failed to fetch");
+        if (fake.createMode === "expired") return { data: null, error: { message: "JWT expired", status: 401 } };
         const h = { id: "hh-" + (households.length + 1), name: a.p_name, budget: {}, seq: 0, backups: [], invites: [], snapshots: [], changes: [], reminders: [], remPrefs: null, members: [meMember("owner")] };
-        households.push(h); return { data: h.id, error: null };
+        households.push(h);
+        if (fake.createMode === "lost") return err("Failed to fetch");
+        return { data: h.id, error: null };
       }
       case "invite_member":
         if (!["owner", "editor"].includes(roleIn(id))) return err("Only owners and editors can invite people");
@@ -253,6 +267,11 @@
     }
   }
 
+  // The project's public auth settings (which sign-in providers are switched on): none unless a test says so
+  const realFetch = window.fetch.bind(window);
+  window.fetch = (url, opts) => /\/auth\/v1\/settings$/.test(String(url))
+    ? Promise.resolve(new Response(JSON.stringify({ external: { email: true, ...(init.providers || {}) } }), { status: 200, headers: { "Content-Type": "application/json" } }))
+    : realFetch(url, opts);
   window.supabase = {
     createClient() {
       return {
@@ -260,6 +279,26 @@
           // Like the real client: with no connection and an expired sign-in, there's no session to give.
           onAuthStateChange(cb) { authCb = cb; setTimeout(() => cb("INITIAL_SESSION", init.signedOut || offline() ? null : { user }), 0); return { data: { subscription: { unsubscribe() {} } } }; },
           async signOut() { fake.authCalls.push({ name: "signOut" }); setTimeout(() => authCb && authCb("SIGNED_OUT", null), 0); return { error: null }; },
+          // Phase 7A: sign-up with an email code, sign-in codes, resending, Google/Apple
+          async signUp(c) { fake.authCalls.push({ name: "signUp", email: c.email, data: copy(c.options && c.options.data), redirect: c.options && c.options.emailRedirectTo }); return { data: { user: { id: "new" }, session: null }, error: null }; },
+          async verifyOtp(c) {
+            fake.authCalls.push({ name: "verifyOtp", email: c.email, type: c.type });
+            await new Promise(r => setTimeout(r, 30));
+            if (c.token !== (init.code || "123456")) return { data: {}, error: { message: "Token has expired or is invalid", status: 403 } };
+            setTimeout(() => authCb && authCb("SIGNED_IN", { user }), 0);
+            return { data: { session: { user }, user }, error: null };
+          },
+          async resend(c) {
+            fake.authCalls.push({ name: "resend", type: c.type, email: c.email });
+            if (fake.resendWait) return { data: {}, error: { message: `For security purposes, you can only request this after ${fake.resendWait} seconds.`, status: 429 } };
+            return { data: {}, error: null };
+          },
+          async signInWithOtp(c) {
+            fake.authCalls.push({ name: "signInWithOtp", email: c.email, shouldCreateUser: c.options && c.options.shouldCreateUser });
+            if (c.email !== user.email) return { data: {}, error: { message: "Signups not allowed for otp", status: 422 } };
+            return { data: {}, error: null };
+          },
+          async signInWithOAuth(c) { fake.authCalls.push({ name: "oauth", provider: c.provider, redirectTo: c.options && c.options.redirectTo }); return { data: { url: "about:blank" }, error: null }; },
           async signInWithPassword(c) { fake.authCalls.push({ name: "signIn", email: c.email }); setTimeout(() => authCb && authCb("SIGNED_IN", { user }), 0); return { error: null }; },
           async updateUser(c) {
             fake.authCalls.push({ name: "updateUser", ...copy(c) });
