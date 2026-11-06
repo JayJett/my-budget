@@ -6,6 +6,7 @@ import { createStore, isNetworkError, clearDeviceCopies } from "../sync/store.js
 import { blankBudget } from "../model/schema.js";
 import { startSetup, endSetup } from "./onboarding.js";
 import { loadSnapshots, ensureMonthly } from "./views/progress.js";
+import { rememberChange, resetUndo, updateUndo, historyNoticeRemote } from "./history.js";
 
 const here = () => location.origin + location.pathname;
 const brand = `<div class="auth-brand"><div class="logo" aria-hidden="true">$</div><div class="brand">My Budget<small>Plan where every dollar goes, together</small></div></div>`;
@@ -62,7 +63,7 @@ function applyRemoteView(meta) {
     const el = document.querySelector(`[data-l="${CSS.escape(focus.l)}"][data-i="${CSS.escape(focus.i)}"][data-f="${CSS.escape(focus.f)}"]`);
     if (el) { el.focus(); try { if (focus.s !== null && focus.s !== undefined) el.setSelectionRange(focus.s, focus.s); } catch (_) {} }
   }
-  if (meta && !meta.self && meta.by && meta.by !== app.meId) toast(`Updated by ${nameOf(meta.by)}`);
+  if (meta && !meta.self && meta.by && meta.by !== app.meId) { toast(`Updated by ${nameOf(meta.by)}`); historyNoticeRemote(); }
 }
 
 /* ---------- sign-in screens ---------- */
@@ -165,12 +166,14 @@ async function openHH(id) {
       else if (st === "error") setStatus("Couldn’t save", "off", /view-only/i.test((info && info.message) || "") ? "You have view-only access, so changes can’t be saved." : "Your last change didn’t save yet. It will keep trying; check your connection.");
     },
     onRemote: meta => applyRemoteView(meta),
+    onSaved: data => rememberChange(data),
   });
   const loaded = await app.store.load();
   document.body.classList.remove("signed-out"); $("#auth").hidden = true;
   app.loaded = true;
   app.offline = !!loaded.offline;
   app.snapshots = null; app.compareId = null;
+  resetUndo(); // Undo only steps back through changes made in this household, this session
   saveOfflineProfile();
   if (loaded.state) { app.state = loaded.state; app.hasData = true; app.store.saveCache(); }
   else {
@@ -227,6 +230,7 @@ function teardown() {
   if (app.store) { app.store.stop(); app.store = null; }
   endSetup();
   app.household = null; app.households = []; app.members = []; app.meId = null; app.hasData = false; app.loaded = false; app.role = null;
+  resetUndo();
   app.state = blankBudget();
   $("#app").innerHTML = ""; showConn(""); closePop();
   const d = $("#sheet"); if (d.open) d.close();
@@ -281,7 +285,7 @@ export function initAuth(sb) {
   window.addEventListener("offline", () => { if (app.household) showConn(OFFLINE_MSG); });
   window.addEventListener("online", () => {
     if (app.session && app.session.offline) { location.reload(); return; } // sign in properly now; offline edits are kept and sent
-    if (app.offline && app.household) { app.offline = false; reloadHouseholds(app.household.id); return; } // fetch the latest, merge offline edits
+    if (app.offline && app.household) { app.offline = false; reloadHouseholds(app.household.id).then(updateUndo); return; } // fetch the latest, merge offline edits
     showConn("");
   });
 

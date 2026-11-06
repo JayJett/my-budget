@@ -22,9 +22,10 @@ export const app = {
   C: null,                       // the latest calculations (see model/calc.js)
   loaded: false, hasData: false, canWrite: true,
   sb: null, session: null, household: null, households: [], role: null, members: [], meId: null,
-  setup: null,
+  setup: null,                   // the setup guide, while it's showing (ui/onboarding.js)
   snapshots: null,               // this household's snapshots for the Progress tab (ui/views/progress.js)
-  compareId: null,               // the snapshot being compared with today                   // the setup guide, while it's showing (ui/onboarding.js)
+  compareId: null,               // the snapshot being compared with today
+  undoStack: [],                 // history entries for your changes this session, for the Undo button (ui/history.js)
   store: null,                   // saving + live updates (sync/store.js)
   // filled in by render.js so other modules can ask for a redraw without importing it
   render: () => {}, refresh: () => {},
