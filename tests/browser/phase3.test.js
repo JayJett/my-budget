@@ -66,6 +66,7 @@ test("phone: move rows with the up/down buttons instead of dragging", { skip: sk
   await settle(page);
   await goTab(page, "spending");
   assert.equal(await page.isVisible(".grip"), false);
+  await page.click("[data-reorder]");                              // reorder mode shows the up/down buttons
   await page.click('[data-move="up"][data-i="s3"]');
   await settle(page);
   const order = Object.values(await fake(page, () => window.__fake.budget.spend)).sort((a, b) => a.pos - b.pos).map(s => s.id);
