@@ -167,7 +167,9 @@ export function createStore({ sb, householdId, getState, setState, onStatus, onR
 export const CACHE_PREFIX = "mb-cache-v1-";
 /** True when a request failed because there's no connection (rather than being refused). */
 export const isNetworkError = e => navigator.onLine === false || /failed to fetch|network|load failed|fetch failed|offline/i.test((e && (e.message || e.details)) || "");
-/** Forget every budget copy kept on this device (used when signing out or deleting your account). */
+/** Forget every copy of household data kept on this device: budgets, Progress snapshots and reminders
+    (used when signing out or deleting your account). */
+const DEVICE_PREFIXES = [CACHE_PREFIX, "mb-snaps-v1-", "mb-rem-v1-"];
 export function clearDeviceCopies() {
-  try { Object.keys(localStorage).filter(k => k.startsWith(CACHE_PREFIX)).forEach(k => localStorage.removeItem(k)); } catch (_) {}
+  try { Object.keys(localStorage).filter(k => DEVICE_PREFIXES.some(p => k.startsWith(p))).forEach(k => localStorage.removeItem(k)); } catch (_) {}
 }
