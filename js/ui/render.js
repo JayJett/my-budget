@@ -69,7 +69,7 @@ export function render() {
   $("#tabs").innerHTML = TABS(app.state).map(([k, l]) => `<button class="tab" role="tab" type="button" data-tab="${k}" aria-selected="${k === app.tab}"><span class="ti">${ICONS[k]}</span><span class="tl">${esc(l)}</span><span class="ts">${esc(SHORT[k])}</span><span class="mark" data-mark="${k}"></span></button>`).join("");
   const note = !app.canWrite && app.household ? `<div class="welcome ro-note"><h3>You’re viewing ${esc(app.household.name)}</h3><p>You can look around, but changes are switched off. An owner can make you an editor in Household settings.</p></div>` : "";
   // (Budget and Spending have their own period switch, in their top card.)
-  $("#app").innerHTML = note + (app.loaded && !app.hasData && app.canWrite ? welcomeBox() : "") + (["progress", "budget", "spending", "networth", "goals"].includes(app.tab) ? "" : viewAsBar()) + VIEWS_BY_TAB[app.tab].view();
+  $("#app").innerHTML = note + (app.loaded && !app.hasData && app.canWrite ? welcomeBox() : "") + (["progress", "budget", "spending", "networth", "goals", "invest"].includes(app.tab) ? "" : viewAsBar()) + VIEWS_BY_TAB[app.tab].view();
   if (app.beforeRefresh) app.beforeRefresh(); // e.g. an open editing sheet redraws itself from the new state
   refresh();
   const ro = readOnly();
