@@ -6,13 +6,13 @@ import { createRequire } from "node:module";
 import { RICH_V3 } from "../fixtures.js";
 import { migrate } from "../../js/model/migrate.js";
 import { toStored } from "../../js/model/schema.js";
-import { setup, skip, SHOTS, open, settle, fake, goTab, setField } from "./helpers.js";
+import { setup, skip, SHOTS, open, settle, fake, goTab, setField, setExpense } from "./helpers.js";
 
 setup();
 const require = createRequire(import.meta.url);
 let devices = {}; try { ({ devices } = require("playwright")); } catch (_) {}
 const V4 = toStored(migrate(RICH_V3));
-const GROCERIES = '[data-l="sp"][data-i="s3"][data-f="amount"]';
+const GROCERIES_ROW = '[data-k="sp.s3.v"]'; // Groceries' amount on the Spending tab
 const ago = h => new Date(Date.now() - h * 3600e3).toISOString();
 // Yesterday Madi changed Power from $150 to $180 and added a goal; today the budget is V4.
 const PAST = [
@@ -33,7 +33,7 @@ test("Undo: appears after your change, and puts it back", { skip }, async () => 
   await settle(page);
   assert.equal(await page.isVisible("#undoBtn"), false, "nothing to undo yet");
   await goTab(page, "spending");
-  await setField(page, GROCERIES, "450");
+  await setExpense(page, "s3", "amount", "450");
   await page.waitForFunction(() => window.__fake.budget.spend.s3.amount === 450);
   await page.waitForSelector("#undoBtn:not([hidden])");
   await page.screenshot({ path: join(SHOTS, "undo-button.png") });
@@ -41,7 +41,7 @@ test("Undo: appears after your change, and puts it back", { skip }, async () => 
   await page.waitForSelector("#toast.on >> text=Undone");
   assert.match(await page.textContent("#toast"), /Groceries: \$450 → \$300/);
   assert.equal((await budget(page)).spend.s3.amount, 300);
-  assert.equal(await page.inputValue(GROCERIES), "300", "the screen shows it too");
+  assert.equal(await page.textContent(GROCERIES_ROW), "$300", "the screen shows it too");
   await page.waitForSelector("#undoBtn", { state: "hidden" });
   const h = await fake(page, () => window.__fake.hh("hh-1").changes);
   assert.deepEqual(h.slice(-2).map(x => x.kind), ["edit", "undo"]);
@@ -54,10 +54,10 @@ test("Undo steps back through your changes one at a time; Ctrl+Z works too", { s
   const { page, errors, ctx } = await open(null, { init: init() });
   await settle(page);
   await goTab(page, "spending");
-  await setField(page, GROCERIES, "450");
+  await setExpense(page, "s3", "amount", "450");
   await page.waitForFunction(() => window.__fake.budget.spend.s3.amount === 450);
   await fake(page, () => { const h = window.__fake.hh("hh-1").changes; h[h.length - 1].changed_at = new Date(Date.now() - 600e3).toISOString(); }); // a while ago
-  await setField(page, '[data-l="sp"][data-i="s1"][data-f="amount"]', "1250");
+  await setExpense(page, "s1", "amount", "1250");
   await page.waitForFunction(() => window.__fake.budget.spend.s1.amount === 1250);
   await settle(page);
   await page.click("h2"); // out of the box, so Ctrl+Z means "undo my change" rather than "undo my typing"
@@ -74,11 +74,11 @@ test("Undo leaves alone what someone else has changed since, and says so", { ski
   const { page, errors, ctx } = await open(null, { init: init() });
   await settle(page);
   await goTab(page, "spending");
-  await setField(page, GROCERIES, "450");
+  await setExpense(page, "s3", "amount", "450");
   await page.waitForFunction(() => window.__fake.budget.spend.s3.amount === 450);
   await settle(page);
   await fake(page, () => window.__fake.remote([{ op: "set", path: ["spend", "s3", "amount"], value: 500 }], "u-madi"));
-  await page.waitForFunction(sel => document.querySelector(sel).value === "500", GROCERIES);
+  await page.waitForFunction(sel => document.querySelector(sel).textContent === "$500", GROCERIES_ROW);
   await page.click("#undoBtn");
   await page.waitForSelector("#toast.on >> text=Nothing to undo");
   assert.match(await page.textContent("#toast"), /Madi has changed Groceries since, so it was left as it is/);
@@ -91,7 +91,7 @@ test("History: changes in plain language, grouped by day, newest first", { skip 
   const { page, errors, ctx } = await open(null, { init: init() });
   await settle(page);
   await goTab(page, "spending");
-  await setField(page, GROCERIES, "450");
+  await setExpense(page, "s3", "amount", "450");
   await page.waitForFunction(() => window.__fake.budget.spend.s3.amount === 450);
   await settle(page);
   await openHistory(page);
@@ -114,7 +114,7 @@ test("Preview an earlier version, then restore it (and the restore can be undone
   const { page, errors, ctx } = await open(null, { init: init() });
   await settle(page);
   await goTab(page, "spending");
-  await setField(page, GROCERIES, "450");
+  await setExpense(page, "s3", "amount", "450");
   await page.waitForFunction(() => window.__fake.budget.spend.s3.amount === 450);
   await settle(page);
   await openHistory(page);
@@ -135,7 +135,7 @@ test("Preview an earlier version, then restore it (and the restore can be undone
   await page.waitForSelector("#sheet .hist-text >> text=You restored the version from");
   assert.equal(await page.isVisible("#sheet .chip.info >> text=Restore"), true);
   await page.click('[data-sheet="close"]');
-  assert.equal(await page.inputValue(GROCERIES), "300");
+  assert.equal(await page.textContent(GROCERIES_ROW), "$300");
   // Changed your mind: Undo brings it all back
   await page.click("#undoBtn");
   await page.waitForFunction(() => window.__fake.budget.spend.s3.amount === 450 && !!window.__fake.budget.goals.joint.g3);
@@ -163,7 +163,7 @@ test("phone: History slides up from the bottom, fits the screen, and is easy to 
   const { page, errors, ctx } = await open(null, { init: init(), device: devices["iPhone 13"] });
   await settle(page);
   await goTab(page, "spending");
-  await setField(page, GROCERIES, "450");
+  await setExpense(page, "s3", "amount", "450");
   await page.waitForFunction(() => window.__fake.budget.spend.s3.amount === 450);
   await page.waitForSelector("#undoBtn:not([hidden])");
   const ub = await page.locator("#undoBtn").boundingBox();
@@ -185,7 +185,7 @@ test("offline: History explains it needs a connection, and Undo waits", { skip }
   const { page, errors, ctx } = await open(null, { init: init() });
   await settle(page);
   await goTab(page, "spending");
-  await setField(page, GROCERIES, "450");
+  await setExpense(page, "s3", "amount", "450");
   await page.waitForFunction(() => window.__fake.budget.spend.s3.amount === 450);
   await settle(page);
   await ctx.setOffline(true);

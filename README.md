@@ -49,6 +49,20 @@ There's **no build step**. GitHub Pages serves these files exactly as they are.
   `tests/browser/budget-ui.test.js` checks every figure matches what the old screen showed
   (`tests/browser/budget-baseline.json`).
 
+### Spending tab (UI phase 2)
+
+- One summary card (planned vs budget, with "remaining" / "over budget" / "on budget" / "no budget yet"),
+  a bar by expense type with a line where the budget ends when it's over, then the expenses grouped as
+  Fixed, Flexible and Sinking. Tapping one opens the expense sheet (the same `data-l="sp"` boxes as before).
+- Expense type colours are `--cat-fixed`, `--cat-flex` and `--cat-sink`; they never follow the accent.
+- Sinking-fund tracking (due month, set aside, status) shows for yearly sinking bills, as it always has.
+  Switching an expense's type or billing period hides those fields but keeps their values.
+- "+ Add expense" (or the + on a group) opens a new expense; closing it while still blank removes it again.
+  The same applies to "+ Add allocation" on the Budget tab.
+- `tests/browser/spending-ui.test.js` checks every figure against `tests/browser/spending-baseline.json`,
+  recorded from the old screen with a fixed date, for six situations (under, over, exactly on budget,
+  no budget, no expenses, and the full test budget).
+
 ## How saving works
 
 The whole budget lives in one row (`budgets.state`), but the app never overwrites it. Each edit is

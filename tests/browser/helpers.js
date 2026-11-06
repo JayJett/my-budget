@@ -91,3 +91,15 @@ export async function closeSheet(page) {
   await page.click('#sheet [data-sheet="close"]');
   await page.waitForSelector("#sheet", { state: "hidden" });
 }
+
+/* Spending tab (UI phase 2): expenses are edited in a sheet. */
+export async function editExpense(page, id) {
+  await page.click(`[data-edit-sp="${id}"]`);
+  await page.waitForSelector(`#sheet .bsheet [data-l="sp"][data-i="${id}"][data-f="name"]`);
+}
+/** Open an expense, type a new value into one of its boxes, and close the sheet again. */
+export async function setExpense(page, id, field, value) {
+  await editExpense(page, id);
+  await setField(page, `#sheet [data-l="sp"][data-i="${id}"][data-f="${field}"]`, value);
+  await closeSheet(page);
+}

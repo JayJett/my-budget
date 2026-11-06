@@ -167,9 +167,10 @@ test("every tab draws without errors, and goals/spending follow the view period"
     await page.screenshot({ path: join(SHOTS, `tab-${tab}.png`), fullPage: true });
   }
   await goTab(page, "spending");
-  assert.match(await page.textContent("thead"), /Per fortnight/);
+  assert.match(await page.textContent('[data-k="sp.s2.per"]'), /\/fn/);
   await page.click('[data-viewas="month"]');
-  assert.match(await page.textContent("thead"), /Per month/);
+  assert.match(await page.textContent('[data-k="sp.s2.per"]'), /\/mo/);
+  assert.equal(await page.textContent('[data-k="sp.s2.v"]'), "$180", "Power is billed monthly");
   await goTab(page, "goals");
   assert.ok(await page.locator("text=Jarden’s personal goals").count());
   assert.ok(await page.locator("text=Madi’s personal goals").count());
@@ -182,20 +183,26 @@ test("adding, reordering and deleting rows all save", { skip }, async () => {
   const { page, errors, ctx } = await open(RICH_V3);
   await settle(page);
   await page.click('[data-tab="spending"]');
-  await page.click('[data-add="sp"]');
+  await page.click('[data-sp-new="Flexible"]');
+  await page.waitForSelector('#sheet .bsheet [data-f="name"]:focus');
   await page.keyboard.type("Netflix");
+  await closeSheet(page);
   await settle(page);
   let saved = await fake(page, () => window.__fake.budget);
   const nf = Object.values(saved.spend).find(s => s.name === "Netflix");
   assert.ok(nf, "new row saved");
-  // move it to the top with the keyboard
-  for (let k = 0; k < 6; k++) { await page.focus(`.grip[data-i="${nf.id}"]`); await page.keyboard.press("ArrowUp"); }
+  // move it to the top with the up buttons in reorder mode
+  await page.click("[data-reorder]");
+  for (let k = 0; k < 6; k++) { const up = page.locator(`[data-move="up"][data-i="${nf.id}"]`); if (await up.isDisabled()) break; await up.click(); }
+  await page.click("[data-reorder]");
   await settle(page);
   saved = await fake(page, () => window.__fake.budget);
   const order = Object.values(saved.spend).sort((a, b) => a.pos - b.pos).map(s => s.name);
   assert.equal(order[0], "Netflix");
-  await page.click(`[data-del="sp"][data-i="s3"]`);
+  await page.click('[data-edit-sp="s3"]');
+  await page.click(`#sheet [data-del="sp"][data-i="s3"]`);
   await page.click("#dlgYes");
+  await page.waitForSelector("#sheet", { state: "hidden" });
   await settle(page);
   saved = await fake(page, () => window.__fake.budget);
   assert.equal(saved.spend.s3, undefined);
