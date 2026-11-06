@@ -14,6 +14,7 @@ import { n, blank } from "../../model/util.js";
 import { drawSplit } from "../charts.js";
 import { spendLabel } from "./labels.js";
 import { budgetUI } from "../budget-sheets.js";
+import { itemIcon } from "../icons.js";
 
 /** The three expense types, with their (fixed) colours and small icons. Colours never follow the accent. */
 export const SP_TYPES = [
@@ -36,7 +37,7 @@ function row(s, ui, i, L) {
   const t = typeInfo(s.type);
   return `<li class="ex">
     <button class="ex-row" type="button" data-edit-sp="${esc(s.id)}"${ui.reorder ? " disabled" : ""} aria-label="${esc(s.name || "Unnamed")}: edit">
-      <span class="ex-ic" style="--cat:${t.col}" aria-hidden="true">${typeIcon(t.key)}</span>
+      <span class="ex-ic" style="--cat:${t.col}" aria-hidden="true">${itemIcon(s.icon) || typeIcon(t.key)}</span>
       <span class="ex-main"><span class="ex-name">${esc(s.name || "Unnamed")}</span>
         <span class="ex-sub">${ui.reorder ? esc(t.key) : K(`sp.${s.id}.sub`)}${isYearlySinking(s) && !ui.reorder ? ` ${K(`sp.${s.id}.sk`, "chip")}` : ""}</span>
         ${isYearlySinking(s) && !ui.reorder ? `<span class="ex-prog" aria-hidden="true"><span data-k="sp.${esc(s.id)}.bar"></span></span>` : ""}</span>

@@ -25,6 +25,7 @@ export function view() {
       <div class="seg iv-h" role="group" aria-label="Years ahead">${HORIZONS.map(y => `<button type="button" data-iv-h="${y}" aria-pressed="${y === h}">${y}y</button>`).join("")}</div></div>
     <div class="sp-head"><span class="amt">${K("iv.h.bal")}</span></div>
     <p class="iv-lab">${K("iv.h.lab")}</p>
+    ${app.C && !(app.C.inv.start > 0) && !(app.C.inv.annual > 0) ? `<div class="iv-empty"><span class="sp-empty-ic" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12l3.5-4 3 2.5 4.5-6"/><path d="M10.5 4.5h3v3"/></svg></span><p><b>Nothing invested yet</b>Add an Investment account on Net worth, or give an Investment allocation a share of pay on Budget, to see a forecast.</p></div>` : ""}
     <div class="sp-figs iv-figs"><div><small><i class="dot dash"></i>You put in</small><b>${K("iv.h.c")}</b></div><div><small><i class="dot" style="background:var(--invest)"></i>Growth after fees</small><b>${K("iv.h.g")}</b></div></div>
     <div class="iv-chart" id="ivChart" tabindex="0" role="group" aria-label="Forecast chart. Use the left and right arrow keys to pick a year." aria-describedby="ivRead"></div>
     <div class="iv-read" id="ivRead" aria-live="polite"></div>

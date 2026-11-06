@@ -5,8 +5,12 @@ export const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 export const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 export const trunc = (s, k) => s.length > k ? s.slice(0, k - 1) + "…" : s;
 
-export function toast(msg) {
-  const t = $("#toast"); t.textContent = msg; t.classList.add("on");
+/** A short message at the bottom. kind "ok" adds a small tick, for things that really did just happen. */
+export function toast(msg, kind) {
+  const t = $("#toast");
+  if (kind === "ok") t.innerHTML = `<span class="toast-ic" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5l3 3 6-7"/></svg></span>${esc(msg)}`;
+  else t.textContent = msg;
+  t.classList.add("on");
   clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove("on"), 2800);
 }
 

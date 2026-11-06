@@ -191,6 +191,7 @@ export function describeChange(c, before, after) {
     if (f === "due") return value(`when ${it} is due`, "month");
     if (f === "aside") return value(`the amount set aside for ${it}`, "money");
     if (f === "notes") return value(`the notes for ${it}`, "text", 3);
+    if (f === "icon") return value(`the icon for ${it}`);
     if (f === "pos") return reorder("the spending categories");
   }
   if (top === "goals") {
@@ -203,6 +204,7 @@ export function describeChange(c, before, after) {
     if (f === "saved") return value(`the amount saved for ${goal}`, "money");
     if (f === "account") return value(`the account for ${goal}`);
     if (f === "deadline") return value(`the ${goal} deadline`, "date");
+    if (f === "icon") return value(`the icon for ${goal}`);
     if (f === "name") return rename(personal ? `${possessive(N.person(p[2]))} goal` : "the goal", "a goal");
     if (f === "split") return value(`${possessive(N.person(p[depth + 1]))} share of the joint goals fund for ${goal}`, "pct");
     if (f === "pct") return value(`${goal}’s share of ${possessive(N.person(p[2]))} goals fund`, "pct");

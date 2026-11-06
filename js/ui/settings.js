@@ -3,7 +3,7 @@
 import { app } from "./ctx.js";
 import { $, esc, toast, confirmDel, offerFile } from "./dom.js";
 import { ymd } from "../model/util.js";
-import { accentPickerHTML } from "./accent.js";
+import { accentPickerHTML, lookSeg, THEMES, DENSITIES } from "./accent.js";
 
 const ROLE_LABEL = { owner: "Owner", editor: "Editor", viewer: "Viewer" };
 const ROLE_HELP = { owner: "Can do everything, including managing people", editor: "Can change the budget and invite people", viewer: "Can look, but not change anything" };
@@ -18,11 +18,20 @@ function open(title, html) {
 const msg = (id, text, kind = "err") => { const m = $("#" + id); if (m) { m.className = "msg " + kind; m.textContent = text; } };
 const close = () => { const d = $("#sheet"); if (d.open) d.close(); };
 
+/* ---------- appearance (personal: saved to your login, never to the household's budget) ---------- */
+export function openAppearance() {
+  open("Appearance", `
+    <section class="set"><h4>Your colour</h4>${accentPickerHTML()}<p class="set-note">Just for you: everyone in the household picks their own. People’s colours in charts and money colours (like debt) don’t change.</p></section>
+    <section class="set"><h4>Light or dark</h4>${lookSeg("theme", THEMES, "Light or dark")}<p class="set-note">Auto follows your phone or computer.</p></section>
+    <section class="set"><h4>Spacing</h4>${lookSeg("density", DENSITIES, "Spacing")}<p class="set-note">Compact fits a little more on screen.</p></section>
+    ${app.session ? `<p class="set-note">Saved to your login, so it follows you to your other devices.</p>` : ""}`);
+}
+
 /* ---------- account ---------- */
 export function openAccount() {
   const u = app.session.user, name = (u.user_metadata && u.user_metadata.name) || "";
   open("Your account", `
-    <section class="set"><h4>Your colour</h4>${accentPickerHTML()}<p class="set-note">Just for you: everyone in the household picks their own.</p></section>
+    <section class="set"><h4>Appearance</h4><button class="btn block soft" type="button" data-sheet="appearance">Colour, light or dark, and spacing</button></section>
     <section class="set"><h4>Your name</h4><form id="setName" class="set-row"><input type="text" name="name" value="${esc(name)}" autocomplete="given-name" required aria-label="Your name"><button class="btn primary" type="submit">Save</button></form><div class="msg" id="mName"></div>
       <p class="set-note">This is how you appear to other people in your households. Names inside a budget are changed on its Budget tab.</p></section>
     <section class="set"><h4>Email</h4><form id="setEmail" class="set-row"><input type="email" name="email" value="${esc(u.email || "")}" autocomplete="email" required aria-label="Email"><button class="btn primary" type="submit">Change</button></form><div class="msg" id="mEmail"></div>
@@ -108,6 +117,7 @@ export function initSettings() {
     const b = e.target.closest("button"); if (!b) return;
     if (b.dataset.sheet === "close") return close();
     if (b.dataset.sheet === "download") return downloadAll();
+    if (b.dataset.sheet === "appearance") return openAppearance();
     if (b.dataset.sheet === "leave") {
       if (!(await confirmDel(`Leave ${app.household.name}?`, leaveText().replace(/<[^>]+>/g, ""), "Leave"))) return;
       const { data, error } = await app.sb.rpc("leave_household", { p_household: app.household.id });

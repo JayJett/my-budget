@@ -117,3 +117,11 @@ describe("entries", () => {
     assert.equal(e.headline, "Madi imported a saved file");
   });
 });
+
+test("history: choosing an icon reads as a plain change to how an item looks", () => {
+  const NOW = toStored(migrate(RICH_V3)), after = clone(NOW);
+  after.goals.joint.g1.icon = "sun"; after.spend.s3.icon = "basket";
+  const texts = describeChanges(changesBetween(NOW, after), NOW, after).map(d => d.text).join(" | ");
+  assert.match(texts, /icon for Holiday/);
+  assert.match(texts, /icon for Groceries/);
+});
