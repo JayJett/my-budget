@@ -136,6 +136,8 @@ begin
                group by rp.household_id) p on p.household_id = b.household_id), '[]'::jsonb));
 end $$;
 
+-- (Part 4C step 2 changes what this returns; dropping first lets this file run again safely.)
+drop function if exists public.reminder_run_save(uuid, jsonb);
 /** For the function, with the run's pass: the reminders it worked out. Anything already sent
     (same key) is skipped. Returns how many new reminders went into inboxes. */
 create or replace function public.reminder_run_save(p_token uuid, p_items jsonb) returns int

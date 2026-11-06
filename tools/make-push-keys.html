@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en-NZ">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<link rel="icon" href="../icons/favicon-32.png">
+<title>Make notification keys · My Budget</title>
+<style>
+  :root{ --bg:#F2F4EE; --surface:#fff; --ink:#1F2622; --muted:#5F675F; --line:#DDE2D8; --accent:#2F6B4F; --accent-soft:#E3EFE7; --bad:#B23B2E; --bad-soft:#F8E6E3; }
+  @media (prefers-color-scheme: dark){ :root{ --bg:#121614; --surface:#1A1F1C; --ink:#E9EEE9; --muted:#A3ADA4; --line:#2C332E; --accent:#6FBF93; --accent-soft:#1E2E25; --bad:#F08A7E; --bad-soft:#3A2220; } }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--bg); color:var(--ink); font:16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main{ max-width:640px; margin:0 auto; padding:28px 16px 48px; }
+  h1{ font-size:1.5rem; margin:0 0 6px; } h2{ font-size:1.05rem; margin:0 0 8px; }
+  .card{ background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:18px; margin-top:16px; }
+  .lead{ color:var(--muted); margin:0; }
+  ol{ padding-left:20px; margin:8px 0 0; } li{ margin:6px 0; }
+  button{ font:inherit; font-weight:650; border-radius:10px; border:1px solid var(--line); background:var(--surface); color:var(--ink); padding:10px 16px; cursor:pointer; min-height:44px; }
+  button.primary{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  textarea{ width:100%; font:13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; border:1px solid var(--line); border-radius:10px; padding:10px; background:var(--bg); color:var(--ink); resize:vertical; min-height:110px; }
+  .warn{ background:var(--bad-soft); color:var(--bad); border-radius:10px; padding:10px 12px; font-size:.92rem; margin:10px 0; }
+  .ok{ background:var(--accent-soft); color:var(--accent); border-radius:10px; padding:10px 12px; font-size:.92rem; }
+  code{ background:var(--accent-soft); padding:1px 6px; border-radius:6px; font-size:.92em; }
+  [hidden]{ display:none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Make the notification key</h1>
+  <p class="lead">Phone notifications need a signing key, so Apple and Google know the reminders really come from My Budget. This page makes one <b>inside your browser</b>: nothing is sent anywhere, and closing the page forgets it.</p>
+
+  <div class="card">
+    <h2>1. Make the key</h2>
+    <p class="lead">You only need to do this once. Making a new key later switches off notifications on every device until each one turns them on again.</p>
+    <p><button class="primary" id="make" type="button">Make the key</button></p>
+    <p class="warn" id="nocrypto" hidden>This browser can’t make keys. Try a recent Chrome, Edge, Firefox or Safari.</p>
+  </div>
+
+  <div class="card" id="out" hidden>
+    <h2>2. Copy it into Supabase (it’s a secret)</h2>
+    <p class="warn">This is a private key. Don’t paste it into a chat, an email, or the app’s code. Only into Supabase, as below.</p>
+    <textarea id="secret" readonly aria-label="The private key"></textarea>
+    <p><button id="copy" type="button">Copy the key</button> <span class="ok" id="copied" hidden>Copied</span></p>
+    <ol>
+      <li>Open <b>supabase.com</b>, sign in, and open your project <b>my-budget</b>.</li>
+      <li>In the left menu, choose <b>Edge Functions</b>, then <b>Secrets</b> (on some screens it’s under <b>Project Settings → Edge Functions</b>).</li>
+      <li>Add a new secret. Name: <code>VAPID_PRIVATE_KEY</code>. Value: paste the key you just copied.</li>
+      <li>Press <b>Save</b>. That’s it: there’s nothing to redeploy.</li>
+    </ol>
+  </div>
+
+  <div class="card" id="done" hidden>
+    <h2>3. Turn notifications on</h2>
+    <p class="lead">Open My Budget, tap the bell 🔔, then <b>Reminder settings</b>, and press <b>Turn on for this device</b>. Then try <b>Send a test</b>.</p>
+  </div>
+</main>
+<script>
+  if (!window.crypto || !crypto.subtle) { document.getElementById("nocrypto").hidden = false; document.getElementById("make").disabled = true; }
+  document.getElementById("make").addEventListener("click", async () => {
+    const pair = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
+    const jwk = await crypto.subtle.exportKey("jwk", pair.privateKey);
+    // Check it works before showing it: sign and verify a test message
+    const msg = new TextEncoder().encode("my-budget");
+    const sig = await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, pair.privateKey, msg);
+    if (!await crypto.subtle.verify({ name: "ECDSA", hash: "SHA-256" }, pair.publicKey, sig, msg)) throw new Error("Key check failed");
+    document.getElementById("secret").value = JSON.stringify({ kty: jwk.kty, crv: jwk.crv, x: jwk.x, y: jwk.y, d: jwk.d });
+    document.getElementById("out").hidden = false; document.getElementById("done").hidden = false;
+    document.getElementById("make").textContent = "Make a different key";
+  });
+  document.getElementById("copy").addEventListener("click", async () => {
+    const t = document.getElementById("secret");
+    try { await navigator.clipboard.writeText(t.value); } catch (_) { t.select(); document.execCommand("copy"); }
+    document.getElementById("copied").hidden = false;
+  });
+</script>
+</body>
+</html>

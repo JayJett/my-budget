@@ -81,7 +81,8 @@
   let authCb = null;
 
   const fake = window.__fake = {
-    households, rpcCalls: [], authCalls: [], backups: [], remUpdates: [], prefSaves: [], listeners: [], failNext: 0, deleted: false,
+    households, rpcCalls: [], authCalls: [], backups: [], remUpdates: [], prefSaves: [], devices: copy(init.devices || []), fnCalls: [],
+    pushKey: init.pushKey === undefined ? "BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4" : init.pushKey, listeners: [], failNext: 0, deleted: false,
     get budget() { return households[0].budget; },
     get seq() { return households[0].seq; },
     hh: id => households.find(h => h.id === id),
@@ -119,6 +120,10 @@
       }
       if (table === "budgets") { const h = fake.hh(hid); return { data: h ? { state: copy(h.budget), seq: h.seq, updated_by: ME, updated_at: new Date().toISOString() } : null, error: null }; }
       if (table === "budget_snapshots") return { data: copy((fake.hh(hid) || { snapshots: [] }).snapshots), error: null };
+      if (table === "push_subscriptions") {
+        if (q.del) { fake.devices = fake.devices.filter(d => d.id !== q.eq.id); return { data: null, error: null }; }
+        return { data: copy(fake.devices), error: null };
+      }
       if (table === "reminders") {
         const all = households.flatMap(h => h.reminders);
         if (q.update) { const ids = q.in.id || [q.eq.id]; all.filter(r => ids.includes(r.id)).forEach(r => Object.assign(r, q.update)); fake.remUpdates.push({ ids: copy(ids), ...copy(q.update) }); return { data: null, error: null }; }
@@ -158,6 +163,12 @@
     const id = a && a.p_household;
     switch (name) {
       case "accept_invites": case "sync_my_profile": return { data: 0, error: null };
+      case "save_push_subscription": {
+        fake.devices = fake.devices.filter(d => d.endpoint !== a.p_endpoint);
+        const row = { id: 900 + fake.devices.length + fake.rpcCalls.length, endpoint: a.p_endpoint, label: a.p_label, created_at: new Date().toISOString() };
+        fake.devices.push(row); return { data: row.id, error: null };
+      }
+      case "forget_push_subscription": fake.devices = fake.devices.filter(d => d.endpoint !== a.p_endpoint); return { data: null, error: null };
       case "ensure_monthly_snapshot": {
         const hh = fake.hh(id); if (!roleIn(id)) return err("Not a member of this household");
         const d = snapData(hh.budget), m = nzMonth();
@@ -258,6 +269,18 @@
         },
         from: query,
         rpc,
+        // Edge Functions: the reminders function's "public key" and "send a test" jobs
+        functions: { async invoke(name, opts) {
+          await new Promise(r => setTimeout(r, 30));
+          const body = (opts && opts.body) || {};
+          fake.fnCalls.push({ name, body: copy(body) });
+          const fail = msg => ({ data: null, error: { message: "Edge Function returned a non-2xx status code", context: { json: async () => ({ error: msg }) } } });
+          if (offline()) return { data: null, error: { message: "Failed to fetch" } };
+          if (!fake.pushKey) return fail("Phone notifications aren’t set up yet");
+          if (body.publicKey) return { data: { publicKey: fake.pushKey }, error: null };
+          if (body.test) return { data: { sent: fake.devices.length, failed: 0, gone: 0 }, error: null };
+          return fail("Missing pass");
+        } },
         channel(name) {
           const id = String(name).replace(/^budget-/, "");
           const ch = { on(_e, _f, fn) { fake.listeners.push({ id, fn }); return ch; }, subscribe(cb) { setTimeout(() => cb("SUBSCRIBED"), 0); return ch; } };

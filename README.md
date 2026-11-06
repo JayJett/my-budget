@@ -105,6 +105,21 @@ goal reached, goal deadline at risk, and allocation not at 100%.
   400 days, so a goal is never celebrated twice.
 - Email reminders aren't set up; `supabase/functions/send-reminders/run.js` has notes on adding them later.
 
+### Phone and computer notifications
+
+- Each person turns them on per device in Reminder settings ("Notifications on this device"). Devices are saved
+  in `push_subscriptions` (each person sees only their own; at most 10). Signing out turns them off on that device.
+- iPhone/iPad: only in the installed app (Add to Home Screen, iOS 16.4+). Android, Windows, Mac and Linux
+  browsers work directly.
+- After the morning run fills inboxes, the function sends each person one notification per device for their new
+  reminders (several become "3 new reminders"). Tapping it opens the right tab, or the inbox. `sw.js` shows them.
+- Messages are encrypted for the device and signed (`supabase/functions/send-reminders/webpush.js`, built on the
+  browser's Web Crypto, tested against the web-push standard's own example).
+- **The one secret:** `VAPID_PRIVATE_KEY`, an Edge Function secret you add in the Supabase dashboard
+  (Edge Functions → Secrets). Make it with `tools/make-push-keys.html`, which runs only in your browser.
+  The app gets the public half from the function, so nothing else needs changing. Without the secret, reminders
+  still appear under the bell; only notifications are off.
+
 ## Households and roles
 
 One login can be in several households (switch from the ⋯ menu). In each household you're an
