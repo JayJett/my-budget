@@ -1454,3 +1454,94 @@ details.help summary, details.more summary, .iv-years summary, .ico-box summary{
 .auth-card .lead, .auth-card .who-chip span, .auth-card .msg{ overflow-wrap:anywhere; }
 @media (max-width:360px){ .auth-card{ padding:22px 18px 18px; } .otp{ letter-spacing:.3em; padding-left:.3em; } }
 .auth-tabs button{ min-height:44px; }
+
+/* ============ Phase 7B: setup (three steps) ============ */
+body.setting-up .top{ display:none; }                                  /* setup has its own small header */
+.ob{ max-width:520px; margin:0 auto; padding-top:max(8px, env(safe-area-inset-top)); }
+.ob-top{ margin:0 0 18px; }
+.ob-top-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:44px; }
+.ob-brand{ display:inline-flex; align-items:center; gap:8px; font:700 var(--fs-md) var(--display); color:var(--ink); }
+.logo.sm{ width:26px; height:26px; border-radius:8px; font-size:.85rem; }
+.ob-later{ min-height:44px; padding:0 4px; font-size:var(--fs-sm); }
+.ob-stage{ display:flex; align-items:baseline; gap:8px; margin:6px 0 8px; font-size:var(--fs-sm); color:var(--muted); }
+.ob-stage b{ color:var(--accent); font-weight:700; }
+.ob-prog{ height:6px; border-radius:99px; background:var(--line); overflow:hidden; }
+.ob-prog span{ display:block; height:100%; border-radius:99px; background:var(--accent); transition:width .35s var(--ease); }
+.ob .ob-card, .ob-auth{ border:0; box-shadow:none; background:none; padding:0; }
+.ob-card h2, .ob-auth h2{ font:700 1.6rem/1.2 var(--display); letter-spacing:-.02em; margin:0 0 6px; outline:none; }
+.ob-card .lead, .ob-auth .lead{ color:var(--muted); font-size:var(--fs-md); margin:0 0 20px; }
+@keyframes ob-in{ from{ opacity:0; transform:translateX(14px); } }
+@keyframes ob-in-back{ from{ opacity:0; transform:translateX(-14px); } }
+.ob-in{ animation:ob-in .22s var(--ease) both; } .ob-in.back{ animation-name:ob-in-back; }
+
+/* step 1: choice cards (real radio buttons underneath) */
+.ob-opts{ border:0; margin:0 0 16px; padding:0; display:flex; flex-direction:column; gap:10px; }
+.ob-opt{ position:relative; display:flex; align-items:center; gap:14px; padding:14px 16px; min-height:72px; border:1.5px solid var(--line-strong); border-radius:18px; background:var(--surface); cursor:pointer; transition:border-color var(--dur), background-color var(--dur), transform .1s var(--ease); -webkit-tap-highlight-color:transparent; }
+.ob-opt:active{ transform:scale(.985); }
+.ob-opt input{ position:absolute; opacity:0; inset:0; margin:0; cursor:pointer; }
+.ob-opt-ic{ width:42px; height:42px; flex:none; border-radius:13px; display:grid; place-items:center; color:var(--accent); background:var(--accent-soft); }
+.ob-opt-ic svg{ width:22px; height:22px; }
+.ob-opt-t{ flex:1; min-width:0; } .ob-opt-t b{ display:block; font:650 1.02rem var(--display); } .ob-opt-t small{ display:block; color:var(--muted); font-size:var(--fs-sm); margin-top:2px; }
+.ob-tick{ width:24px; height:24px; flex:none; border-radius:50%; border:1.5px solid var(--line-strong); display:grid; place-items:center; color:transparent; transition:all var(--dur); }
+.ob-tick svg{ width:14px; height:14px; }
+.ob-opt:has(input:checked){ border-color:var(--accent); background:color-mix(in srgb, var(--accent) 7%, var(--surface)); }
+.ob-opt:has(input:checked) .ob-tick{ background:var(--accent); border-color:var(--accent); color:var(--on-accent); }
+.ob-opt:has(input:focus-visible){ outline:2px solid var(--accent); outline-offset:2px; }
+.ob-name, .ob-join{ margin:4px 0 16px; }
+.ob-note{ color:var(--muted); font-size:var(--fs-sm); background:var(--surface-2); border-radius:14px; padding:12px 14px; margin:0 0 12px; overflow-wrap:anywhere; }
+.ob-hint{ color:var(--muted); font-size:var(--fs-sm); margin:4px 0 0; }
+
+/* step 2: one big money box, how often, and optional details */
+.ob-pay{ background:var(--surface); border:1px solid var(--line); border-radius:20px; padding:14px; margin:0 0 12px; }
+.ob-pay-h{ display:flex; align-items:flex-end; gap:8px; margin-bottom:10px; }
+.ob-who{ margin:0 0 8px; font:650 var(--fs-md) var(--display); }
+.ob-amount{ display:flex; align-items:center; gap:4px; min-height:64px; padding:0 16px; border:1.5px solid var(--line-strong); border-radius:16px; background:var(--surface-2); cursor:text; transition:border-color var(--dur), background-color var(--dur); }
+.ob-amount:focus-within{ border-color:var(--accent); background:var(--surface); }
+.ob-cur{ font:700 1.6rem var(--display); color:var(--muted); }
+.ob-amount input{ flex:1; min-width:0; border:0; background:none; outline:none; padding:8px 0; font:700 1.9rem/1.1 var(--display); letter-spacing:-.02em; color:var(--ink); font-variant-numeric:tabular-nums; }
+.ob-amount input::placeholder{ color:var(--faint); }
+.ob-freq{ margin-top:10px; }
+.ob-freq span{ min-height:44px; }
+.ob-more{ margin-top:6px; }
+.ob-more summary{ min-height:44px; display:flex; align-items:center; color:var(--accent); font-weight:650; font-size:var(--fs-sm); cursor:pointer; list-style:none; }
+.ob-more summary::-webkit-details-marker{ display:none; }
+.ob-more summary::after{ content:"›"; margin-left:6px; transition:transform var(--dur); }
+.ob-more[open] summary::after{ transform:rotate(90deg); }
+.ob-small{ display:block; color:var(--muted); font-size:var(--fs-xs); margin-top:6px; }
+.ob-field input[type=text], .ob-field input[type=date]{ font-size:16px; }
+.ob-add{ margin:0 0 4px; } .ob-add small{ color:var(--muted); font-weight:500; margin-left:4px; }
+.icon-x{ width:44px; height:44px; flex:none; border:0; border-radius:12px; background:none; color:var(--muted); font-size:1.4rem; cursor:pointer; }
+
+/* step 3: the plan */
+.ob-sum{ display:flex; gap:10px; margin:0 0 10px; }
+.ob-sum > div{ flex:1; min-width:0; background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:10px 14px; }
+.ob-sum small{ display:block; color:var(--muted); font-size:var(--fs-xs); font-weight:600; }
+.ob-sum b{ font:700 1.25rem var(--display); white-space:nowrap; } .ob-sum b i{ font:500 var(--fs-xs) var(--body); color:var(--muted); font-style:normal; margin-left:2px; }
+.ob-bar{ height:12px; margin:4px 0 8px; } .ob-bar span{ transition:width .25s var(--ease); }
+.ob-status{ margin:0 0 10px; min-height:24px; }
+.ob-buckets{ list-style:none; margin:0 0 16px; padding:4px 0; background:var(--surface); border:1px solid var(--line); border-radius:20px; }
+.ob-buckets li{ display:flex; align-items:center; gap:10px; padding:10px 14px; }
+.ob-buckets li + li{ border-top:1px solid var(--line); }
+.ob-b-dot{ width:10px; height:10px; border-radius:50%; background:var(--bc); flex:none; }
+.ob-b-name{ flex:1; min-width:0; } .ob-b-name b{ display:block; font-weight:650; font-size:var(--fs-md); } .ob-b-name small{ display:block; color:var(--muted); font-size:var(--fs-xs); }
+.unit.ob-pct{ min-height:44px; border-radius:12px; padding:0 10px; background:var(--surface-2); flex:none; }
+.unit.ob-pct input{ width:4ch; font:650 1rem var(--display); text-align:right; font-size:16px; }
+.ob-b-amt{ min-width:72px; flex:none; text-align:right; white-space:nowrap; font:650 var(--fs-sm) var(--display); font-variant-numeric:tabular-nums; } .ob-b-amt small{ font:500 var(--fs-xs) var(--body); color:var(--muted); }
+.ob-nav{ display:flex; gap:10px; margin-top:8px; }
+.ob-nav .btn{ min-height:50px; justify-content:center; font-size:1rem; }
+.ob-nav .btn.primary{ flex:1; }
+.ob-back{ min-width:96px; }
+.ob-skip{ text-align:center; margin:14px 0 0; } .ob-skip .linkish{ min-height:44px; }
+
+/* done */
+.ob-done{ text-align:center; padding-top:12px; }
+.ob-done-ic{ width:64px; height:64px; margin:0 auto 14px; border-radius:50%; display:grid; place-items:center; color:var(--on-accent); background:var(--accent); animation:ob-pop .35s var(--ease) both; }
+.ob-done-ic svg{ width:30px; height:30px; }
+@keyframes ob-pop{ from{ transform:scale(.6); opacity:0; } }
+.ob-done .btn{ min-height:50px; margin-top:10px; justify-content:center; }
+
+/* the household step sits in the sign-in card, with the same header */
+.auth-card.ob-auth{ width:min(520px,100%); }
+@media (max-width:360px){ .ob-b-amt{ min-width:0; } .ob-buckets li{ flex-wrap:wrap; } .ob-b-name{ flex-basis:calc(100% - 20px); } .ob-b-amt{ margin-left:auto; } .ob-card h2, .ob-auth h2{ font-size:1.4rem; } .ob-amount input{ font-size:1.6rem; } }
+@media (prefers-reduced-motion: reduce){ .ob-in, .ob-done-ic{ animation:none !important; } }
+h2[tabindex="-1"]:focus, h2[tabindex="-1"]:focus-visible{ outline:none !important; }   /* focused only so screen readers announce the new step */

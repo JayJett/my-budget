@@ -12,85 +12,7 @@ const other = (id, name, role) => ({ user_id: id, display_name: name, email: nam
 const me = role => ({ user_id: "u-me", display_name: "Jarden", email: "jarden@example.com", role, joined_at: "2026-01-01" });
 const next = page => page.click('[data-obact="next"]');
 
-test("setup guide: answers become a ready-made budget, then the tour", { skip }, async () => {
-  const { page, errors, ctx } = await open({}, { waitFor: ".ob" });
-  await page.screenshot({ path: join(SHOTS, "setup-1-purpose.png"), fullPage: true });
-  assert.equal(await page.isDisabled('[data-obact="next"]'), true, "must pick a purpose first");
-  await page.click('[data-purpose="household"]');
-  await next(page);
-  // Who's in it: "you" is pre-filled, a second row is ready
-  assert.equal(await page.inputValue('[data-ob="people.0.name"]'), "Jarden");
-  await page.fill('[data-ob="people.1.name"]', "Madi");
-  await next(page);
-  await page.fill('[data-ob="people.0.pay"]', "2000");
-  await page.fill('[data-ob="people.1.pay"]', "4000");
-  await page.selectOption('[data-ob="people.1.freq"]', "monthly");
-  assert.match(await page.textContent('[data-obk="paytotal"]'), /\$3,846 per fortnight/); // $100,000 a year ÷ 26
-  await page.screenshot({ path: join(SHOTS, "setup-3-pay.png"), fullPage: true });
-  await next(page);
-  await page.fill('[data-ob="have.savings"]', "5000");
-  await page.fill('[data-ob="have.emergency"]', "2000");
-  await page.fill('[data-ob="have.kiwisaver"]', "20000");
-  await page.click('[data-obact="adddebt"]');
-  await page.fill('[data-ob="have.debts.0.name"]', "Car loan");
-  await page.fill('[data-ob="have.debts.0.balance"]', "8000");
-  await next(page);
-  // Suggested split: adds to 100%, can be tweaked
-  assert.equal(await page.textContent('[data-obk="total"]'), "100%");
-  await page.screenshot({ path: join(SHOTS, "setup-5-split.png"), fullPage: true });
-  await page.fill('[data-ob="split.0"]', "45");
-  assert.equal(await page.textContent('[data-obk="total"]'), "95%");
-  assert.equal(await page.isDisabled('[data-obact="next"]'), true, "can't continue unless it adds to 100%");
-  await page.fill('[data-ob="split.0"]', "50");
-  await next(page);
-  await page.waitForSelector("text=You’re all set, Jarden!");
-  await settle(page);
-  const b = await fake(page, () => window.__fake.budget);
-  assert.equal(b.version, 4);
-  const people = Object.values(b.people);
-  assert.deepEqual(people.map(p => [p.name, p.pay, p.freq]), [["Jarden", 2000, "fortnightly"], ["Madi", 4000, "monthly"]]);
-  for (const p of people) {
-    const total = Object.values(b.accounts).reduce((s, a) => s + (a.split[p.id] || 0), 0);
-    assert.ok(Math.abs(total - 1) < 1e-9, `${p.name}'s split adds to 100%`);
-  }
-  const nw = Object.values(b.nw.accounts).map(a => [a.name, a.type, a.balance]);
-  assert.deepEqual(nw, [["Savings", "Savings", 5000], ["Emergency Fund", "Savings", 2000], ["KiwiSaver", "Super", 20000], ["Car loan", "Debt", 8000]]);
-  assert.equal(b.goals.ef.target, 12500);
-  // Tour
-  await page.click('[data-obact="tour"]');
-  await page.waitForSelector(".tour:not([hidden])");
-  assert.equal(await page.textContent(".tour-card h3"), "Pick your period");
-  await page.screenshot({ path: join(SHOTS, "tour-1.png") });
-  for (let i = 0; i < 5; i++) await page.click('[data-tour="next"]');
-  assert.equal(await page.textContent(".tour-card h3"), "Settings live here");
-  await page.click('[data-tour="next"]'); // Done
-  assert.equal(await page.isVisible(".tour"), false);
-  assert.equal(await page.evaluate(() => localStorage.getItem("mb-tour-done-u-me")), "1");
-  assert.ok(await page.isVisible("#tabs"), "the normal app is back");
-  assert.deepEqual(errors, []);
-  await ctx.close();
-});
-
-test("setup guide: saving for something creates the goal", { skip }, async () => {
-  const { page, errors, ctx } = await open({}, { waitFor: ".ob" });
-  await page.click('[data-purpose="saving"]'); await next(page);
-  await next(page);
-  await page.fill('[data-ob="people.0.pay"]', "1500"); await next(page);
-  await page.fill('[data-ob="goal.name"]', "Trip to Japan");
-  await page.fill('[data-ob="goal.target"]', "9000");
-  await next(page); await next(page);
-  await page.waitForSelector("text=You’re all set");
-  await settle(page);
-  const b = await fake(page, () => window.__fake.budget);
-  const g = Object.values(b.goals.joint);
-  assert.equal(g.length, 1); assert.equal(g[0].name, "Trip to Japan"); assert.equal(g[0].target, 9000);
-  await page.click('[data-obact="finish"]');
-  await page.click('[data-tab="goals"]');
-  await page.waitForSelector('[data-tab="goals"][aria-selected="true"]');
-  assert.ok(await page.locator('.gl-name', { hasText: "Trip to Japan" }).count());
-  assert.deepEqual(errors, []);
-  await ctx.close();
-});
+/* The six-step setup guide was replaced by the three-step setup in Phase 7B: see tests/browser/phase7b.test.js. */
 
 test("viewers can look but not change anything", { skip }, async () => {
   const init = { households: [{ id: "hh-1", name: "Mum’s budget", role: "viewer", budget: RICH_V3, members: [other("u-mum", "Mum", "owner"), me("viewer")] }] };
@@ -239,7 +161,7 @@ test("'Welcome back, Jarden' on a device you've used before", { skip }, async ()
   assert.equal(await page.evaluate(() => document.activeElement.name), "password", "straight to the password box");
   await page.screenshot({ path: join(SHOTS, "welcome-back.png") });
   await page.click('[data-auth="notme"]');
-  assert.equal(await page.textContent("#auth h2"), "Welcome");
+  assert.equal(await page.textContent("#auth h2"), "Welcome to Moni Money");
   assert.ok(await page.isVisible('#fSignin input[name="email"]'));
   assert.deepEqual(errors, []);
   await ctx.close();
@@ -252,15 +174,6 @@ test("signing in remembers you for next time", { skip }, async () => {
   await page.click("#fSignin button");
   await page.waitForSelector("#app .viewas");
   assert.deepEqual(JSON.parse(await page.evaluate(() => localStorage.getItem("mb-welcome"))), { name: "Jarden", email: "jarden@example.com" });
-  assert.deepEqual(errors, []);
-  await ctx.close();
-});
-
-test("setup guide on a phone", { skip }, async () => {
-  const { page, errors, ctx } = await open({}, { width: 390, waitFor: ".ob" });
-  await page.screenshot({ path: join(SHOTS, "setup-phone.png"), fullPage: true });
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
-  assert.equal(overflow, false, "no sideways scrolling");
   assert.deepEqual(errors, []);
   await ctx.close();
 });

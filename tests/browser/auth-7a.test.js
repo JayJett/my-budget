@@ -9,7 +9,8 @@ setup();
 const creates = page => fake(page, () => window.__fake.rpcCalls.filter(c => c.name === "create_household").length);
 const households = page => fake(page, () => window.__fake.households.length);
 const auth = (page, name) => page.evaluate(n => window.__fake.authCalls.filter(c => c.name === n), name);
-const newUser = (extra = {}) => open(null, { init: { households: [], ...extra }, waitFor: "#fHousehold", width: 390 });
+// Phase 7B: setup step 1 asks who's budgeting first (nothing is chosen for you)
+const newUser = async (extra = {}) => { const o = await open(null, { init: { households: [], ...extra }, waitFor: "#fHousehold", width: 390 }); await o.page.check('#fHousehold input[value="solo"]'); return o; };
 const signedOut = (extra = {}, waitFor = "#fSignin") => open(null, { init: { signedOut: true, households: [], ...extra }, waitFor, width: 390 });
 const msg = page => page.textContent("#authMsg");
 

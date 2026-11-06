@@ -16,7 +16,7 @@ async function pngSize(f) {
 
 test("the manifest has what phones need to install the app", async () => {
   const m = JSON.parse(await read("manifest.webmanifest"));
-  assert.equal(m.name, "My Budget");
+  assert.equal(m.name, "Moni Money");
   assert.ok(m.short_name.length <= 12, "short enough to fit under the icon");
   assert.equal(m.display, "standalone");
   assert.equal(m.start_url, "./"); assert.equal(m.scope, "./");
@@ -30,7 +30,7 @@ test("the manifest has what phones need to install the app", async () => {
 test("iPhone home-screen icon, full screen and splash screens", async () => {
   const html = (await read("index.html")).toString();
   assert.deepEqual(await pngSize("icons/apple-touch-icon.png"), [180, 180]);
-  for (const tag of ['rel="manifest"', 'name="apple-mobile-web-app-capable" content="yes"', 'name="apple-mobile-web-app-title" content="My Budget"', 'rel="apple-touch-icon"', 'name="theme-color"', "viewport-fit=cover"])
+  for (const tag of ['rel="manifest"', 'name="apple-mobile-web-app-capable" content="yes"', 'name="apple-mobile-web-app-title" content="Moni Money"', 'rel="apple-touch-icon"', 'name="theme-color"', "viewport-fit=cover"])
     assert.ok(html.includes(tag), tag);
   const splashes = [...html.matchAll(/rel="apple-touch-startup-image" href="([^"]+)" media="\(device-width: (\d+)px\) and \(device-height: (\d+)px\) and \(-webkit-device-pixel-ratio: (\d)\)/g)];
   assert.ok(splashes.length >= 8, "covers current iPhone sizes");

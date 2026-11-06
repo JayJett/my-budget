@@ -1,7 +1,7 @@
 {
-  "name": "My Budget",
-  "short_name": "My Budget",
-  "description": "A friendly household budget visualiser.",
+  "name": "Moni Money",
+  "short_name": "Moni Money",
+  "description": "Moni Money: a friendly budget for you or your household. Moni is the Māori word for money.",
   "id": "./",
   "start_url": "./",
   "scope": "./",

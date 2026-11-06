@@ -32,7 +32,7 @@ test("offline: no 'leave this page?' prompt when the app knows it's offline, eve
 
 test("a brand-new budget: one welcome card (on Budget), no review nag or $0 charts, nothing called 'Joint'", { skip }, async () => {
   const { page, errors, ctx } = await open({}, { waitFor: ".ob", width: 390 });
-  await page.click("text=Skip setup and start with a blank budget");
+  await page.click(".ob-later");
   await page.waitForSelector("#app .viewas");
   assert.equal(await page.locator(".welcome").count(), 1);
   assert.doesNotMatch(await page.textContent(".welcome"), /tinted/);

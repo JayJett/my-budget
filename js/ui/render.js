@@ -45,7 +45,7 @@ const initial = p => (p.name || "?").trim().charAt(0).toUpperCase() || "?";
     and, for more than one person, their names underneath. Nothing here is fixed to particular people. */
 export function renderBrand() {
   const P = app.state.people, names = P.map(p => (p.name || "").trim()).filter(Boolean);
-  const title = app.household ? app.household.name : (names.length ? listNames(names) : "My budget");
+  const title = app.household ? app.household.name : (names.length ? listNames(names) : "Moni Money");
   const av = $("#avatars");
   if (av) av.innerHTML = P.slice(0, 4).map(p => `<span class="av ${pc(p)}">${esc(initial(p))}</span>`).join("");
   const brand = $("#brandNames");

@@ -105,7 +105,7 @@ function deviceHTML() {
   let body;
   if (!D) body = `<p class="set-note">Checking this device…</p>`;
   else if (!s.ok) body = `<p class="set-note">${{
-    "ios-home": "On iPhone and iPad, notifications only work in the installed app (iOS 16.4 or later). In Safari, tap the Share button, then <b>Add to Home Screen</b>. Open My Budget from your Home Screen, then turn them on here.",
+    "ios-home": "On iPhone and iPad, notifications only work in the installed app (iOS 16.4 or later). In Safari, tap the Share button, then <b>Add to Home Screen</b>. Open Moni Money from your Home Screen, then turn them on here.",
     unsupported: "This browser can’t show notifications. Try Chrome, Edge, Firefox or Safari, or the installed app.",
     denied: "Notifications are blocked for this app on this device. Allow them in your device or browser settings, then come back here.",
   }[s.why]}</p>`;

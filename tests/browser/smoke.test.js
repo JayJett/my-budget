@@ -140,9 +140,9 @@ test("the fair-split check only shows with two or more earners", { skip }, async
 
 test("a brand-new household opens the setup guide; skipping it gives one person and no fair-split check", { skip }, async () => {
   const { page, errors, ctx } = await open({}, { waitFor: ".ob" });
-  assert.ok(await page.isVisible("text=What’s this budget for?"));
+  assert.ok(await page.isVisible("text=Let’s start with your income"));
   assert.equal(await page.isVisible("#tabs"), false, "tabs are hidden during setup");
-  await page.click("text=Skip setup and start with a blank budget");
+  await page.click(".ob-later");
   await page.waitForSelector("#app .viewas");
   assert.equal(await page.locator("[data-edit-person]").count(), 1);
   assert.equal(await page.textContent(".m-name"), "Jarden", "named after the signed-in person");
