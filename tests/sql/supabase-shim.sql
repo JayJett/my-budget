@@ -1,9 +1,11 @@
 -- A tiny stand-in for the parts of Supabase the migrations rely on (roles, auth.users,
 -- auth.uid(), auth.jwt()), so they can be tested on a plain throwaway Postgres.
 -- Test only: never run this against the real project.
+-- Roles are shared by every database on the server, so two test files starting at once could
+-- both try to create them. Creating one that already exists is simply ignored.
 do $$ begin
-  if not exists (select 1 from pg_roles where rolname = 'anon') then create role anon nologin; end if;
-  if not exists (select 1 from pg_roles where rolname = 'authenticated') then create role authenticated nologin; end if;
+  begin create role anon nologin; exception when duplicate_object or unique_violation then null; end;
+  begin create role authenticated nologin; exception when duplicate_object or unique_violation then null; end;
 end $$;
 create schema if not exists auth;
 create table if not exists auth.users (
