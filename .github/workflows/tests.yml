@@ -1,0 +1,61 @@
+name: Tests
+
+# Runs on every push and pull request. Nothing here deploys anything:
+# GitHub Pages keeps serving the files straight from the main branch.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  money-maths:
+    name: Money maths
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run the calculation, migration and saving tests
+        run: TZ=Pacific/Auckland npm test
+
+  database:
+    name: Database changes (throwaway Postgres)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Test the migrations on a throwaway database
+        env:
+          DATABASE_URL: postgresql://postgres@localhost:5432/postgres
+        run: npm run test:sql
+
+  browser:
+    name: App in a real browser (fake Supabase)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install Playwright (test-only, not part of the app)
+        run: npm install --no-save playwright@1.48.2 && npx playwright install --with-deps chromium
+      - name: Click through the app
+        run: TZ=Pacific/Auckland npm run test:browser
+      - name: Keep screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: tests/browser/screenshots/
+          if-no-files-found: ignore

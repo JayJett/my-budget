@@ -1,72 +1,13 @@
 /* Browser tests: load the real app in Chromium, with a fake Supabase (fake-supabase.js),
    and click through it. Run with: npm run test:browser
    Screenshots go to tests/browser/screenshots/ (not committed) so a person can eyeball them. */
-import { test, before, after } from "node:test";
+import { test } from "node:test";
 import assert from "node:assert/strict";
-import http from "node:http";
-import { readFile, mkdir } from "node:fs/promises";
-import { extname, join, normalize } from "node:path";
-import { fileURLToPath } from "node:url";
-import { createRequire } from "node:module";
+import { join } from "node:path";
 import { LIVE_V3, RICH_V3 } from "../fixtures.js";
+import { setup, skip, SHOTS, open, settle, fake, goTab, setField } from "./helpers.js";
 
-const require = createRequire(import.meta.url);
-let chromium;
-try { ({ chromium } = require("playwright")); } catch (_) { /* skipped below */ }
-const skip = !chromium && "Playwright isn't installed";
-
-const ROOT = fileURLToPath(new URL("../../", import.meta.url));
-const SHOTS = join(ROOT, "tests/browser/screenshots");
-const TYPES = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png" };
-let server, base, browser;
-
-before(async () => {
-  if (skip) return;
-  server = http.createServer(async (req, res) => {
-    const p = normalize(decodeURIComponent(new URL(req.url, "http://x").pathname)).replace(/^(\.\.[/\\])+/, "");
-    const file = join(ROOT, p === "/" || p === "\\" ? "index.html" : p);
-    try { const body = await readFile(file); res.writeHead(200, { "content-type": TYPES[extname(file)] || "text/plain" }); res.end(body); }
-    catch { res.writeHead(404); res.end("not found"); }
-  }).listen(0);
-  base = `http://127.0.0.1:${server.address().port}/`;
-  browser = await chromium.launch();
-  await mkdir(SHOTS, { recursive: true });
-});
-after(async () => { if (browser) await browser.close(); if (server) server.close(); });
-
-/** Open the app with a given saved budget. Returns the page and a list of errors seen. */
-async function open(budget, { width = 1280, seq = 0 } = {}) {
-  const ctx = await browser.newContext({ viewport: { width, height: 900 } });
-  const page = await ctx.newPage();
-  const errors = [];
-  page.on("pageerror", e => errors.push(String(e)));
-  page.on("console", m => { if (m.type() === "error") errors.push(m.text()); });
-  page.on("response", r => { if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`); });
-  const fakeJs = await readFile(join(ROOT, "tests/browser/fake-supabase.js"), "utf8");
-  await page.route("https://cdn.jsdelivr.net/**", r => r.fulfill({ contentType: "text/javascript", body: fakeJs }));
-  await page.route(/fonts\.(googleapis|gstatic)\.com/, r => r.fulfill({ contentType: "text/css", body: "" }));
-  await page.addInitScript(([b, s]) => { window.__FAKE_INIT = { budget: b, seq: s }; }, [budget, seq]);
-  await page.goto(base);
-  try { await page.waitForSelector("#app .viewas", { timeout: 10000 }); }
-  catch (e) {
-    await page.screenshot({ path: join(SHOTS, "failed-to-load.png") });
-    throw new Error(`The app didn't load. Page errors: ${errors.join(" | ") || "none"}. Screen: ${(await page.textContent("body")).replace(/\s+/g, " ").slice(0, 200)}`);
-  }
-  return { page, errors, ctx };
-}
-const settle = page => page.waitForFunction(() => document.querySelector("#saveText")?.textContent === "Saved", null, { timeout: 5000 });
-const fake = (page, expr) => page.evaluate(expr);
-/** Click a tab and wait until it's showing. */
-async function goTab(page, tab) {
-  await page.click(`[data-tab="${tab}"]`);
-  await page.waitForSelector(`[data-tab="${tab}"][aria-selected="true"]`);
-}
-/** Type into a box the way a person does: click in, select what's there, type over it. */
-async function setField(page, sel, v) {
-  await page.click(sel);
-  await page.$eval(sel, el => el.select());
-  if (v === "") await page.keyboard.press("Backspace"); else await page.keyboard.type(v);
-}
+setup();
 
 test("your live budget upgrades itself, with a backup, and shows both people", { skip }, async () => {
   const { page, errors, ctx } = await open(LIVE_V3);
@@ -184,8 +125,12 @@ test("the fair-split check only shows with two or more earners", { skip }, async
   await ctx.close();
 });
 
-test("a brand-new household starts with one person and no fair-split check", { skip }, async () => {
-  const { page, errors, ctx } = await open({});
+test("a brand-new household opens the setup guide; skipping it gives one person and no fair-split check", { skip }, async () => {
+  const { page, errors, ctx } = await open({}, { waitFor: ".ob" });
+  assert.ok(await page.isVisible("text=What’s this budget for?"));
+  assert.equal(await page.isVisible("#tabs"), false, "tabs are hidden during setup");
+  await page.click("text=Skip setup and start with a blank budget");
+  await page.waitForSelector("#app .viewas");
   assert.equal(await page.locator('[data-l="pp"][data-f="name"]').count(), 1);
   assert.equal(await page.inputValue('[data-l="pp"][data-f="name"]'), "Jarden", "named after the signed-in person");
   assert.equal(await page.isVisible("#fairSec"), false);

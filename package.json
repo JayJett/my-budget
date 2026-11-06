@@ -6,6 +6,6 @@
   "scripts": {
     "test": "node --test \"tests/*.test.js\"",
     "test:browser": "node --test --test-concurrency=1 \"tests/browser/*.test.js\"",
-    "test:sql": "node --test \"tests/sql/*.test.js\""
+    "test:sql": "node --test --test-concurrency=1 \"tests/sql/*.test.js\""
   }
 }
