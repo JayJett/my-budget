@@ -26,8 +26,57 @@
     return s;
   }
 
+  /* History, like the database's budget_changes (see supabase/migrations/..._history.sql). */
+  const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  function changesBetween(a, b, path = [], out = []) {
+    if (same(a, b)) return out;
+    if (isObj(a) && isObj(b)) {
+      for (const k of [...new Set([...Object.keys(a), ...Object.keys(b)])].sort()) {
+        if (!has(a, k)) out.push({ p: [...path, k], n: copy(b[k]) });
+        else if (!has(b, k)) out.push({ p: [...path, k], o: copy(a[k]) });
+        else changesBetween(a[k], b[k], [...path, k], out);
+      }
+      return out;
+    }
+    out.push({ p: path, o: copy(a), n: copy(b) }); return out;
+  }
+  const getPath = (s, p) => { let c = s; for (const k of p) { if (!isObj(c) || !has(c, k)) return undefined; c = c[k]; } return c; };
+  function invert(s0, changes) {
+    const s = copy(s0) || {};
+    for (const c of [...changes].reverse()) {
+      if (has(c, "o")) { let x = s; for (let i = 0; i < c.p.length - 1; i++) { if (!isObj(x[c.p[i]])) x[c.p[i]] = {}; x = x[c.p[i]]; } x[c.p[c.p.length - 1]] = copy(c.o); }
+      else { let x = s; for (let i = 0; i < c.p.length - 1 && isObj(x); i++) x = x[c.p[i]]; if (isObj(x)) delete x[c.p[c.p.length - 1]]; }
+    }
+    return s;
+  }
+  let changeId = 500;
+  /** Record a save in the household's history; returns the entry id (or null). Merges quick follow-ups. */
+  function record(hh, before, after, by, kind = "edit", reason = "", refId = null, refAt = null) {
+    const ch = changesBetween(before || {}, after || {});
+    if (!ch.length) return null;
+    const now = Date.now(), last = hh.changes[hh.changes.length - 1];
+    if (kind === "edit" && last && last.kind === "edit" && last.changed_by === by && !last.undone_at && now - Date.parse(last.changed_at) < 120000) {
+      const merged = copy(last.changes); let ok = true;
+      for (const c of ch) {
+        const e = merged.find(x => x.p.length <= c.p.length && same(c.p.slice(0, x.p.length), x.p));
+        if (!e) { ok = false; break; }
+        if (e.p.length === c.p.length) { if (has(c, "n")) e.n = copy(c.n); else delete e.n; }
+        else if (isObj(e.n)) { const rest = c.p.slice(e.p.length); e.n = has(c, "n") ? invert(e.n, [{ p: rest, o: c.n }]) : invert(e.n, [{ p: rest }]); }
+        else { ok = false; break; }
+      }
+      if (ok) {
+        last.changes = merged.filter(x => !(has(x, "o") === has(x, "n") && (!has(x, "o") || same(x.o, x.n))));
+        if (!last.changes.length) { hh.changes.pop(); return null; }
+        last.changed_at = new Date(now).toISOString(); return last.id;
+      }
+    }
+    const row = { id: ++changeId, household_id: hh.id, changed_by: by, changed_at: new Date(now).toISOString(), kind, reason, ref_id: refId, ref_at: refAt, undone_at: null, changes: ch };
+    hh.changes.push(row); return row.id;
+  }
+
   const households = (init.households || [{ id: "hh-1", name: "Test household", role: "owner", budget: init.budget || {}, seq: init.seq || 0 }])
-    .map(h => ({ seq: 0, backups: [], invites: [], snapshots: [], ...copy(h), members: h.members ? copy(h.members) : [meMember(h.role || "owner")] }));
+    .map(h => ({ seq: 0, backups: [], invites: [], snapshots: [], changes: [], ...copy(h), members: h.members ? copy(h.members) : [meMember(h.role || "owner")] }));
   const user = { id: ME, email: "jarden@example.com", user_metadata: { name: init.myName || "Jarden" }, created_at: "2026-01-01T00:00:00Z" };
   let authCb = null;
 
@@ -38,7 +87,8 @@
     hh: id => households.find(h => h.id === id),
     /** Simulate someone else saving to the first (or given) household. */
     remote(ops, by = "u-other", id = households[0].id) {
-      const hh = fake.hh(id); hh.budget = applyOps(hh, ops); hh.seq++;
+      const hh = fake.hh(id), before = copy(hh.budget); hh.budget = applyOps(hh, ops); hh.seq++;
+      record(hh, before, hh.budget, by);
       const row = { household_id: id, state: copy(hh.budget), seq: hh.seq, updated_by: by, updated_at: new Date().toISOString() };
       fake.listeners.filter(l => l.id === id).forEach(l => l.fn({ new: row }));
     },
@@ -55,7 +105,7 @@
   const NET = { data: null, error: { message: "TypeError: Failed to fetch" } };
 
   function query(table) {
-    const q = { eq: {}, is: {}, update: null, del: false, cols: "" };
+    const q = { eq: {}, is: {}, lt: {}, gt: {}, limit: Infinity, desc: false, update: null, del: false, cols: "" };
     const run = () => {
       if (offline()) return NET;
       const hid = q.eq.household_id || q.eq.id;
@@ -69,6 +119,11 @@
       }
       if (table === "budgets") { const h = fake.hh(hid); return { data: h ? { state: copy(h.budget), seq: h.seq, updated_by: ME, updated_at: new Date().toISOString() } : null, error: null }; }
       if (table === "budget_snapshots") return { data: copy((fake.hh(hid) || { snapshots: [] }).snapshots), error: null };
+      if (table === "budget_changes") {
+        let rows = copy((fake.hh(hid) || { changes: [] }).changes).filter(r => (q.lt.id === undefined || r.id < q.lt.id) && (q.gt.id === undefined || r.id > Number(q.gt.id)));
+        if (q.desc) rows.reverse();
+        return { data: rows.slice(0, q.limit), error: null };
+      }
       if (table === "budget_backups") return { data: copy((fake.hh(hid) || { backups: [] }).backups), error: null };
       if (table === "household_invites") {
         if (q.del) { households.forEach(h => { h.invites = h.invites.filter(i => i.id !== q.eq.id); }); return { data: null, error: null }; }
@@ -77,7 +132,8 @@
       return { data: [], error: null };
     };
     const b = {
-      select(cols) { q.cols = cols || ""; return b; }, eq(k, v) { q.eq[k] = v; return b; }, is(k, v) { q.is[k] = v; return b; }, order() { return b; },
+      select(cols) { q.cols = cols || ""; return b; }, eq(k, v) { q.eq[k] = v; return b; }, is(k, v) { q.is[k] = v; return b; },
+      order(_c, o) { q.desc = !!(o && o.ascending === false); return b; }, lt(k, v) { q.lt[k] = Number(v); return b; }, gt(k, v) { q.gt[k] = Number(v); return b; }, limit(n) { q.limit = n; return b; },
       update(v) { q.update = v; return b; }, delete() { q.del = true; return b; }, maybeSingle() { return b; },
       then(res, rej) { return Promise.resolve(run()).then(res, rej); },
     };
@@ -112,8 +168,38 @@
         if (fake.failNext > 0) { fake.failNext--; return err("Failed to fetch"); }
         if (!roleIn(id)) return err("Not a member of this household");
         if (roleIn(id) === "viewer") return err("You have view-only access to this budget");
-        const hh = fake.hh(id); hh.budget = applyOps(hh, a.p_ops); hh.seq++;
-        return { data: { state: copy(hh.budget), seq: hh.seq, updated_at: new Date().toISOString(), updated_by: ME }, error: null };
+        const hh = fake.hh(id), before = copy(hh.budget); hh.budget = applyOps(hh, a.p_ops); hh.seq++;
+        const rep = a.p_ops.find(o => o.op === "replace");
+        const change_id = record(hh, before, hh.budget, ME, rep ? "replace" : "edit", rep ? rep.reason || "Replaced" : "");
+        return { data: { state: copy(hh.budget), seq: hh.seq, updated_at: new Date().toISOString(), updated_by: ME, change_id }, error: null };
+      }
+      case "undo_budget_change": {
+        if (!["owner", "editor"].includes(roleIn(id))) return err("Only owners and editors can undo changes");
+        const hh = fake.hh(id), r = hh.changes.find(x => x.id === Number(a.p_change_id));
+        if (!r) return err("That change is no longer in the history");
+        if (r.undone_at) return err("That change has already been undone");
+        const before = copy(hh.budget); let s = copy(hh.budget); const skipped = [];
+        for (const c of [...r.changes].reverse()) {
+          const cur = getPath(s, c.p);
+          if (has(c, "n") ? same(cur, c.n) : cur === undefined) s = invert(s, [c]);
+          else skipped.push({ p: c.p, by: ([...hh.changes].reverse().find(l => l.id > r.id && l.changes.some(lc => same(lc.p.slice(0, c.p.length), c.p.slice(0, lc.p.length)))) || {}).changed_by || null });
+        }
+        if (same(before, s)) return { data: { state: before, seq: hh.seq, updated_at: new Date().toISOString(), updated_by: ME, change_id: null, skipped }, error: null };
+        hh.budget = s; hh.seq++;
+        const change_id = record(hh, before, s, ME, "undo", "", r.id, r.changed_at);
+        r.undone_at = new Date().toISOString();
+        return { data: { state: copy(s), seq: hh.seq, updated_at: new Date().toISOString(), updated_by: ME, change_id, skipped }, error: null };
+      }
+      case "restore_budget_version": {
+        if (!["owner", "editor"].includes(roleIn(id))) return err("Only owners and editors can restore an earlier version");
+        const hh = fake.hh(id), r = hh.changes.find(x => x.id === Number(a.p_change_id));
+        if (!r) return err("That version is no longer in the history");
+        const before = copy(hh.budget);
+        const target = [...hh.changes].filter(x => x.id > r.id).reverse().reduce((s, x) => invert(s, x.changes), copy(hh.budget));
+        if (same(before, target)) return { data: { state: before, seq: hh.seq, updated_at: new Date().toISOString(), updated_by: ME, change_id: null }, error: null };
+        hh.budget = target; hh.seq++;
+        const change_id = record(hh, before, target, ME, "restore", "", r.id, r.changed_at);
+        return { data: { state: copy(target), seq: hh.seq, updated_at: new Date().toISOString(), updated_by: ME, change_id }, error: null };
       }
       case "create_household": {
         const h = { id: "hh-" + (households.length + 1), name: a.p_name, budget: {}, seq: 0, backups: [], invites: [], members: [meMember("owner")] };

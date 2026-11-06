@@ -26,7 +26,7 @@ export function openAccount() {
     <section class="set"><h4>Email</h4><form id="setEmail" class="set-row"><input type="email" name="email" value="${esc(u.email || "")}" autocomplete="email" required aria-label="Email"><button class="btn primary" type="submit">Change</button></form><div class="msg" id="mEmail"></div>
       <p class="set-note">We’ll email a confirmation link. The change happens once you open it.</p></section>
     <section class="set"><h4>Password</h4><form id="setPass" class="set-row"><input type="password" name="password" minlength="8" autocomplete="new-password" required placeholder="New password (8+ characters)" aria-label="New password"><button class="btn primary" type="submit">Change</button></form><div class="msg" id="mPass"></div></section>
-    <section class="set"><h4>Your data</h4><p class="set-note">Download everything we store about you: your account details, every household you’re in, their budgets and backups.</p><button class="btn" type="button" data-sheet="download">Download all my data</button><div class="msg" id="mDl"></div></section>
+    <section class="set"><h4>Your data</h4><p class="set-note">Download everything we store about you: your account details, every household you’re in, their budgets, backups and change history.</p><button class="btn" type="button" data-sheet="download">Download all my data</button><div class="msg" id="mDl"></div></section>
     <section class="set danger-zone"><h4>Delete my account</h4><div id="delPlan" class="set-note">Working out what would happen…</div>
       <form id="setDelete" class="set-row"><input type="text" name="confirm" autocomplete="off" placeholder="Type DELETE to confirm" aria-label="Type DELETE to confirm"><button class="btn danger" type="submit">Delete my account</button></form><div class="msg" id="mDel"></div></section>`);
   explainDelete();
@@ -55,14 +55,15 @@ async function downloadAll() {
     account: { id: u.id, email: u.email, name: u.user_metadata && u.user_metadata.name, created_at: u.created_at }, households: [] };
   for (const h of await myHouseholds()) {
     const id = h.household_id;
-    const [members, budget, backups, invites] = await Promise.all([
+    const [members, budget, backups, invites, history] = await Promise.all([
       sb.from("household_members").select("display_name, email, role, joined_at").eq("household_id", id),
       sb.from("budgets").select("state, updated_at").eq("household_id", id).maybeSingle(),
       sb.from("budget_backups").select("state, reason, taken_at").eq("household_id", id).order("taken_at"),
       sb.from("household_invites").select("email, role, created_at, accepted_at").eq("household_id", id),
+      sb.from("budget_changes").select("changed_by, changed_at, kind, reason, changes").eq("household_id", id).order("id"),
     ]);
     out.households.push({ id, name: h.households && h.households.name, your_role: h.role, joined_at: h.joined_at,
-      members: members.data || [], budget: budget.data || null, backups: backups.data || [], invites: invites.data || [] });
+      members: members.data || [], budget: budget.data || null, backups: backups.data || [], invites: invites.data || [], history_last_90_days: history.data || [] });
   }
   offerFile(`my-budget-data-${ymd(new Date())}.json`, JSON.stringify(out, null, 1), "Your data");
   msg("mDl", "", "info");

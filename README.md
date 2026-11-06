@@ -70,6 +70,23 @@ It's built from **snapshots**: copies of the net-worth balances and goals, saved
   monthly snapshots (about 2 KB each) are all kept.
 - Totals are worked out in the app (`js/model/snapshots.js`) with the same maths as the Net worth tab.
 
+## History and undo
+
+Every change to a budget is recorded in `budget_changes`: who made it, when, and each box's old and new value.
+
+- It's written by the database itself, inside `apply_budget_ops`, so nothing can skip it (offline edits appear once they sync).
+- Quick follow-ups by the same person to the same thing within 2 minutes are merged into one entry, so typing
+  "4… 45… 450" shows as one change from $400 to $450.
+- **Undo** (next to "Saved", or Ctrl/⌘+Z outside a text box) steps back through *your* changes from this session.
+  It never overwrites a newer change by someone else; it leaves that box alone and says who changed it.
+- **History** (⋯ menu) lists changes in plain language, grouped by day. From there, owners and editors can undo any
+  change or restore the whole budget to how it was after an earlier change. Undo and restore are saved as new
+  changes, so they can be undone too. Viewers can look but not change anything.
+- The wording and the "step back" maths live in `js/model/history.js`; the database does the real undo and
+  restore (`undo_budget_change`, `restore_budget_version`), and tests check both give the same answer.
+- Clean-up: a nightly job (`budget-history-cleanup`) deletes history older than 90 days, keeps at most 5,000
+  changes per household, and keeps the newest 20 "before a replace" backups per household.
+
 ## Households and roles
 
 One login can be in several households (switch from the ⋯ menu). In each household you're an

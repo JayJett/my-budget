@@ -15,7 +15,7 @@ import { diff, applyOps, same } from "./ops.js";
 import { toStored, fromStored, VERSION } from "../model/schema.js";
 import { migrate } from "../model/migrate.js";
 
-export function createStore({ sb, householdId, getState, setState, onStatus, onRemote }) {
+export function createStore({ sb, householdId, getState, setState, onStatus, onRemote, onSaved = () => {} }) {
   let base = {}, seq = -1;
   let timer = null, writing = false, again = false, retryTimer = null, chain = 0;
   let replaceReason = null;  // set when the next save must replace the whole budget (upgrade/import)
@@ -110,6 +110,7 @@ export function createStore({ sb, householdId, getState, setState, onStatus, onR
     replaceReason = null;
     const pending = diff(target, local()); // anything typed while the save was on its way
     adopt(data.state, Number(data.seq), pending, { by: data.updated_by, at: data.updated_at, self: true });
+    onSaved(data); // e.g. remember the history entry for the Undo button
     processQueued();
     // Keep going if there's more to save, but never loop forever on our own.
     if ((again || dirty()) && chain++ < 3) { again = false; return flush(); }
@@ -156,6 +157,8 @@ export function createStore({ sb, householdId, getState, setState, onStatus, onR
     busy: () => !!(timer || writing),
     hasUnsaved: () => !!(timer || writing) || dirty(),
     replaceNext: reason => { replaceReason = reason; saveCache(); },
+    /** The budget exactly as the database last told us (without edits still on their way). */
+    serverCopy: () => JSON.parse(JSON.stringify(base)),
     saveCache,
   };
 }
