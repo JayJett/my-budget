@@ -97,9 +97,15 @@ test("viewers can look but not change anything", { skip }, async () => {
   const { page, errors, ctx } = await open(null, { init });
   await page.waitForFunction(() => document.querySelector("#saveText").textContent === "View only");
   assert.ok(await page.isVisible("text=You’re viewing Mum’s budget"));
-  assert.equal(await page.isDisabled('[data-l="pp"][data-i="j"][data-f="pay"]'), true);
-  assert.equal(await page.isVisible('[data-addperson]'), true);
-  assert.equal(await page.isDisabled('[data-addperson]'), true);
+  assert.equal(await page.locator("[data-person-new], [data-acc-new], [data-reorder]").count(), 0, "no add or reorder buttons");
+  await page.click('[data-edit-person="j"]');                        // viewers can still look at the details
+  assert.equal(await page.isDisabled('#sheet [data-l="pp"][data-i="j"][data-f="pay"]'), true);
+  assert.equal(await page.locator("#sheet [data-rmperson]").count(), 0);
+  await page.click('#sheet [data-sheet="close"]');
+  await page.click('[data-edit-acc="js"]');
+  assert.equal(await page.isDisabled('#sheet [data-f="split.j"]'), true);
+  assert.equal(await page.locator("#sheet [data-del]").count(), 0);
+  await page.click('#sheet [data-sheet="close"]');
   await page.screenshot({ path: join(SHOTS, "viewer.png") });
   const calls = await fake(page, () => window.__fake.rpcCalls.filter(c => c.name === "apply_budget_ops"));
   assert.equal(calls.length, 0, "a viewer never tries to save, not even the version upgrade");
@@ -119,7 +125,7 @@ test("switch between households from the menu", { skip }, async () => {
   await page.screenshot({ path: join(SHOTS, "menu-switcher.png") });
   await page.click('[data-switch="hh-2"]');
   await page.waitForFunction(() => document.querySelector('[data-f="note"]')?.value === "Mum’s numbers");
-  assert.match(await page.textContent("#brandNames small"), /Mum’s budget/);
+  assert.match(await page.textContent("#brandNames .brand-t"), /Mum’s budget/);
   // Remembered on this device
   assert.equal(await page.evaluate(() => localStorage.getItem("mb-household-u-me")), "hh-2");
   assert.deepEqual(errors, []);
@@ -138,7 +144,7 @@ test("household settings: rename, roles, remove, invite with a role", { skip }, 
   await page.click('#setHHName button');
   await page.waitForSelector("#mHH.ok");
   assert.equal(await fake(page, () => window.__fake.hh("hh-1").name), "The Jett house");
-  assert.match(await page.textContent("#brandNames small"), /The Jett house/);
+  assert.match(await page.textContent("#brandNames .brand-t"), /The Jett house/);
   await page.selectOption('[data-role-for="u-madi"]', "owner");
   await page.waitForSelector("text=Role updated");
   assert.equal(await fake(page, () => window.__fake.hh("hh-1").members.find(m => m.user_id === "u-madi").role), "owner");
@@ -179,13 +185,13 @@ test("leaving a household moves you to your other one; creating one starts the s
   await page.waitForSelector("#sheet[open]");
   assert.match(await page.textContent("#sheet"), /Madi will become the owner/);
   await page.click('[data-sheet="leave"]'); await page.click("#dlgYes");
-  await page.waitForFunction(() => /Mum’s budget/.test(document.querySelector("#brandNames small").textContent));
+  await page.waitForFunction(() => /Mum’s budget/.test(document.querySelector("#brandNames .brand-t").textContent));
   assert.equal(await fake(page, () => window.__fake.hh("hh-1").members[0].role), "owner", "Madi now owns it");
   await page.click("#menuBtn"); await page.click('[data-act="household"]');
   await page.fill('#setNewHH input[name="name"]', "Holiday house");
   await page.click("#setNewHH button");
   await page.waitForSelector(".ob");
-  assert.match(await page.textContent("#brandNames small"), /Holiday house/);
+  assert.match(await page.textContent("#brandNames .brand-t"), /Holiday house/);
   assert.deepEqual(errors, []);
   await ctx.close();
 });

@@ -46,7 +46,8 @@ after(async () => { if (browser) await browser.close(); if (server) server.close
 /** Open the app with a given saved budget (or a full fake setup via opts.init).
     Returns the page and a list of errors seen. waitFor: what to wait for before returning. */
 export async function open(budget, { width = 1280, seq = 0, init = null, waitFor = "#app .viewas", storage = null, device = null } = {}) {
-  const ctx = await browser.newContext(device ? { ...device } : { viewport: { width, height: 900 } });
+  // Reduced motion: sheets appear in place, so tests can measure them straight away (and the setting is exercised).
+  const ctx = await browser.newContext({ ...(device ? { ...device } : { viewport: { width, height: 900 } }), reducedMotion: "reduce" });
   const page = await ctx.newPage();
   const errors = [];
   page.on("pageerror", e => errors.push(String(e)));
@@ -76,3 +77,17 @@ export async function setField(page, sel, v) {
   if (v === "") await page.keyboard.press("Backspace"); else await page.keyboard.type(v);
 }
 
+
+/* Budget tab (UI phase 1): pay and allocations are edited in a sheet. */
+export async function editPerson(page, id) {
+  await page.click(`[data-edit-person="${id}"]`);
+  await page.waitForSelector(`#sheet .bsheet [data-l="pp"][data-i="${id}"][data-f="name"]`);
+}
+export async function editAccount(page, id) {
+  await page.click(`[data-edit-acc="${id}"]`);
+  await page.waitForSelector(`#sheet .bsheet [data-l="acc"][data-i="${id}"][data-f="name"]`);
+}
+export async function closeSheet(page) {
+  await page.click('#sheet [data-sheet="close"]');
+  await page.waitForSelector("#sheet", { state: "hidden" });
+}

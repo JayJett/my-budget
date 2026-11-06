@@ -18,7 +18,7 @@ export function mainMenu() {
     <button class="item" type="button" data-act="reminders">Reminders<small>Gentle nudges, all optional. Choose yours.</small></button>
     <button class="item" type="button" data-act="history">History<small>Who changed what, and when. Undo or go back.</small></button>
     <button class="item" type="button" data-act="household">Household settings<small>${esc(app.household ? app.household.name : "")}: people, roles, invites</small></button>
-    <button class="item" type="button" data-act="account">Account settings<small>Name, email, password, your data</small></button>
+    <button class="item" type="button" data-act="account">Account settings<small>Your colour, name, email, password</small></button>
     <button class="item" type="button" data-act="tour">Take the tour<small>A one-minute look around</small></button><hr>` : ""}
     <div class="pop-h">Appearance</div>${seg("theme", [["auto", "Auto"], ["light", "Light"], ["dark", "Dark"]], app.ui.theme)}
     <div class="pop-h">Row spacing</div>${seg("density", [["comfortable", "Comfortable"], ["compact", "Compact"]], app.ui.density)}

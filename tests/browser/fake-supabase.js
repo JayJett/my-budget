@@ -77,7 +77,7 @@
 
   const households = (init.households || [{ id: "hh-1", name: "Test household", role: "owner", budget: init.budget || {}, seq: init.seq || 0 }])
     .map(h => ({ seq: 0, backups: [], invites: [], snapshots: [], changes: [], reminders: [], remPrefs: null, ...copy(h), members: h.members ? copy(h.members) : [meMember(h.role || "owner")] }));
-  const user = { id: ME, email: "jarden@example.com", user_metadata: { name: init.myName || "Jarden" }, created_at: "2026-01-01T00:00:00Z" };
+  const user = { id: ME, email: "jarden@example.com", user_metadata: { name: init.myName || "Jarden", ...(init.accent ? { accent: init.accent } : {}) }, created_at: "2026-01-01T00:00:00Z" };
   let authCb = null;
 
   const fake = window.__fake = {

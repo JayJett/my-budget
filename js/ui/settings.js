@@ -3,6 +3,7 @@
 import { app } from "./ctx.js";
 import { $, esc, toast, confirmDel, offerFile } from "./dom.js";
 import { ymd } from "../model/util.js";
+import { accentPickerHTML } from "./accent.js";
 
 const ROLE_LABEL = { owner: "Owner", editor: "Editor", viewer: "Viewer" };
 const ROLE_HELP = { owner: "Can do everything, including managing people", editor: "Can change the budget and invite people", viewer: "Can look, but not change anything" };
@@ -21,6 +22,7 @@ const close = () => { const d = $("#sheet"); if (d.open) d.close(); };
 export function openAccount() {
   const u = app.session.user, name = (u.user_metadata && u.user_metadata.name) || "";
   open("Your account", `
+    <section class="set"><h4>Your colour</h4>${accentPickerHTML()}<p class="set-note">Just for you: everyone in the household picks their own.</p></section>
     <section class="set"><h4>Your name</h4><form id="setName" class="set-row"><input type="text" name="name" value="${esc(name)}" autocomplete="given-name" required aria-label="Your name"><button class="btn primary" type="submit">Save</button></form><div class="msg" id="mName"></div>
       <p class="set-note">This is how you appear to other people in your households. Names inside a budget are changed on its Budget tab.</p></section>
     <section class="set"><h4>Email</h4><form id="setEmail" class="set-row"><input type="email" name="email" value="${esc(u.email || "")}" autocomplete="email" required aria-label="Email"><button class="btn primary" type="submit">Change</button></form><div class="msg" id="mEmail"></div>

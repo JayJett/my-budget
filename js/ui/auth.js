@@ -9,6 +9,7 @@ import { loadSnapshots, ensureMonthly } from "./views/progress.js";
 import { rememberChange, resetUndo, updateUndo, historyNoticeRemote } from "./history.js";
 import { loadReminders, resetReminders, openFromHash } from "./reminders.js";
 import { disablePush } from "./push.js";
+import { useAccentOf, resetAccent } from "./accent.js";
 
 const here = () => location.origin + location.pathname;
 const brand = `<div class="auth-brand"><div class="logo" aria-hidden="true">$</div><div class="brand">My Budget<small>Plan where every dollar goes, together</small></div></div>`;
@@ -253,6 +254,7 @@ export async function signOut() {
 /** Opened with no connection and no usable sign-in: use the copy kept on this device. */
 async function enterOffline(prof) {
   app.session = { user: prof.user, offline: true };
+  useAccentOf(prof.user);
   app.meId = prof.user.id;
   try { await reloadHouseholds(); } catch (_) { showAuth("signin", "You’re offline, and this budget isn’t saved on this device yet. Connect to sign in."); return; }
   showConn(OFFLINE_MSG);
@@ -301,7 +303,7 @@ export function initAuth(sb) {
     // Work is deferred so it never runs inside Supabase's own callback.
     setTimeout(() => {
       if (event === "PASSWORD_RECOVERY") { recovering = true; app.session = s; showAuth("newpass"); return; }
-      if (event === "SIGNED_OUT") { app.session = null; teardown(); showAuth("signin"); return; }
+      if (event === "SIGNED_OUT") { app.session = null; resetAccent(); teardown(); showAuth("signin"); return; }
       if (!s) {
         if (event !== "INITIAL_SESSION") return;
         const prof = offlineProfile();
@@ -309,6 +311,7 @@ export function initAuth(sb) {
         showAuth("signin"); return;
       }
       const wasSignedIn = !!app.session; app.session = s;
+      useAccentOf(s.user); // your own colour (or the default), never the last person's
       if (event === "USER_UPDATED") rememberMe();
       if (!recovering && !wasSignedIn) enterApp();
     }, 0);

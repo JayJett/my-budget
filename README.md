@@ -32,6 +32,23 @@ There's **no build step**. GitHub Pages serves these files exactly as they are.
 | `.github/workflows/tests.yml` | Runs all the tests on every push. |
 | `.github/workflows/keep-alive.yml` | Pings the database every 3 days so the free project doesn't pause. |
 
+## Look and feel (UI phase 1)
+
+- **Design tokens** live at the top of `css/app.css`: colours (light and dark), spacing (`--sp-*`), type sizes
+  (`--fs-*`), corner radii and motion. Use them rather than raw values. Headings use the system's rounded font.
+- **Three kinds of colour, kept apart:**
+  - the *accent* (`--accent*`): each person's own choice, used for buttons, the selected tab, links and focus;
+  - *member colours* (`--c-blue` etc., `.pc-*`): one per person in the budget, used in charts and contributions;
+  - *status* and *chart* colours (`--ok`, `--warn`, `--bad`, `--joint`, `--invest`): never change with the accent.
+- **Accent colours** (Mint, Ocean, Lavender, Coral, Rose, Amber) are in `js/ui/accent-list.js` and `css/app.css`.
+  Each person picks theirs in Account settings. It's saved on their login (Supabase Auth `user_metadata.accent`),
+  so it follows them across devices and never affects anyone else. A copy is kept on the device under their user
+  id for a quick start. `tests/accent.test.js` checks every accent is readable in light and dark mode.
+- **Budget tab**: compact cards and rows; tapping a person or an allocation opens an editing sheet
+  (`js/ui/budget-sheets.js`) with the same boxes as before, so saving, history and undo work unchanged.
+  `tests/browser/budget-ui.test.js` checks every figure matches what the old screen showed
+  (`tests/browser/budget-baseline.json`).
+
 ## How saving works
 
 The whole budget lives in one row (`budgets.state`), but the app never overwrites it. Each edit is
