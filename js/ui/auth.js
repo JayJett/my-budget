@@ -2,7 +2,7 @@
 import { app } from "./ctx.js";
 import { $, esc, toast, closePop } from "./dom.js";
 import { render } from "./render.js";
-import { createStore } from "../sync/store.js";
+import { createStore, isNetworkError, clearDeviceCopies } from "../sync/store.js";
 import { blankBudget } from "../model/schema.js";
 import { startSetup, endSetup } from "./onboarding.js";
 
@@ -16,7 +16,20 @@ function rememberMe() {
   const u = app.session && app.session.user; if (!u) return;
   try { localStorage.setItem(WELCOME, JSON.stringify({ name: (u.user_metadata && u.user_metadata.name) || "", email: u.email || "" })); } catch (_) {}
 }
-function forgetMe() { try { localStorage.removeItem(WELCOME); } catch (_) {} }
+/** Forget this person on this device: the welcome-back name, the offline copy of who they are,
+    and every budget copy (used for "Not you?", signing out and deleting the account). */
+function forgetMe() { try { localStorage.removeItem(WELCOME); localStorage.removeItem(OFFLINE); } catch (_) {} clearDeviceCopies(); }
+
+/* ---------- what's needed to open the app offline: who you are and your households ---------- */
+const OFFLINE = "mb-offline";
+const OFFLINE_MSG = "You’re offline. You can keep working: changes are kept on this phone and sync when you’re back online.";
+const offlineProfile = () => { try { return JSON.parse(localStorage.getItem(OFFLINE) || "null"); } catch (_) { return null; } };
+function saveOfflineProfile() {
+  const u = app.session && app.session.user; if (!u || app.session.offline) return;
+  const prev = offlineProfile(), members = { ...((prev && prev.user.id === u.id && prev.members) || {}) };
+  if (app.household) members[app.household.id] = app.members;
+  try { localStorage.setItem(OFFLINE, JSON.stringify({ user: { id: u.id, email: u.email, user_metadata: u.user_metadata || {} }, households: app.households, members })); } catch (_) {}
+}
 const lastHHKey = () => `mb-household-${app.meId}`;
 
 /* ---------- save status in the header ---------- */
@@ -115,12 +128,17 @@ async function busy(form, fn) {
 
 /* ---------- households ---------- */
 async function loadMembers() {
-  const { data } = await app.sb.from("household_members").select("user_id, display_name, email, role").eq("household_id", app.household.id).order("joined_at");
-  app.members = data || [];
+  const { data, error } = await app.sb.from("household_members").select("user_id, display_name, email, role").eq("household_id", app.household.id).order("joined_at");
+  const prof = offlineProfile();
+  app.members = error && prof && prof.members ? (prof.members[app.household.id] || []) : (data || []);
 }
 async function loadHouseholds() {
   const { data, error } = await app.sb.from("household_members").select("household_id, role, households(name)").eq("user_id", app.meId).order("joined_at");
-  if (error) throw error;
+  if (error) {
+    const prof = offlineProfile();
+    if (isNetworkError(error) && prof && prof.user.id === app.meId && prof.households) { app.households = prof.households; return app.households; }
+    throw error;
+  }
   app.households = (data || []).map(r => ({ id: r.household_id, role: r.role, name: (r.households && r.households.name) || "Our budget" }));
   return app.households;
 }
@@ -142,6 +160,7 @@ async function openHH(id) {
     onStatus: (st, info) => {
       if (st === "saving") setStatus("Saving…", "wait");
       else if (st === "saved") showSaved(info);
+      else if (st === "offline") setStatus("Offline", "offline", "You’re offline. Changes are kept on this phone and will sync when you’re back online.");
       else if (st === "error") setStatus("Couldn’t save", "off", /view-only/i.test((info && info.message) || "") ? "You have view-only access, so changes can’t be saved." : "Your last change didn’t save yet. It will keep trying; check your connection.");
     },
     onRemote: meta => applyRemoteView(meta),
@@ -149,7 +168,9 @@ async function openHH(id) {
   const loaded = await app.store.load();
   document.body.classList.remove("signed-out"); $("#auth").hidden = true;
   app.loaded = true;
-  if (loaded.state) { app.state = loaded.state; app.hasData = true; }
+  app.offline = !!loaded.offline;
+  saveOfflineProfile();
+  if (loaded.state) { app.state = loaded.state; app.hasData = true; app.store.saveCache(); }
   else {
     const me = app.members.find(m => m.user_id === app.meId);
     app.state = blankBudget({ name: (me && me.display_name) || "" }); app.hasData = false;
@@ -157,9 +178,12 @@ async function openHH(id) {
   }
   render();
   if (loaded.upgraded && app.canWrite) { app.store.schedule(); toast("Your budget was upgraded to the new version. A backup of the old one was kept."); }
+  else if (loaded.resumed && app.canWrite) { app.store.schedule(); toast("Saving the changes you made while offline…"); }
+  else if (loaded.offline) { setStatus("Offline", "offline", "You’re offline. Changes are kept on this phone and will sync when you’re back online."); showConn(OFFLINE_MSG); }
   else showSaved(loaded.meta && { by: loaded.meta.updated_by, at: loaded.meta.updated_at });
+  if (app.offline) return; // live updates start when the app reconnects
   app.store.subscribe(status => {
-    if (status === "SUBSCRIBED") showConn("");
+    if (status === "SUBSCRIBED") showConn(navigator.onLine === false ? OFFLINE_MSG : "");
     else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") showConn("Live updates are paused. Your changes still save; refresh to see others’ latest changes.");
   });
 }
@@ -205,7 +229,19 @@ function teardown() {
 }
 export async function signOut() {
   if (app.store) await app.store.flushNow();
+  if (app.store && app.store.hasUnsaved() && !confirm("Some changes haven’t reached the server yet (you may be offline). Sign out anyway and lose them?")) return;
+  // A signed-out device keeps no copy of your budgets (the "Welcome back" name stays).
+  try { localStorage.removeItem(OFFLINE); } catch (_) {}
+  clearDeviceCopies();
   await app.sb.auth.signOut();
+}
+
+/** Opened with no connection and no usable sign-in: use the copy kept on this device. */
+async function enterOffline(prof) {
+  app.session = { user: prof.user, offline: true };
+  app.meId = prof.user.id;
+  try { await reloadHouseholds(); } catch (_) { showAuth("signin", "You’re offline, and this budget isn’t saved on this device yet. Connect to sign in."); return; }
+  showConn(OFFLINE_MSG);
 }
 
 export function initAuth(sb) {
@@ -238,6 +274,13 @@ export function initAuth(sb) {
     else showAuth(m);
   });
 
+  window.addEventListener("offline", () => { if (app.household) showConn(OFFLINE_MSG); });
+  window.addEventListener("online", () => {
+    if (app.session && app.session.offline) { location.reload(); return; } // sign in properly now; offline edits are kept and sent
+    if (app.offline && app.household) { app.offline = false; reloadHouseholds(app.household.id); return; } // fetch the latest, merge offline edits
+    showConn("");
+  });
+
   if (/type=recovery/.test(location.hash)) recovering = true;
   showAuth("loading");
   sb.auth.onAuthStateChange((event, s) => {
@@ -245,7 +288,12 @@ export function initAuth(sb) {
     setTimeout(() => {
       if (event === "PASSWORD_RECOVERY") { recovering = true; app.session = s; showAuth("newpass"); return; }
       if (event === "SIGNED_OUT") { app.session = null; teardown(); showAuth("signin"); return; }
-      if (!s) { if (event === "INITIAL_SESSION") showAuth("signin"); return; }
+      if (!s) {
+        if (event !== "INITIAL_SESSION") return;
+        const prof = offlineProfile();
+        if (navigator.onLine === false && prof) { enterOffline(prof); return; }
+        showAuth("signin"); return;
+      }
       const wasSignedIn = !!app.session; app.session = s;
       if (event === "USER_UPDATED") rememberMe();
       if (!recovering && !wasSignedIn) enterApp();

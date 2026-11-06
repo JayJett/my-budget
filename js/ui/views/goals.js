@@ -36,7 +36,7 @@ function goalTable(key, goals, kind) {
   else if (isEF) extra = `<div class="ef-suggest" id="efSuggest"></div>`;
   else foot = `<tfoot><tr><td></td><td>Totals</td><td></td><td></td><td></td><td class="num">${K(`gp.${person.id}.tp`)}</td><td class="num">${K(`gp.${person.id}.tv`)}</td><td></td><td></td><td></td><td></td></tr>
     <tr class="check"><td></td><td colspan="4">The % column should total 100% to use the full pool</td><td colspan="2" class="num">${K(`gp.${person.id}.c`, "chip")}</td><td colspan="4"></td></tr></tfoot>`;
-  return `<div class="panel ${isEF ? "" : "scroll"} w-goal"><div class="${isEF ? "scroll" : ""}"><table><thead>${head}</thead><tbody>${body}</tbody>${foot}</table></div>${extra}${isEF ? "" : `<button class="add" type="button" data-add="${esc(key)}">+ Add a goal</button>`}</div>`;
+  return `<div class="panel ${isEF ? "" : "scroll"} w-goal cards"><div class="${isEF ? "scroll" : ""}"><table><thead>${head}</thead><tbody>${body}</tbody>${foot}</table></div>${extra}${isEF ? "" : `<button class="add" type="button" data-add="${esc(key)}">+ Add a goal</button>`}</div>`;
 }
 
 export function view() {

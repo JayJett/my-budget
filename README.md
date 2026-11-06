@@ -10,7 +10,12 @@ There's **no build step**. GitHub Pages serves these files exactly as they are.
 
 | Path | What it is |
 |---|---|
-| `index.html` | The page outline. Loads the CSS, the Supabase client and `js/main.js`. |
+| `index.html` | The page outline. Loads the CSS, the Supabase client and `js/main.js`, plus the icon, splash-screen and "install" tags. |
+| `manifest.webmanifest` | Name, icon and colours used when the app is added to a home screen. |
+| `sw.js` | The service worker: keeps a copy of the app on the device so it opens offline, and offers updates. |
+| `icons/` | App icons and iPhone splash screens (made by `tools/make-icons.mjs`). |
+| `vendor/` | A pinned copy of the Supabase client (2.45.4, from npm), so the app doesn't depend on a CDN. |
+| `tools/` | Small helper scripts you run by hand (see "Changing the app" below). Not a build step. |
 | `css/app.css` | All the styling (colours, light/dark mode, layout). |
 | `js/config.js` | The Supabase URL and the public anon key. Never put the service_role key here. |
 | `js/model/` | **The money maths.** No page code, so it can be tested on its own. |
@@ -34,6 +39,25 @@ sent as a tiny change, like "set `accounts → js → split → j` to 0.2", to t
 `apply_budget_ops`. So two people editing different things at the same time both keep their changes.
 If you both edit the *same* box, the later one wins for that box only. Anything that replaces the
 whole budget (the version 4 upgrade, importing a file) first saves a copy in `budget_backups`.
+
+## On phones, and offline
+
+- On a phone the tabs move to a bar at the bottom, tables become cards, and menus slide up from the bottom.
+- **Add to Home Screen** (Safari's Share button on iPhone, or the install prompt on Android) gives a full-screen app with its own icon.
+- The app opens without a connection. Your budget's last copy is kept on the device, and edits made offline are kept
+  (even if you close the app) and sent when you're back online, merging with anyone else's changes.
+- Signing out removes the budget copies from that device.
+
+## Changing the app
+
+After changing any file the app loads (HTML, CSS, JS, icons), run:
+
+```bash
+node tools/sw-version.mjs
+```
+
+It updates the list of files the service worker stores, and its version, so phones pick up the new version
+("A new version is ready. Tap to refresh"). The tests fail if you forget. To redraw the icons and splash screens: `node tools/make-icons.mjs`.
 
 ## Households and roles
 

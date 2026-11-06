@@ -15,6 +15,9 @@ const ROOT = fileURLToPath(new URL("../../", import.meta.url));
 export const SHOTS = join(ROOT, "tests/browser/screenshots");
 const TYPES = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png" };
 let server, base, browser;
+let swExtra = "";
+/** Pretend a new version was published: the service worker file changes. */
+export const publishNewVersion = () => { swExtra += `\n// new version ${Date.now()}`; };
 
 /** Call once per test file: starts the web server and browser before the tests, stops them after. */
 export function setup() {
@@ -22,8 +25,15 @@ before(async () => {
   if (skip) return;
   server = http.createServer(async (req, res) => {
     const p = normalize(decodeURIComponent(new URL(req.url, "http://x").pathname)).replace(/^(\.\.[/\\])+/, "");
-    const file = join(ROOT, p === "/" || p === "\\" ? "index.html" : p);
-    try { const body = await readFile(file); res.writeHead(200, { "content-type": TYPES[extname(file)] || "text/plain" }); res.end(body); }
+    // The app's own copy of Supabase is swapped for the fake, so nothing reaches the real database.
+    const file = /supabase-js-[\d.]+[\/\\]supabase\.js$/.test(p) ? join(ROOT, "tests/browser/fake-supabase.js")
+      : join(ROOT, p === "/" || p === "\\" ? "index.html" : p);
+    try {
+      let body = await readFile(file);
+      if (p.endsWith("sw.js") && swExtra) body = Buffer.concat([body, Buffer.from(swExtra)]);
+      res.writeHead(200, { "content-type": TYPES[extname(file)] || (file.endsWith(".webmanifest") ? "application/manifest+json" : "text/plain"), "cache-control": "no-store" });
+      res.end(body);
+    }
     catch { res.writeHead(404); res.end("not found"); }
   }).listen(0);
   base = `http://127.0.0.1:${server.address().port}/`;
@@ -35,15 +45,13 @@ after(async () => { if (browser) await browser.close(); if (server) server.close
 
 /** Open the app with a given saved budget (or a full fake setup via opts.init).
     Returns the page and a list of errors seen. waitFor: what to wait for before returning. */
-export async function open(budget, { width = 1280, seq = 0, init = null, waitFor = "#app .viewas", storage = null } = {}) {
-  const ctx = await browser.newContext({ viewport: { width, height: 900 } });
+export async function open(budget, { width = 1280, seq = 0, init = null, waitFor = "#app .viewas", storage = null, device = null } = {}) {
+  const ctx = await browser.newContext(device ? { ...device } : { viewport: { width, height: 900 } });
   const page = await ctx.newPage();
   const errors = [];
   page.on("pageerror", e => errors.push(String(e)));
   page.on("console", m => { if (m.type() === "error") errors.push(m.text()); });
   page.on("response", r => { if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`); });
-  const fakeJs = await readFile(join(ROOT, "tests/browser/fake-supabase.js"), "utf8");
-  await page.route("https://cdn.jsdelivr.net/**", r => r.fulfill({ contentType: "text/javascript", body: fakeJs }));
   await page.route(/fonts\.(googleapis|gstatic)\.com/, r => r.fulfill({ contentType: "text/css", body: "" }));
   await page.addInitScript(([i, st]) => { window.__FAKE_INIT = i; if (st) for (const [k, v] of Object.entries(st)) localStorage.setItem(k, v); }, [init || { budget, seq }, storage]);
   await page.goto(base);

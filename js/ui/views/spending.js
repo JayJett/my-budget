@@ -19,21 +19,21 @@ export function view() {
 
   <section>
     <div class="sec-head"><h2>Spending categories</h2>${tipq(`Fixed: same every time (rent). Flexible: varies, and is where you have choice (eating out). Sinking: a yearly bill you save for a little each ${w.noun} (rego).`)}<span class="sec-note">Enter each amount however it’s billed. For yearly sinking costs, add the month it’s due and how much is set aside, and the app works out whether you’re on track.</span></div>
-    <div class="panel scroll w-sp"><table>
+    <div class="panel scroll w-sp cards"><table>
       <thead><tr><th></th>${TH("Category", "What the money is for.")}${TH("Type", "Fixed, Flexible or Sinking. Only Sinking items get a due month.")}${TH("Amount", "Enter it however it’s billed: per week, fortnight, month or year.", "num")}${TH("Period", "How often the amount is billed.")}${TH(`Per ${w.noun}`, `Everything converted to a ${w.adj.toLowerCase()} amount, so it all adds up.`, "num")}${TH("% of pool", "This category’s share of the spending pool.", "num")}${TH("Due", "For yearly sinking costs: the month the bill lands.")}${TH("Set aside", "How much you’ve already saved toward this bill.", "num")}${TH("Progress", "Compares what you’ve set aside with what you should have by now, counting from the last due date.")}${TH("Notes", "")}<th></th></tr></thead>
       <tbody>${L.map(s => {
         const sk = s.type === "Sinking" && s.period === "Year";
         return `<tr>
         <td class="c-grip">${grip("sp", s.id)}</td>
-        <td>${tIn("sp", s.id, "name", s.name, "name", "Category")}</td>
-        <td>${sIn("sp", s.id, "type", s.type, ["Fixed", "Flexible", "Sinking"])}</td>
-        <td class="num">${$In("sp", s.id, "amount", s.amount, "", "Amount")}</td>
-        <td>${sIn("sp", s.id, "period", s.period, BILL_PERIODS)}</td>
-        <td class="num">${K(`sp.${s.id}.v`)}</td><td class="num dim">${K(`sp.${s.id}.p`)}</td>
-        <td>${sk ? `<select class="cell month" ${attrs("sp", s.id, "due", "month")} aria-label="Due month"><option value="">Pick</option>${MONTHS.map((mo, k) => `<option value="${k + 1}"${s.due === k + 1 ? " selected" : ""}>${mo}</option>`).join("")}</select>` : `<span class="dim"${s.type === "Sinking" ? ' data-tip="Due dates work for yearly bills. Set the period to Year to track this one."' : ""}>—</span>`}</td>
-        <td class="num">${sk ? $In("sp", s.id, "aside", s.aside, "", "Set aside") : '<span class="dim">—</span>'}</td>
-        <td>${sk ? `${K(`sp.${s.id}.sk`, "chip")}<div class="sub">${K(`sp.${s.id}.sk2`)}</div>` : ""}</td>
-        <td>${tIn("sp", s.id, "notes", s.notes, "note", "")}</td><td>${del("sp", s.id)}</td></tr>`;
+        <td class="c-name">${tIn("sp", s.id, "name", s.name, "name", "Category")}</td>
+        <td data-label="Type">${sIn("sp", s.id, "type", s.type, ["Fixed", "Flexible", "Sinking"])}</td>
+        <td class="num" data-label="Amount">${$In("sp", s.id, "amount", s.amount, "", "Amount")}</td>
+        <td data-label="Billed every">${sIn("sp", s.id, "period", s.period, BILL_PERIODS)}</td>
+        <td class="num" data-label="Per ${w.noun}">${K(`sp.${s.id}.v`)}</td><td class="num dim" data-label="% of pool">${K(`sp.${s.id}.p`)}</td>
+        <td data-label="Due"${sk ? "" : ' class="m-hide"'}>${sk ? `<select class="cell month" ${attrs("sp", s.id, "due", "month")} aria-label="Due month"><option value="">Pick</option>${MONTHS.map((mo, k) => `<option value="${k + 1}"${s.due === k + 1 ? " selected" : ""}>${mo}</option>`).join("")}</select>` : `<span class="dim"${s.type === "Sinking" ? ' data-tip="Due dates work for yearly bills. Set the period to Year to track this one."' : ""}>—</span>`}</td>
+        <td class="num${sk ? "" : " m-hide"}" data-label="Set aside">${sk ? $In("sp", s.id, "aside", s.aside, "", "Set aside") : '<span class="dim">—</span>'}</td>
+        <td data-label="Progress"${sk ? "" : ' class="m-hide"'}>${sk ? `<div class="stack-r">${K(`sp.${s.id}.sk`, "chip")}<div class="sub">${K(`sp.${s.id}.sk2`)}</div></div>` : ""}</td>
+        <td data-label="Notes">${tIn("sp", s.id, "notes", s.notes, "note", "Notes")}</td><td class="c-del">${del("sp", s.id)}</td></tr>`;
       }).join("")}</tbody>
       <tfoot><tr><td></td><td>Totals</td><td></td><td></td><td></td><td class="num">${K("sp.tot")}</td><td class="num">${K("sp.totp")}</td><td></td><td></td><td></td><td></td><td></td></tr></tfoot>
     </table><button class="add" type="button" data-add="sp">+ Add category</button></div>
