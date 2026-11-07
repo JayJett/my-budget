@@ -59,11 +59,19 @@ function touchGuard(e) {
   if ((dy > 0 && atTop) || (dy < 0 && atEnd)) { if (e.cancelable) e.preventDefault(); }
 }
 const touchStart = e => { touchY = e.touches[0].clientY; };
+/* Mouse wheels and trackpads: the same rule (the sheet's own list may scroll, nothing behind it). */
+function wheelGuard(e) {
+  const sc = e.target.closest && e.target.closest("[data-scroll-ok]");
+  if (!sc) { e.preventDefault(); return; }
+  const atTop = sc.scrollTop <= 0, atEnd = sc.scrollTop + sc.clientHeight >= sc.scrollHeight - 1;
+  if ((e.deltaY < 0 && atTop) || (e.deltaY > 0 && atEnd)) e.preventDefault();
+}
 export function lockScroll() {
   if (lockCount++) return;
   document.documentElement.classList.add("scroll-locked");
   document.addEventListener("touchstart", touchStart, { passive: true });
   document.addEventListener("touchmove", touchGuard, { passive: false });
+  document.addEventListener("wheel", wheelGuard, { passive: false });
 }
 export function unlockScroll() {
   if (!lockCount) return;
@@ -71,6 +79,7 @@ export function unlockScroll() {
   document.documentElement.classList.remove("scroll-locked");
   document.removeEventListener("touchstart", touchStart);
   document.removeEventListener("touchmove", touchGuard);
+  document.removeEventListener("wheel", wheelGuard);
 }
 const setBehind = on => BEHIND.forEach(s => { const el = $(s); if (el) { if (on) el.setAttribute("inert", ""); else el.removeAttribute("inert"); } });
 
