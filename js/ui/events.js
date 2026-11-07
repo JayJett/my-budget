@@ -80,7 +80,7 @@ export function initEvents() {
     if (tb) { const h = TAB_HASH[tb.dataset.tab]; if (location.hash !== "#" + h) location.hash = h; else { app.tab = tb.dataset.tab; render(); } window.scrollTo({ top: 0 }); return; }
     if (e.target.closest('[data-act="import"]')) { $("#importFile").click(); return; }
     if (e.target.closest('[data-act="setup"]') && !readOnly()) { startSetup(); render(); window.scrollTo({ top: 0 }); return; }
-    if (e.target.closest("#menuBtn")) { if (!pop.hidden) { closePop(); return; } openPop(e.target.closest("#menuBtn"), mainMenu(), menuAct); return; }
+    if (e.target.closest("#menuBtn")) { if (!pop.hidden) { closePop(); return; } openPop(e.target.closest("#menuBtn"), mainMenu(), menuAct, { label: "Menu" }); return; }
     if (readOnly()) return;
 
     const va = e.target.closest("[data-viewas]");

@@ -63,7 +63,7 @@ const welcomeBox = () => `<div class="welcome"><h3>Start your budget</h3><p>Noth
 export function render() {
   if (!VIEWS_BY_TAB[app.tab]) app.tab = "budget";
   applyUI();
-  if (app.setup) { renderBrand(); app.setup.render(); return; } // the setup guide has the page to itself
+  if (app.setup) { renderBrand(); app.setup.render(); if (app.afterRender) app.afterRender(); return; } // the setup guide has the page to itself
   app.C = compute(app.state, app.today);
   app.colours = accountColours(app.state);
   $("#tabs").innerHTML = TABS(app.state).map(([k, l]) => `<button class="tab" role="tab" type="button" data-tab="${k}" aria-selected="${k === app.tab}"><span class="ti">${ICONS[k]}</span><span class="tl">${esc(l)}</span><span class="ts">${esc(SHORT[k])}</span><span class="mark" data-mark="${k}"></span></button>`).join("");
@@ -75,6 +75,7 @@ export function render() {
   const ro = readOnly();
   document.body.classList.toggle("readonly", ro);
   if (ro) $$("#app [data-f], #app [data-add], #app [data-del], #app [data-addperson], #app [data-rmperson], #app [data-colour], #app [data-viewas]").forEach(el => el.disabled = true);
+  if (app.afterRender) app.afterRender(); // guided tours (ui/tour.js): keep a running tour in step, maybe offer one
 }
 
 export function refresh() {

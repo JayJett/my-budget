@@ -22,6 +22,8 @@ import { blankBudget, MAX_PEOPLE } from "../model/schema.js";
 import { WORDS, freqToView, perYear } from "../model/periods.js";
 import { money as fmtMoney } from "../model/format.js";
 import { n, blank } from "../model/util.js";
+import { ART } from "./art.js";
+import { markTour } from "./tour.js";
 
 export const STAGES = ["Make it yours", "Your income", "Your starting plan"];
 const FREQS = [["weekly", "Weekly"], ["fortnightly", "Fortnightly"], ["monthly", "Monthly"]];
@@ -55,7 +57,7 @@ export function startSetup() {
   const myName = (me && me.display_name) || md.name || (md.full_name || "").trim().split(/\s+/)[0] || "";
   const mode = savedMode() || (app.members.length > 1 ? "with" : "solo");
   ans = { mode, people: [{ name: myName, pay: null, freq: "fortnightly", payday: "" }], needName: !myName };
-  stage = 2; done = 1; split = null; dir = 1; saving = false; saveErr = "";
+  stage = 2; done = 1; split = null; dir = 1; saving = false; saveErr = ""; shownStage = 0;
   app.setup = { render: draw };
   document.body.classList.add("setting-up");
 }
@@ -69,14 +71,44 @@ function skip() {
   window.scrollTo({ top: 0 });
 }
 
-/* ---------- drawing ---------- */
+/* ---------- drawing ----------
+   The page has two parts: the small header (step, progress bar) and the card for the current step.
+   Moving between steps keeps the header and swaps only the card, so the progress bar glides to its
+   new width, and the old card slides out as the new one slides in (the browser's own View
+   Transitions where it has them; elsewhere the new card simply eases in). With "reduce motion" on,
+   the step changes straight away. Nothing waits on an animation: the new step is drawn at once. */
+let shownStage = 0;
+const calm = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+function header(shell) {
+  const tmp = document.createElement("div");
+  tmp.innerHTML = obHeader(stage, done, stage <= 3 ? `<button class="linkish ob-later" type="button" data-obact="skip">Set up later</button>` : "");
+  const fresh = tmp.firstElementChild, old = shell.querySelector(".ob-top");
+  old.querySelector(".ob-top-row").replaceWith(fresh.querySelector(".ob-top-row"));
+  old.querySelector(".ob-stage").replaceWith(fresh.querySelector(".ob-stage"));
+  const bar = old.querySelector(".ob-prog"), nb = fresh.querySelector(".ob-prog");
+  ["aria-valuenow", "aria-valuetext"].forEach(a => bar.setAttribute(a, nb.getAttribute(a)));
+  bar.firstElementChild.style.width = nb.firstElementChild.style.width; // the bar's width eases (CSS)
+}
 function draw() {
-  const el = $("#app");
-  el.innerHTML = `<div class="ob">${obHeader(stage, done, stage <= 3 ? `<button class="linkish ob-later" type="button" data-obact="skip">Set up later</button>` : "")}
-    <div class="ob-card ob-in ${dir < 0 ? "back" : ""}" role="group" aria-labelledby="obTitle">${body()}</div></div>`;
-  // Tell screen readers where they are, without popping up the keyboard
-  const h = $("#obTitle"); if (h) h.focus({ preventScroll: true });
-  window.scrollTo({ top: 0 });
+  const el = $("#app"), html = body(), moved = shownStage !== stage;
+  let shell = el.querySelector(":scope > .ob");
+  const swap = () => {
+    if (!shell) { el.innerHTML = `<div class="ob">${obHeader(stage, done, "")}<div class="ob-card" role="group" aria-labelledby="obTitle"></div></div>`; shell = el.firstElementChild; }
+    header(shell);
+    const card = shell.querySelector(".ob-card");
+    card.className = `ob-card st-${stage}`; card.innerHTML = html;
+    // Tell screen readers where they are, without popping up the keyboard
+    const h = $("#obTitle"); if (h && moved) h.focus({ preventScroll: true });
+    if (moved) window.scrollTo({ top: 0 });
+  };
+  const animate = shell && moved && shownStage && !calm();
+  shownStage = stage;
+  if (animate && document.startViewTransition) {
+    document.documentElement.dataset.obDir = dir < 0 ? "back" : "fwd";
+    try { document.startViewTransition(swap); return; } catch (_) { /* fall through: draw it plainly */ }
+  }
+  swap();
+  if (animate) { const c = shell.querySelector(".ob-card"); c.classList.add("ob-in"); if (dir < 0) c.classList.add("back"); }
 }
 
 const nav = (next, { disabled = false, back = true, cls = "" } = {}) => `<div class="ob-nav">${back ? `<button class="btn ob-back" type="button" data-obact="back">Back</button>` : ""}<button class="btn primary ${cls}" type="button" data-obact="next"${disabled ? " disabled" : ""}>${next}</button></div>`;
@@ -93,12 +125,12 @@ export const modeChoices = (cur, withJoin) => `<fieldset class="ob-opts"><legend
 
 function body() {
   const P = ans.people;
-  if (stage === 1) return `<h2 id="obTitle" tabindex="-1">Let’s make this yours</h2><p class="lead">Are you budgeting on your own or with someone else?</p>
+  if (stage === 1) return `<div class="ob-art" aria-hidden="true">${ART.together()}</div><h2 id="obTitle" tabindex="-1">Let’s make this yours</h2><p class="lead">Are you budgeting on your own or with someone else?</p>
     ${modeChoices(ans.mode, false)}
     <p class="ob-hint">${app.household ? `Your household: <b>${esc(app.household.name)}</b>. You can rename it or invite people in Household settings.` : ""}</p>
     ${nav("Continue", { back: false })}`;
 
-  if (stage === 2) return `<h2 id="obTitle" tabindex="-1">Let’s start with your income</h2><p class="lead">How much do you usually take home after tax?</p>
+  if (stage === 2) return `<div class="ob-art" aria-hidden="true">${ART.jar()}</div><h2 id="obTitle" tabindex="-1">Let’s start with your income</h2><p class="lead">How much do you usually take home after tax?</p>
     ${ans.needName ? `<label class="ob-field"><span>Your first name</span><input type="text" data-ob="people.0.name" value="${esc(P[0].name)}" autocomplete="given-name" placeholder="First name"></label>` : ""}
     ${P.map((p, i) => payBlock(p, i)).join("")}
     ${ans.mode === "with" && P.length < MAX_PEOPLE ? `<button class="add-row ob-add" type="button" data-obact="addperson">+ Add ${P.length > 1 ? "someone else’s" : "their"} pay too <small>optional</small></button>` : ""}
@@ -114,7 +146,6 @@ function body() {
       <div><small>Planned</small><b data-obk="tot">${fmtNum(t)}%</b></div>
     </div>
     <div class="split ob-bar" data-obk="bar" aria-hidden="true">${barHTML()}</div>
-    <p class="ob-status" data-obk="status" aria-live="polite">${statusHTML(t)}</p>
     ${yr ? "" : `<p class="ob-note">Add your income to see what each part is in dollars. <button class="linkish" type="button" data-obact="back">Add income</button></p>`}
     <ul class="ob-buckets">${split.buckets.map((b, i) => `<li style="--bc:${BUCKET_COL[b.key] || "var(--faint)"}">
       <span class="ob-b-dot" aria-hidden="true"></span>
@@ -122,17 +153,19 @@ function body() {
       <span class="unit ob-pct"><input type="text" inputmode="decimal" data-ob="split.${i}" value="${fmtNum(b.pct)}" aria-label="${esc(b.name)}, percent of pay"><i>%</i></span>
       <span class="ob-b-amt" data-obk="amt.${i}">${bucketAmount(b)}</span></li>`).join("")}</ul>
     ${saveErr ? `<p class="msg err" role="alert">${esc(saveErr)}</p>` : ""}
-    ${nav(saving ? "Saving your budget…" : saveErr ? "Try again" : "Use this plan", { disabled: saving || Math.round(t * 100) !== 10000 })}
+    <div class="ob-foot"><p class="ob-status" data-obk="status" aria-live="polite">${statusHTML(t)}</p>
+    ${nav(saving ? "Saving your budget…" : saveErr ? "Try again" : "Use this plan", { disabled: saving || Math.round(t * 100) !== 10000 })}</div>
     <p class="ob-skip"><button class="linkish" type="button" data-obact="skip">Start with a blank budget instead</button></p>`;
   }
 
-  // Step 4: saved
+  // Step 4: saved. The picture and words sit in the middle; the two choices sit where "Continue" was.
   const first = (P[0].name || "").trim();
-  return `<div class="ob-done"><span class="ob-done-ic" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5l3 3 6-7"/></svg></span>
-    <h2 id="obTitle" tabindex="-1">Your budget is ready${first ? `, ${esc(first)}` : ""}!</h2>
-    <p class="lead">It’s saved. You can adjust everything whenever you like, and add your accounts and goals when you’re ready.</p>
-    <button class="btn primary block" type="button" data-obact="finish">Open my budget</button>
-    <button class="btn ghost block" type="button" data-obact="tour">Show me around</button></div>`;
+  return `<div class="ob-done"><div class="ob-done-mid">
+      <div class="ob-done-art" aria-hidden="true">${ART.grow()}<span class="ob-done-ic"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5l3 3 6-7"/></svg></span></div>
+      <h2 id="obTitle" tabindex="-1">Your budget is ready${first ? `, ${esc(first)}` : ""}!</h2>
+      <p class="lead">It’s saved. You can adjust everything whenever you like, and add your accounts and goals when you’re ready.</p></div>
+    <div class="ob-done-acts"><button class="btn primary block" type="button" data-obact="finish">Open my budget</button>
+    <button class="btn ghost block" type="button" data-obact="tour">Show me around</button></div></div>`;
 }
 
 function payBlock(p, i) {
@@ -156,7 +189,14 @@ function bucketAmount(b) {
 }
 function barHTML() {
   const t = Math.max(100, splitTotal(split.buckets));
-  return split.buckets.filter(b => n(b.pct) > 0).map(b => `<span style="width:${n(b.pct) / t * 100}%;background:${BUCKET_COL[b.key] || "var(--faint)"}"></span>`).join("");
+  return split.buckets.map(b => `<span style="width:${n(b.pct) / t * 100}%;background:${BUCKET_COL[b.key] || "var(--faint)"}"></span>`).join("");
+}
+/** Change the bar's widths in place, so each part glides to its new size. */
+function syncBar() {
+  const bar = $('[data-obk="bar"]'); if (!bar) return;
+  const t = Math.max(100, splitTotal(split.buckets)), parts = bar.children;
+  if (parts.length !== split.buckets.length) { bar.innerHTML = barHTML(); return; }
+  split.buckets.forEach((b, i) => { parts[i].style.width = `${n(b.pct) / t * 100}%`; });
 }
 function statusHTML(t) {
   const r = Math.round(t * 100) / 100;
@@ -204,7 +244,7 @@ export function initSetupEvents() {
       const t = splitTotal(split.buckets);
       $('[data-obk="tot"]').textContent = fmtNum(t) + "%";
       $('[data-obk="status"]').innerHTML = statusHTML(t);
-      $('[data-obk="bar"]').innerHTML = barHTML();
+      syncBar();
       const amt = $(`[data-obk="amt.${i}"]`); if (amt) amt.innerHTML = bucketAmount(b);
       const nx = $('[data-obact="next"]'); if (nx && !saving) nx.disabled = Math.round(t * 100) !== 10000;
       return;
@@ -247,8 +287,10 @@ export function initSetupEvents() {
     }
     if (act === "rmperson") { ans.people.splice(i, 1); split = null; return draw(); }
     if (act === "finish" || act === "tour") {
+      // "Show me around" is the Budget tour; "Open my budget" counts as having been offered it
+      if (act === "finish") markTour("budget", "offered");
       endSetup(); app.render(); window.scrollTo({ top: 0 });
-      if (act === "tour") app.startTour();
+      if (act === "tour") app.startTour("budget");
     }
   });
 }

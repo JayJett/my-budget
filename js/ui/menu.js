@@ -1,6 +1,7 @@
 /* The "⋯" menu: households (switch between them), settings, appearance, export and import. */
 import { app, readOnly } from "./ctx.js";
-import { $, esc, openPop, closePop, toast } from "./dom.js";
+import { $, esc, closePop, setPopContent, toast } from "./dom.js";
+import { toursMenu } from "./tour.js";
 import { exportCSV, exportJSON } from "./exports.js";
 import { openAccount, openHouseholdSettings, openAppearance } from "./settings.js";
 import { openHistory } from "./history.js";
@@ -18,7 +19,7 @@ export function mainMenu() {
     <button class="item" type="button" data-act="household">Household settings<small>${esc(app.household ? app.household.name : "")}: people, roles, invites</small></button>
     <button class="item" type="button" data-act="appearance">Appearance<small>Your colour, light or dark, spacing</small></button>
     <button class="item" type="button" data-act="account">Account settings<small>Name, email, password, your data</small></button>
-    <button class="item" type="button" data-act="tour">Take the tour<small>A one-minute look around</small></button><hr>` : ""}
+    <button class="item" type="button" data-act="tours">Guided tours<small>A short look around any tab</small></button><hr>` : ""}
     ${s ? "" : `<button class="item" type="button" data-act="appearance">Appearance<small>Colour, light or dark, spacing</small></button><hr>`}<button class="item" type="button" data-act="csv">Export to CSV<small>Opens in Excel or Google Sheets</small></button>
     <button class="item" type="button" data-act="backup">Download a backup<small>A .json copy of this budget, just in case</small></button>
     <button class="item" type="button" data-act="import"${readOnly() ? " disabled" : ""}>Import a saved file<small>From a backup or an earlier version</small></button>
@@ -26,7 +27,11 @@ export function mainMenu() {
 }
 
 export function menuAct(b) {
+  // sub-lists open inside the menu itself
+  if (b.dataset.act === "tours") { setPopContent(toursMenu()); return; }
+  if (b.dataset.act === "menu-back") { setPopContent(mainMenu()); return; }
   closePop();
+  if (b.dataset.tourReplay) { if (app.setup) { toast("Finish setting up first, then take a tour."); return; } app.startTour(b.dataset.tourReplay); return; }
   if (b.dataset.switch) { app.switchHousehold(b.dataset.switch); return; }
   const act = b.dataset.act;
   if (act === "csv") exportCSV();
@@ -37,6 +42,5 @@ export function menuAct(b) {
   if (act === "household") openHouseholdSettings();
   if (act === "account") openAccount();
   if (act === "appearance") openAppearance();
-  if (act === "tour") { if (app.setup) { toast("Finish setting up first, then take the tour."); return; } app.startTour(); }
   if (act === "signout") app.signOut();
 }

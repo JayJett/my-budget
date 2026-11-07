@@ -18,6 +18,7 @@ import { n, blank } from "../../model/util.js";
 import { jointGoalsLabel } from "./labels.js";
 import { budgetUI } from "../budget-sheets.js";
 import { itemIcon, iconPickerHTML } from "../icons.js";
+import { ART } from "../art.js";
 
 const CHEV = '<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5L10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const CHECK = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7"/></svg>';
@@ -55,6 +56,10 @@ function card(g, grp, ui, i) {
 /** Which person-groups to show: anyone with goals, or with money going to their goals pool. */
 const shown = (S, grp) => grp.kind === "ef" || grp.kind === "joint" || grp.goals.length > 0 || (app.C && app.C.pool.personalGoals[grp.kind.id] > 0);
 
+/** No goals at all yet (the emergency fund doesn't count: it's always there). */
+const size = x => Array.isArray(x) ? x.length : Object.keys(x || {}).length;
+const anyGoals = S => size(S.goals.joint) > 0 || Object.values(S.goals.personal || {}).some(g => size(g) > 0);
+
 function section(S, grp, ui, ro) {
   const isPerson = grp.kind !== "ef" && grp.kind !== "joint", P = S.people;
   const pool = grp.kind === "ef" ? K("g.ef.fn") : grp.kind === "joint" ? K("gp.jg") : K(`gpool.${grp.kind.id}`);
@@ -65,6 +70,7 @@ function section(S, grp, ui, ro) {
     : isPerson ? `<p class="gl-alloc"><span>Shared out</span>${K(`gp.${grp.kind.id}.c`, "chip")}</p>` : "";
   const spare = grp.kind === "joint" ? `<p class="gl-spare" data-k="gl.gj.spare" data-base="gl-spare"></p>` : isPerson ? `<p class="gl-spare" data-k="gl.${esc(grp.kind.id)}.spare" data-base="gl-spare"></p>` : "";
   const body = grp.goals.length ? `<ul class="gl-list">${grp.goals.map((g, i) => card(g, grp, ui, i)).join("")}</ul>`
+    : grp.kind === "joint" && !anyGoals(S) ? `<div class="card gl-none gl-first"><div class="empty-art" aria-hidden="true">${ART.target()}</div><h3>Create your first goal</h3><p>A holiday, a car, a house deposit: name it, set a target, and watch it fill.</p>${ro ? "" : `<button class="btn small primary" type="button" data-goal-new="${esc(grp.key)}">+ Add a goal</button>`}</div>`
     : `<div class="card gl-none"><p>No goals yet.</p>${ro ? "" : `<button class="btn small soft" type="button" data-goal-new="${esc(grp.key)}">+ Add a goal</button>`}</div>`;
   return `<section class="gl-group ${isPerson ? pc(grp.kind) : grp.kind === "ef" ? "ef" : "joint"}">
     <div class="ex-gh"><span class="ex-dot" aria-hidden="true"></span><h3>${esc(grp.title)}</h3>${grp.kind === "ef" ? "" : `<small>${grp.goals.length}</small>`}
