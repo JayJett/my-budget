@@ -35,7 +35,7 @@ export const TOURS = {
       { sel: ["#allocStatus"], title: "Every dollar has a job", text: "How much of each person’s pay is planned. Aim for 100%, and use Fill to top up the last bit." },
       { sel: ["#app .b-allocs", "#app .alloc-list"], title: "Your allocations", text: "Where the pay goes, account by account. Tap one to change its share of each person’s pay." },
       { sel: ["#tabs"], title: "The other tabs", text: "Net worth is what you own and owe. Spending is where the bills money goes. Goals and Investments show what your saving adds up to." },
-      { sel: ["#menuBtn"], title: "Settings live here", text: "Your account, household members and roles, switching households, downloads, and a guided tour for every tab." },
+      { sel: ["#menuBtn"], title: "Tap your initial for settings", text: "Your account, household members and roles, switching households, appearance, downloads, and a guided tour for every tab." },
     ],
   },
   networth: {

@@ -57,9 +57,10 @@ function drawList() {
   const intro = `<p class="set-note hist-intro">Every change to this budget from the last 90 days: who made it and when. ${canChange() ? "Tap one to see the details, undo it, or go back to how the budget was at that point." : readOnly() ? "You can look, but only owners and editors can undo changes." : ""}</p>`;
   if (!list.length) { sheet("History", `${intro}<div class="hist-empty"><b>No changes yet</b><p class="set-note">When anyone changes the budget, it’ll show here.</p></div>`); return; }
   const item = e => {
-    const tag = e.undone_at ? `<span class="chip">Undone</span>` : e.kind === "restore" ? `<span class="chip info">Restore</span>` : e.kind === "undo" ? `<span class="chip">Undo</span>` : "";
+    const setupEntry = isSetupEntry(e);
+    const tag = e.undone_at ? `<span class="chip">Undone</span>` : setupEntry ? `<span class="chip info">Budget set up</span>` : e.kind === "restore" ? `<span class="chip info">Restore</span>` : e.kind === "undo" ? `<span class="chip">Undo</span>` : "";
     const lines = e.lines.length > 1 || e.kind !== "edit" ? `<ul class="hist-lines">${e.lines.slice(0, 40).map(l => `<li>${esc(l.short)}</li>`).join("")}${e.lines.length > 40 ? `<li class="dim">…and ${e.lines.length - 40} more</li>` : ""}</ul>` : "";
-    const acts = `<div class="hist-acts">${canChange() && !e.undone_at ? `<button class="btn small" type="button" data-hist="undo" data-id="${e.id}">Undo this change</button>` : ""}
+    const acts = `<div class="hist-acts">${canChange() && !e.undone_at && !setupEntry ? `<button class="btn small" type="button" data-hist="undo" data-id="${e.id}">Undo this change</button>` : ""}
       <button class="btn small" type="button" data-hist="preview" data-id="${e.id}">See the budget at this point</button></div>`;
     return `<li class="hist-item${e.undone_at ? " undone" : ""}"><details><summary><span class="hist-text">${esc(e.headline)} ${tag}</span><span class="hist-time">${esc(e.time)}</span></summary>
       <div class="hist-body">${lines}${acts}</div></details></li>`;
@@ -115,14 +116,33 @@ async function restore(id, btn) {
 }
 
 /* ---------- undo ---------- */
+/* Phase 7D.1: the budget's starting point is never something to undo.
+   Setting the budget up (the setup guide's plan, or the empty budget behind "Set up later") is saved as
+   one change like any other, but it's the baseline, not an edit: undoing it would wipe the setup.
+   So the save that creates the budget is held back from the Undo button (holdUndoForSetup), and in
+   the History panel an entry that creates the budget is labelled "Budget set up" with no Undo.
+   It's also saved as one whole-budget "replace" labelled SETUP_REASON, which the database never merges
+   with later edits. (A normal save would have been: the database groups your edits to the same area
+   within 2 minutes into one entry, and setup touches every area, so your first real edit used to be
+   folded into the setup entry, and undoing it undid the whole setup.) */
+export const SETUP_REASON = "Budget set up";
+export function holdUndoForSetup() {
+  app.undoHold = true;
+  if (app.store && app.store.replaceNext) app.store.replaceNext(SETUP_REASON);
+}
+/** A history entry that created the budget: saved by setup, or (older budgets) its version went from nothing to something. */
+export const isSetupEntry = e => (e.kind === "replace" && e.reason === SETUP_REASON)
+  || (e.changes || []).some(c => Array.isArray(c.p) && c.p.length === 1 && c.p[0] === "version" && (c.o === null || c.o === undefined));
+
 /** Your changes made in this session, newest last (history entry ids), for the Undo button. */
 export function rememberChange(data) {
   if (!data || !data.change_id || readOnly()) return;
+  if (app.undoHold || app.setup) { app.undoHold = false; return; } // the budget's starting point: not undoable
   const s = app.undoStack || (app.undoStack = []);
   if (s[s.length - 1] !== data.change_id) s.push(data.change_id);
   updateUndo();
 }
-export function resetUndo() { app.undoStack = []; updateUndo(); }
+export function resetUndo() { app.undoStack = []; app.undoHold = false; updateUndo(); }
 
 export function updateUndo() {
   const b = $("#undoBtn"); if (!b) return;

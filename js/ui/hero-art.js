@@ -43,7 +43,11 @@ function prism(cx, base, w, h, top, left, right) {
     <path d="M${cx} ${t + q}L${cx + w / 2} ${t}L${cx + w / 2} ${base}L${cx} ${base + q}Z" fill="${right}"/>
     <path d="M${cx} ${t - q}L${cx + w / 2} ${t}L${cx} ${t + q}L${cx - w / 2} ${t}Z" fill="${top}"/>`;
 }
-const svg = (name, inner) => { const p = `ha${++uid}`; return `<svg class="hart hart-${name}" viewBox="0 0 300 260" aria-hidden="true" focusable="false">${defs(p)}${inner(p)}</svg>`; };
+/* Phase 7D.1: every drawing has a built-in safe margin (the viewBox reaches 20 units beyond the artwork on
+   every side) and nothing is drawn outside its own box (overflow: hidden in the CSS). So a floating coin,
+   sparkle or glow, including where its one-off animation starts, always stays inside the picture's own
+   space and can never reach the progress bar, a heading or a button. */
+const svg = (name, inner) => { const p = `ha${++uid}`; return `<svg class="hart hart-${name}" viewBox="-20 -24 340 304" preserveAspectRatio="xMidYMid meet" aria-hidden="true" focusable="false">${defs(p)}${inner(p)}</svg>`; };
 
 export const HERO = {
   /** "Give every dollar a job": a twisted ring around a coin in a glass bubble. */

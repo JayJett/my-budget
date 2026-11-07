@@ -39,13 +39,12 @@
 <header class="top">
   <div class="top-in">
     <div class="brand-row">
-      <div class="avatars" id="avatars" aria-hidden="true"></div>
+      <button class="me-btn" id="menuBtn" type="button" aria-label="Open account menu" aria-haspopup="dialog" aria-expanded="false"><span class="av" id="meAv" aria-hidden="true">?</span></button>
       <h1 class="brand" id="brandNames">Budget</h1>
       <div class="save-area">
         <button class="btn small undo-btn" id="undoBtn" type="button" hidden data-tip="Undo your last change" aria-label="Undo"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 3.5 2.5 6.5l3 3"/><path d="M2.5 6.5h7a4 4 0 0 1 0 8H7"/></svg><span>Undo</span></button>
         <span class="save-state" id="saveState" tabindex="0" role="status" aria-live="polite"><span class="dot"></span><span class="txt" id="saveText">Loading…</span></span>
         <button class="btn icon bell-btn" id="bellBtn" type="button" aria-label="Reminders" hidden><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11.5V7a4 4 0 0 1 8 0v4.5l1.2 1.3H2.8z"/><path d="M6.6 14.2a1.5 1.5 0 0 0 2.8 0"/></svg><span class="bell-count" id="bellCount" hidden>0</span></button>
-        <button class="btn icon" id="menuBtn" type="button" aria-label="More options" aria-haspopup="true"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3" cy="8" r="1.6"/><circle cx="8" cy="8" r="1.6"/><circle cx="13" cy="8" r="1.6"/></svg></button>
       </div>
     </div>
     <nav class="tabs" role="tablist" id="tabs"></nav>

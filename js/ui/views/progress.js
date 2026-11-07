@@ -147,7 +147,7 @@ export function view() {
       return `<li class="card pg-g${done ? " done" : ""}"><div class="pg-g-top">${goalIcon(g)}<span class="pg-g-n"><b>${esc(g.name)}</b><small>${esc(g.group)}</small></span>${done ? `<span class="gl-done">${CHECK}Reached</span>` : ""}</div>
         <div class="pg-g-row"><div class="pg-g-main"><span class="pg-g-v">${m0(g.saved)}${g.target ? `<small> of ${m0(g.target)}</small>` : ""}</span>
           ${g.target ? `<span class="gl-bar"><span style="width:${Math.min(1, g.pct || 0) * 100}%"></span></span>` : ""}
-          <small class="dim">${esc(goalNote(g, pts, app.today) || "Add a target to track progress")}</small></div>${sparkline(hist.map(h => h.saved), g.target, "var(--accent)")}</div></li>`;
+          <small class="dim">${esc(goalNote(g, pts, app.today) || "Add a target to track progress")}</small></div>${hist.filter(h => !h.now && h.saved !== null).length >= 2 ? sparkline(hist.map(h => h.saved), g.target, "var(--accent)") : ""}</div></li>`; /* a trend line only once there are two real points to draw */
     }).join("")}</ul>` : `<div class="card gl-none"><p>No goals yet. Add some on the Goals tab and they’ll show here.</p></div>`}</section>`;
 
   const cmp = app.compareId && snaps.find(s => String(s.id) === String(app.compareId));

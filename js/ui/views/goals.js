@@ -70,8 +70,8 @@ function section(S, grp, ui, ro) {
     : isPerson ? `<p class="gl-alloc"><span>Shared out</span>${K(`gp.${grp.kind.id}.c`, "chip")}</p>` : "";
   const spare = grp.kind === "joint" ? `<p class="gl-spare" data-k="gl.gj.spare" data-base="gl-spare"></p>` : isPerson ? `<p class="gl-spare" data-k="gl.${esc(grp.kind.id)}.spare" data-base="gl-spare"></p>` : "";
   const body = grp.goals.length ? `<ul class="gl-list">${grp.goals.map((g, i) => card(g, grp, ui, i)).join("")}</ul>`
-    : grp.kind === "joint" && !anyGoals(S) ? `<div class="card gl-none gl-first"><div class="empty-art" aria-hidden="true">${ART.target()}</div><h3>Create your first goal</h3><p>A holiday, a car, a house deposit: name it, set a target, and watch it fill.</p>${ro ? "" : `<button class="btn small primary" type="button" data-goal-new="${esc(grp.key)}">+ Add a goal</button>`}</div>`
-    : `<div class="card gl-none"><p>No goals yet.</p>${ro ? "" : `<button class="btn small soft" type="button" data-goal-new="${esc(grp.key)}">+ Add a goal</button>`}</div>`;
+    : grp.kind === "joint" && !anyGoals(S) ? `<div class="card gl-first"><div class="empty-art" aria-hidden="true">${ART.target()}</div><h3>Create your first goal</h3><p>Saving for something? Set a target and track your progress.</p>${ro ? "" : `<button class="btn primary gl-first-btn" type="button" data-goal-new="${esc(grp.key)}">+ Add a goal</button>`}</div>`
+    : `<div class="card gl-none"><p>${isPerson ? "No personal goals yet." : "No goals yet."}</p>${ro ? "" : `<button class="btn small soft" type="button" data-goal-new="${esc(grp.key)}">+ Add a goal</button>`}</div>`;
   return `<section class="gl-group ${isPerson ? pc(grp.kind) : grp.kind === "ef" ? "ef" : "joint"}">
     <div class="ex-gh"><span class="ex-dot" aria-hidden="true"></span><h3>${esc(grp.title)}</h3>${grp.kind === "ef" ? "" : `<small>${grp.goals.length}</small>`}
       <span class="ex-gt">${pool}<small class="per">${K("gl.per")}</small></span>${ui.reorder ? "" : addBtn}</div>
