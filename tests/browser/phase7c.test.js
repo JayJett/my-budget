@@ -87,8 +87,12 @@ test("sign-in: the tagline wraps instead of being cut off", { skip }, async () =
 /* ---------------- the menu as a bottom sheet ---------------- */
 test("menu on a phone: a sheet; the page behind stays exactly where it was; backdrop, Escape and drag close it", { skip }, async () => {
   const { page, errors, ctx } = await open(RICH, { ...PHONE, storage: { "mb-tours-u-me": JSON.stringify({ tabs: { budget: "done", networth: "done", spending: "done", goals: "done", invest: "done", progress: "done" } }) } });
-  await page.evaluate(() => scrollTo(0, 500));
+  // let the tab finish loading first (anything that arrives late above the fold would move the page by itself)
+  await page.waitForLoadState("networkidle"); await page.waitForTimeout(800);
+  await page.evaluate(() => scrollTo(0, 500)); await page.waitForTimeout(300);
   const y0 = await page.evaluate(() => scrollY);
+  // record anything that changes size while the menu is open, so a failure says what moved
+  await page.evaluate(() => { window.__moved = []; new ResizeObserver(es => es.forEach(e => window.__moved.push(`${e.target.tagName}.${e.target.className}`))).observe(document.querySelector("#app")); window.addEventListener("scroll", () => window.__moved.push("scroll " + scrollY)); });
   assert.ok(y0 > 300, "scrolled down the Budget tab");
   await page.click("#menuBtn");
   await page.waitForSelector("#pop.as-sheet:not([hidden])");
@@ -101,7 +105,7 @@ test("menu on a phone: a sheet; the page behind stays exactly where it was; back
   // trying to scroll the page behind does nothing
   await page.mouse.move(195, 120); await page.mouse.wheel(0, 600);
   await page.waitForTimeout(150);
-  assert.equal(await page.evaluate(() => scrollY), y0, "background didn't move");
+  assert.equal(await page.evaluate(() => scrollY), y0, `background didn't move (${await page.evaluate(() => window.__moved.join(", "))})`);
   // the sheet's own list still scrolls (when it's taller than the sheet)
   await page.$eval("#pop .pop-body", el => el.scrollTop = 40);
   // backdrop closes it, and the page is where it was
