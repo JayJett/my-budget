@@ -3,6 +3,7 @@
 import { app, readOnly } from "./ctx.js";
 import { $, $$, esc } from "./dom.js";
 import { pc } from "./inputs.js";
+import { avatarHTML, myName } from "./profile.js";
 import { compute } from "../model/calc.js";
 import { WORDS, VIEWS } from "../model/periods.js";
 import { listNames } from "../model/format.js";
@@ -44,18 +45,13 @@ const initial = p => (p.name || "?").trim().charAt(0).toUpperCase() || "?";
 /** Header (Phase 7D.1): YOUR avatar on the left (it opens the account menu), the household's name, and,
     for more than one person, everyone's names underneath. The avatar uses your name and, when you're one
     of the people in the budget, your colour there (otherwise your accent). Nothing is fixed to particular people. */
-export function myName() {
-  const me = (app.members || []).find(m => m.user_id === app.meId), md = (app.session && app.session.user && app.session.user.user_metadata) || {};
-  return ((me && me.display_name) || md.name || (md.full_name || "").trim().split(/\s+/)[0] || (app.session && app.session.user && app.session.user.email) || "").trim();
-}
 export function renderBrand() {
   const P = app.state.people, names = P.map(p => (p.name || "").trim()).filter(Boolean);
   const title = app.household ? app.household.name : (names.length ? listNames(names) : "Moni Money");
-  const btn = $("#menuBtn"), av = $("#meAv");
-  if (av) {
-    const nm = myName(), mine = P.find(p => (p.name || "").trim().toLowerCase() === nm.toLowerCase() && nm);
-    av.className = `av ${mine ? pc(mine) : "me-accent"}`;
-    av.textContent = (nm.charAt(0) || "?").toUpperCase();
+  const btn = $("#menuBtn"), slot = $("#meSlot");
+  if (slot && app.session) {
+    slot.innerHTML = avatarHTML();
+    const nm = myName();
     if (btn) btn.setAttribute("aria-label", nm ? `Open account menu (${nm})` : "Open account menu");
   }
   const brand = $("#brandNames");

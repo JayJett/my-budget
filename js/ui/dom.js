@@ -85,7 +85,7 @@ export function unlockScroll() {
   document.removeEventListener("touchmove", touchGuard);
   document.removeEventListener("wheel", wheelGuard);
 }
-const setBehind = on => BEHIND.forEach(s => { const el = $(s); if (el) { if (on) el.setAttribute("inert", ""); else el.removeAttribute("inert"); } });
+export const setBehind = on => BEHIND.forEach(s => { const el = $(s); if (el) { if (on) el.setAttribute("inert", ""); else el.removeAttribute("inert"); } });
 
 export function openPop(anchor, html, handler, { label = "Options" } = {}) {
   const pop = $("#pop"), back = $("#popBack");

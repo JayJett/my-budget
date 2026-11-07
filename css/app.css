@@ -1993,3 +1993,109 @@ body.setting-up::before, body.signed-out::before{ background:transparent; }
    letter tile gets a colour (these cards don't set the goal colour the tile reads) */
 .pg-g .pg-g-n small{ display:block; margin:1px 0 0; }
 .pg-g{ --gc:var(--accent); }
+
+/* =====================================================================
+   PHASE 7D.2: drawer menu, notifications, profile, bell
+   ===================================================================== */
+/* --- the bell: a plain toolbar icon with a 44px tap area, and a dot when something's unread --- */
+.icon-btn{ position:relative; display:grid; place-items:center; width:44px; height:44px; padding:0; border:0; border-radius:50%; background:none; color:var(--ink); cursor:pointer; -webkit-tap-highlight-color:transparent; transition:transform var(--m-fast) var(--ease), background-color var(--m-sel); }
+.icon-btn:active{ transform:scale(.9); }
+@media (hover:hover){ .icon-btn:hover{ background:var(--surface-2); } }
+.icon-btn:focus-visible{ outline:2px solid var(--accent); outline-offset:-2px; }
+.icon-btn[hidden]{ display:none; }
+.bell-dot{ position:absolute; top:10px; right:11px; width:9px; height:9px; border-radius:50%; background:var(--attn); box-shadow:0 0 0 2px var(--surface); pointer-events:none; }
+.bell-dot[hidden]{ display:none; }
+@media (prefers-reduced-motion: no-preference){ .bell-dot:not([hidden]){ animation:ar-pop .3s var(--ease-out) both; } }
+/* the save dot: on phones the words are hidden from sight but still read out ("Saved", "Saving…", "Offline") */
+@media (max-width:640px){ .save-state .txt{ display:inline !important; position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; } }
+
+/* --- the drawer --- */
+.dr-back{ position:fixed; inset:0; z-index:40; background:rgba(12,16,14,.45); opacity:0; transition:opacity var(--m-sheet) var(--ease); }
+.dr-back.on{ opacity:1; }
+.dr-back[hidden]{ display:none; }
+.drawer{ position:fixed; top:0; bottom:0; z-index:41; width:min(86vw, 360px); display:flex; flex-direction:column; background:var(--surface); color:var(--ink);
+  box-shadow:0 0 40px -10px rgba(0,0,0,.4); outline:none; transform:translateX(0); transition:transform var(--m-sheet) var(--ease-out); will-change:transform; }
+.drawer[hidden]{ display:none; }
+.drawer.dr-left{ left:0; border-radius:0 22px 22px 0; }
+.drawer.dr-right{ right:0; border-radius:22px 0 0 22px; }
+.drawer.dr-left.dr-enter, .drawer.dr-left.dr-leave{ transform:translateX(-102%); }
+.drawer.dr-right.dr-enter, .drawer.dr-right.dr-leave{ transform:translateX(102%); }
+.drawer.dr-leave{ transition:transform .22s var(--ease); pointer-events:none; }
+.dr-body{ flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch;
+  padding:calc(env(safe-area-inset-top,0px) + 10px) 12px calc(env(safe-area-inset-bottom,0px) + 14px); display:flex; flex-direction:column; }
+@media (prefers-reduced-motion: reduce){ .drawer, .dr-back{ transition:none !important; } }
+.dr-top{ display:flex; align-items:flex-start; gap:4px; padding:4px 0 10px; border-bottom:1px solid var(--line); margin-bottom:6px; }
+.dr-me{ flex:1; min-width:0; display:flex; align-items:center; gap:12px; padding:8px; border:0; background:none; border-radius:16px; text-align:left; color:inherit; cursor:pointer; min-height:64px; }
+.dr-me:active, .dr-row:active, .dr-hh:active{ background:var(--surface-2); }
+@media (hover:hover){ .dr-me:hover, .dr-row:hover, .dr-hh:hover{ background:var(--surface-2); } }
+.dr-me-t{ flex:1; min-width:0; } .dr-me-t b{ display:block; font:700 1.05rem/1.25 var(--display); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.dr-me-t small{ color:var(--accent); font-weight:650; font-size:var(--fs-sm); }
+.dr-x{ flex:none; width:44px; height:44px; display:grid; place-items:center; border:0; background:none; color:var(--muted); border-radius:12px; cursor:pointer; }
+.dr-x:active{ background:var(--surface-2); }
+.dr-sec{ padding:6px 0; }
+.dr-sec + .dr-sec{ border-top:1px solid var(--line); }
+.dr-h{ margin:4px 10px 4px; font-size:var(--fs-xs); font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; }
+.dr-row{ width:100%; display:flex; align-items:center; gap:14px; min-height:50px; padding:8px 10px; border:0; background:none; border-radius:14px; text-align:left; color:var(--ink); font:600 1rem var(--body); cursor:pointer; transition:background-color var(--m-sel); }
+.dr-row > span{ flex:1; min-width:0; }
+.dr-row.tall > span small{ display:block; font-weight:500; font-size:var(--fs-xs); color:var(--muted); margin-top:1px; }
+.dr-row[disabled]{ opacity:.5; cursor:default; }
+.mi{ width:22px; height:22px; flex:none; color:var(--muted); }
+.mi-chev{ width:14px; height:14px; flex:none; color:var(--faint); }
+.dr-hh{ width:100%; display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:46px; padding:8px 10px; border:0; background:none; border-radius:12px; text-align:left; color:var(--ink); font:600 .95rem var(--body); cursor:pointer; }
+.dr-hh-n{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.dr-hh small{ flex:none; color:var(--muted); font-size:var(--fs-xs); font-weight:600; }
+.dr-hh[aria-current="true"]{ background:var(--accent-soft); color:var(--accent); } .dr-hh[aria-current="true"] small{ color:var(--accent); }
+.dr-foot{ margin-top:auto; padding-top:8px; border-top:1px solid var(--line); }
+.dr-out, .dr-out .mi{ color:var(--bad); }
+.dr-sub-h{ display:flex; align-items:center; gap:6px; padding:2px 0 10px; border-bottom:1px solid var(--line); margin-bottom:6px; }
+.dr-sub-h h2{ flex:1; margin:0; font:700 1.15rem var(--display); }
+.dr-inbox-h h2{ padding-left:8px; }
+.dr-back-btn{ width:44px; height:44px; display:grid; place-items:center; border:0; background:none; border-radius:12px; color:var(--ink); cursor:pointer; }
+.dr-tours .item{ display:block; width:100%; text-align:left; border:0; background:none; padding:11px 10px; border-radius:12px; font:600 1rem var(--body); color:var(--ink); cursor:pointer; min-height:50px; }
+.dr-tours .item small{ display:block; font-weight:500; font-size:var(--fs-xs); color:var(--muted); }
+.dr-tours .item:active{ background:var(--surface-2); }
+/* avatars: a picture when there is one */
+.av.lg{ width:52px; height:52px; font-size:1.25rem; }
+.av.xl{ width:112px; height:112px; font-size:2.6rem; }
+.av-img{ position:relative; overflow:hidden; background:var(--surface-2); }
+.av-img img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; border-radius:50%; }
+.av-img i{ display:none; font-style:normal; }
+.av-img.av-broken img{ display:none; } .av-img.av-broken i{ display:inline; }
+.me-btn #meSlot{ display:grid; place-items:center; }
+.me-btn .av{ width:34px; height:34px; }
+/* notifications in the drawer */
+.dr-inbox .rem-item{ border-radius:16px; }
+.dr-inbox .rem-item:not(.read){ background:var(--accent-soft); }
+.dr-inbox .rem-empty{ text-align:center; padding:28px 12px 18px; }
+.dr-inbox .rem-bell{ display:grid; place-items:center; width:64px; height:64px; margin:0 auto 10px; border-radius:50%; background:var(--accent-soft); color:var(--accent); }
+.dr-inbox .rem-bell svg{ width:30px; height:30px; }
+.dr-inbox .rem-empty b{ display:block; font:700 1.05rem var(--display); margin-bottom:4px; }
+.dr-inbox .rem-foot{ margin-top:14px; }
+/* my profile */
+.prof{ display:flex; flex-direction:column; align-items:center; text-align:center; padding:12px 0 6px; }
+.prof-av{ margin-bottom:12px; }
+.prof-acts{ display:flex; gap:8px; flex-wrap:wrap; justify-content:center; }
+.prof-acts .btn{ min-height:40px; }
+.prof .msg{ margin-top:8px; }
+.prof-crop{ width:100%; display:flex; flex-direction:column; align-items:center; gap:12px; margin-top:12px; }
+.prof-crop[hidden]{ display:none; }
+.prof-canvas{ width:min(240px, 70vw); height:auto; aspect-ratio:1; border-radius:50%; touch-action:none; cursor:grab; box-shadow:0 0 0 4px var(--accent-soft); }
+.prof-canvas:focus-visible{ outline:2px solid var(--accent); outline-offset:4px; }
+.prof-zoom{ display:flex; align-items:center; gap:10px; width:min(260px, 80vw); font-size:var(--fs-sm); color:var(--muted); }
+.prof-zoom input{ flex:1; accent-color:var(--accent); min-height:44px; }
+.prof-crop-acts{ display:flex; gap:10px; }
+.prof-email{ margin:0 0 8px; font-weight:600; overflow-wrap:anywhere; }
+/* --- hero cards (Phase 7D.2): the period switch is its own control at the top, full width; the label sits
+   right on top of its big number, so they read as one ("Household income / $4,300 per fortnight").
+   Same on Budget, Spending, Goals and Invest; Net worth and Progress have no switch, so their label
+   already sits on the number. --- */
+:is(.b-income, .sp-sum, .gl-sum, .iv-hero).card > .b-row:first-child:has(.seg){ flex-direction:column-reverse; align-items:stretch; gap:16px; }
+:is(.b-income, .sp-sum, .gl-sum, .iv-hero).card > .b-row:first-child .seg-wrap{ display:block; width:100%; }
+:is(.b-income, .sp-sum, .gl-sum, .iv-hero).card > .b-row:first-child .seg{ display:flex; width:100%; padding:3px; gap:2px; border-radius:12px; background:rgba(255,255,255,.08); }
+:is(.b-income, .sp-sum, .gl-sum, .iv-hero).card > .b-row:first-child .seg button{ flex:1; min-height:36px; border-radius:9px; padding:6px 4px; font-size:var(--fs-sm); font-weight:650; color:var(--muted); background:none; border:0; transition:background-color var(--m-sel), color var(--m-sel); }
+:is(.b-income, .sp-sum, .gl-sum, .iv-hero).card > .b-row:first-child .seg button[aria-pressed="true"]{ background:rgba(255,255,255,.16); color:var(--ink); box-shadow:none; }
+:is(.b-income, .nw-hero, .sp-sum, .gl-sum, .iv-hero, .pg-hero).card .eyebrow{ font-size:var(--fs-sm); color:var(--muted); font-weight:600; letter-spacing:0; }
+:is(.b-income, .sp-sum, .gl-sum, .iv-hero).card > .b-row:first-child + :is(.sp-head, .hero-amt){ margin-top:2px; }
+@media (max-width:760px){ :is(.b-income, .sp-sum, .gl-sum, .iv-hero).card > .b-row:first-child .seg button{ min-height:40px; } }
+/* "Where should the money come from?" choices */
+.pop .item.gl-pot{ display:flex; flex-direction:column; align-items:flex-start; }

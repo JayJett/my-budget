@@ -52,7 +52,7 @@ test("a couple: summary, emergency fund, joint and each person's goals as cards,
 
 test("one person: no couple wording, no empty partner sections", { skip }, async () => {
   const { page, errors, ctx } = await goalsTab(CASES.mixed);
-  assert.deepEqual(await page.$$eval(".gl-group h3", els => els.map(e => e.textContent)), ["Emergency fund", "Goals", "Jarden’s goals"]);
+  assert.deepEqual(await page.$$eval(".gl-group h3", els => els.map(e => e.textContent)), ["Emergency fund", "Goals", "Personal goals"]);
   assert.doesNotMatch(await page.textContent("#app"), /Joint|Madi|both of you|partner/i);
   assert.equal(await text(page, "g.g1.accflag"), "Not in a savings account", "a goal kept in an everyday account is flagged");
   assert.equal(await text(page, "ef.cover"), "1.7 months cover");
@@ -79,7 +79,7 @@ test("edge cases: overfunded, no target, no plan, no spending data, no saved amo
   assert.equal(await text(o.page, "gl.saved"), "$0");
   assert.equal(await text(o.page, "ef.cover"), "", "nothing saved: no cover figure");
   assert.equal(await text(o.page, "g.ef.amt"), "$0 saved");
-  assert.ok(await o.page.locator(".gl-none [data-goal-new]").count() >= 1, "a compact empty state with a way to add");
+  assert.equal(await o.page.locator(".gl-first [data-goal-new]").count(), 1, "one clear way to add the first goal");
   assert.doesNotMatch(await o.page.textContent("#app"), /NaN|Infinity|undefined/);
   assert.deepEqual(o.errors, []); await o.ctx.close();
 });
@@ -130,7 +130,7 @@ test("add: closing a blank goal leaves nothing; the + Add goal menu picks the li
   await closeSheet(page); await settle(page);
   assert.equal(Object.keys((await saved(page)).goals.joint).length, 3, "no empty goal left behind");
   await page.click('.add-row[data-goal-new="pick"]');
-  assert.deepEqual(await page.$$eval("#pop [data-pick-goal]", els => els.map(e => e.textContent)), ["Joint goals", "Jarden’s goals", "Madi’s goals"]);
+  assert.deepEqual(await page.$$eval("#pop [data-pick-goal] span", els => els.map(e => e.textContent)), ["Joint goals", "Jarden’s goals", "Madi’s goals"]);
   await page.click('#pop [data-pick-goal="gp:m"]');
   await page.waitForSelector('#sheet [data-f="name"]:focus');
   await page.keyboard.type("Laptop");
