@@ -164,7 +164,7 @@ test("step 1 for a brand-new account: nothing pre-chosen; 'joining' explains inv
   await shot(page, "1-start");
   await page.check('input[name="obmode"][value="join"]');
   assert.match(await page.textContent(".ob-join"), /jarden@example\.com/);
-  assert.equal(await page.isVisible('#fHousehold [name="name"]'), false);
+  assert.equal(await page.isVisible('#fHousehold [name="name"]'), false, "the name box makes way for the note");
   await page.check('input[name="obmode"][value="with"]');
   assert.equal(await page.inputValue('#fHousehold [name="name"]'), "Our budget");
   await shot(page, "1-selected");

@@ -35,7 +35,31 @@ test("six accents, each with a name, and Mint is the default", () => {
 test("accents never touch member, status or chart colours", () => {
   const blocks = [...css.matchAll(/\[data-accent="\w+"\]\{([^}]*)\}/g)].map(m => m[1]);
   assert.ok(blocks.length >= 18);
-  for (const b of blocks) assert.deepEqual(Object.keys(vars(b)).sort(), ["accent", "accent-hover", "accent-soft", "on-accent"]);
+  for (const b of blocks) {
+    const k = Object.keys(vars(b)).sort();
+    // either the accent itself, or (Phase 7C redesign) its light version for the dark hero cards
+    assert.ok(JSON.stringify(k) === JSON.stringify(["accent", "accent-hover", "accent-soft", "on-accent"]) || JSON.stringify(k) === JSON.stringify(["acc-d", "on-acc-d"]), k.join(","));
+  }
+});
+
+test("the dark hero cards and the dark setup screens are readable (Phase 7C redesign)", () => {
+  const block = sel => { const i = css.indexOf(sel); assert.ok(i >= 0, `missing ${sel}`); return vars(css.slice(i, css.indexOf("}", css.indexOf("{", i)))); };
+  for (const mode of ["light", "dark"]) {
+    const hero = base[mode].hero, h = block(":is(.b-income, .nw-hero, .sp-sum, .gl-sum, .iv-hero, .pg-hero).card{");
+    for (const k of ["ink", "muted", "ok", "warn", "bad", "c-blue", "c-gold", "c-coral", "c-rose", "c-slate", "joint", "invest"])
+      assert.ok(ratio(h[k], hero) >= 4.5, `${mode}: ${k} on the hero card is ${ratio(h[k], hero).toFixed(2)}:1`);
+    assert.ok(ratio(h.muted, h["surface-2"]) >= 4.5, `${mode}: muted text on a hero tile`);
+  }
+  // each accent's light version on the hero card, and text on it
+  const accD = [...css.matchAll(/--acc-d:(#[0-9A-Fa-f]{6}); --on-acc-d:(#[0-9A-Fa-f]{6})/g)].map(m => [m[1], m[2]]);
+  assert.ok(accD.length >= 7);
+  for (const hero of [base.light.hero, base.dark.hero]) for (const [a, on] of accD) {
+    assert.ok(ratio(a, hero) >= 4.5, `accent ${a} on the hero card is ${ratio(a, hero).toFixed(2)}:1`);
+    assert.ok(ratio(on, a) >= 4.5, `text on ${a} buttons`);
+  }
+  const im = block(".im{");
+  for (const k of ["ink", "muted", "accent", "bad", "ok"]) assert.ok(ratio(im[k], im.bg) >= 4.5 && ratio(im[k], im["surface-2"]) >= 4.5, `setup screens: ${k}`);
+  assert.ok(ratio(im["on-accent"], im.accent) >= 4.5);
 });
 
 test("status and people's colours are readable too (phase 6 audit: warning chips and the gold person colour)", () => {

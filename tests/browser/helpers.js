@@ -45,7 +45,10 @@ after(async () => { if (browser) await browser.close(); if (server) server.close
 
 /** Open the app with a given saved budget (or a full fake setup via opts.init).
     Returns the page and a list of errors seen. waitFor: what to wait for before returning. */
-export async function open(budget, { width = 1280, seq = 0, init = null, waitFor = "#app .viewas", storage = null, device = null } = {}) {
+export async function open(budget, { width = 1280, seq = 0, init = null, waitFor = "#app .viewas", storage = null, device = null, welcome = false } = {}) {
+  // Phase 7C redesign: someone new sees the welcome slides first. Older tests start as someone who has
+  // already been past them on this device (pass welcome: true to see them).
+  if (!welcome) storage = { "mb-welcome-seen": "1", ...(storage || {}) };
   // Reduced motion: sheets appear in place, so tests can measure them straight away (and the setting is exercised).
   const ctx = await browser.newContext({ ...(device ? { ...device } : { viewport: { width, height: 900 } }), reducedMotion: "reduce" });
   const page = await ctx.newPage();
