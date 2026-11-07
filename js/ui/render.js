@@ -41,13 +41,23 @@ export function applyUI() {
 
 const initial = p => (p.name || "?").trim().charAt(0).toUpperCase() || "?";
 
-/** Header: one small avatar per person in the budget (in their colour), the household's name,
-    and, for more than one person, their names underneath. Nothing here is fixed to particular people. */
+/** Header (Phase 7D.1): YOUR avatar on the left (it opens the account menu), the household's name, and,
+    for more than one person, everyone's names underneath. The avatar uses your name and, when you're one
+    of the people in the budget, your colour there (otherwise your accent). Nothing is fixed to particular people. */
+export function myName() {
+  const me = (app.members || []).find(m => m.user_id === app.meId), md = (app.session && app.session.user && app.session.user.user_metadata) || {};
+  return ((me && me.display_name) || md.name || (md.full_name || "").trim().split(/\s+/)[0] || (app.session && app.session.user && app.session.user.email) || "").trim();
+}
 export function renderBrand() {
   const P = app.state.people, names = P.map(p => (p.name || "").trim()).filter(Boolean);
   const title = app.household ? app.household.name : (names.length ? listNames(names) : "Moni Money");
-  const av = $("#avatars");
-  if (av) av.innerHTML = P.slice(0, 4).map(p => `<span class="av ${pc(p)}">${esc(initial(p))}</span>`).join("");
+  const btn = $("#menuBtn"), av = $("#meAv");
+  if (av) {
+    const nm = myName(), mine = P.find(p => (p.name || "").trim().toLowerCase() === nm.toLowerCase() && nm);
+    av.className = `av ${mine ? pc(mine) : "me-accent"}`;
+    av.textContent = (nm.charAt(0) || "?").toUpperCase();
+    if (btn) btn.setAttribute("aria-label", nm ? `Open account menu (${nm})` : "Open account menu");
+  }
   const brand = $("#brandNames");
   if (brand) brand.innerHTML = `<span class="brand-t">${esc(title)}</span>${P.length > 1 && names.length ? `<small>${esc(listNames(names))}</small>` : ""}`;
   document.title = `${title} · Budget`;

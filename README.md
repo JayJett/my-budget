@@ -230,6 +230,17 @@ The closing audit's findings, fixes and remaining items are in `docs/phase6-audi
   - `tests/sql/isolation.test.js`: every table has row-level security, and no household can see another's rows.
   - `tests/browser/phase7d.test.js`.
 
+### Refinements (Phase 7D.1)
+
+- **Undo never takes back setup.**
+  - Setup is saved as one whole-budget change, "Budget set up", which the database never merges with later edits. It's held back from the Undo button and has no Undo in History. "Set up later" works the same way with its first save.
+  - Before this, setup's save went onto the Undo stack, and the database folded your first edit within 2 minutes into it. So Undo could wipe the plan.
+- **Header:** your avatar opens the account menu; the ⋯ button is gone. Switching household stays in the menu.
+- **Onboarding pictures** (`js/ui/hero-art.js`) have a built-in safe margin and can't draw outside their own box, so nothing reaches the progress bar. The welcome picture only takes leftover space. Step 3's status and buttons are one solid footer.
+- **Goals' first-goal card** is stacked (picture, heading, one line, a full-width button); other empty sections are one short line.
+- **Progress savings cards** only draw a trend line once there are two real snapshots.
+- Tests: `tests/browser/phase7d1.test.js` (undo after setup, header, and overlap / tappable / footer checks at 320–430px).
+
 ## How saving works
 
 The whole budget lives in one row (`budgets.state`), but the app never overwrites it. Each edit is

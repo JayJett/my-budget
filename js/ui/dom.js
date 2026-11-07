@@ -110,7 +110,9 @@ export function openPop(anchor, html, handler, { label = "Options" } = {}) {
   ["role", "aria-modal", "aria-label"].forEach(a => pop.removeAttribute(a)); pop.removeAttribute("tabindex");
   pop.innerHTML = html; pop.hidden = false;
   const b = anchor.getBoundingClientRect(), w = pop.offsetWidth;
-  pop.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, b.right - w)) + "px"; pop.style.top = (b.bottom + 6) + "px";
+  // opens under its button, lined up with whichever side of the screen the button is on
+  const x = b.left + b.width / 2 < window.innerWidth / 2 ? b.left : b.right - w;
+  pop.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, x)) + "px"; pop.style.top = (b.bottom + 6) + "px";
 }
 /** Swap what an open menu shows (a sub-list), keeping it open. */
 export function setPopContent(html) {

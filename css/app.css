@@ -1950,5 +1950,46 @@ body.setting-up::before, body.signed-out::before{ background:transparent; }
 .nw-rv-act{ flex-wrap:wrap; }
 .nw-rv-date{ min-width:0; max-width:100%; }
 .nw-rv-date input{ max-width:100%; min-width:0; box-sizing:border-box; }
-/* Header on narrow phones: the household name gets the room (the avatars are repeated in the names line) */
-@media (max-width:380px){ .top .avatars{ display:none; } }
+/* =====================================================================
+   PHASE 7D.1
+   ===================================================================== */
+/* Header: your avatar is the account-menu button (the ⋯ button is gone) */
+.me-btn{ flex:none; position:relative; display:grid; place-items:center; width:44px; height:44px; margin:-2px 0 -2px -6px; padding:0; border:0; border-radius:50%; background:none; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+.me-btn .av{ width:34px; height:34px; font-size:.92rem; box-shadow:0 0 0 2px var(--surface); transition:transform var(--m-fast) var(--ease), box-shadow var(--m-sel); }
+.me-btn .av.me-accent{ background:var(--accent); color:var(--on-accent); }
+.me-btn:hover .av{ box-shadow:0 0 0 2px var(--surface), 0 0 0 4px var(--accent-soft); }
+.me-btn:active .av{ transform:scale(.92); }
+.me-btn:focus-visible{ outline:2px solid var(--accent); outline-offset:0; }
+.me-btn[aria-expanded="true"] .av{ box-shadow:0 0 0 2px var(--surface), 0 0 0 4px var(--accent); }
+/* Goals, first goal: picture, heading, one line, one button, stacked (it used to share the one-line
+   "No goals yet" row's side-by-side layout, which squeezed everything into narrow columns) */
+.gl-first{ display:flex; flex-direction:column; align-items:center; text-align:center; gap:0; padding:18px 18px 18px; }
+.gl-first .empty-art{ width:min(160px, 52%); margin:0 auto 4px; }
+.gl-first h3{ margin:4px 0 4px; font:700 var(--fs-lg)/1.25 var(--display); }
+.gl-first p{ margin:0 0 14px; max-width:30ch; color:var(--muted); font-size:var(--fs-sm); line-height:1.45; }
+.gl-first-btn{ align-self:stretch; justify-content:center; min-height:46px; white-space:nowrap; }
+@media (min-width:600px){ .gl-first-btn{ align-self:center; padding-left:28px; padding-right:28px; } }
+/* the compact "no goals" rows: a short line and a button that never wraps */
+.gl-none{ flex-wrap:wrap; row-gap:8px; }
+.gl-none p{ flex:1 1 140px; min-width:0; }
+.gl-none .btn{ white-space:nowrap; flex:none; }
+/* Onboarding pictures stay inside their own space (see js/ui/hero-art.js), with a fixed gap below the
+   progress bar and above the headline */
+.hart{ overflow:hidden; }
+.im .ob-top{ margin-bottom:14px; }
+.im .ob-art{ margin:2px auto 10px; }
+.im .ob-done-art{ margin-top:4px; }
+/* Step 3: the plan's status and buttons are one solid footer, not a floating badge over the list */
+.im .ob-foot{ background:#0A231E; border-top:1px solid rgba(255,255,255,.08); padding-top:10px; box-shadow:0 -10px 24px -12px rgba(0,0,0,.45); }
+.im .ob-foot .ob-status{ margin:0 0 8px; display:flex; justify-content:center; }
+.im .ob-foot .ob-status .chip{ background:transparent; padding:0; font-size:var(--fs-sm); }
+.im .ob-foot .ob-status .chip::before{ display:none; }
+.im .ob-buckets{ margin-bottom:12px; }
+/* Welcome: the picture takes the space left between the words and the dots (it used to have a 150px
+   minimum, which pushed "Sign in" off a 320×568 screen); too little room and it isn't drawn */
+.wl-art{ flex:1 1 0; min-height:0; container-type:size; padding:8px 0 4px; }
+.wl-art .hart{ height:100%; max-height:300px; }
+/* Progress, savings cards: the goal's group sits under its name (it wrapped beside it at 320px), and the
+   letter tile gets a colour (these cards don't set the goal colour the tile reads) */
+.pg-g .pg-g-n small{ display:block; margin:1px 0 0; }
+.pg-g{ --gc:var(--accent); }

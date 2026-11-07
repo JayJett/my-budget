@@ -25,6 +25,7 @@ import { n, blank } from "../model/util.js";
 import { HERO } from "./hero-art.js";
 import { setThemeColour } from "./auth.js";
 import { markTour } from "./tour.js";
+import { holdUndoForSetup } from "./history.js";
 
 export const STAGES = ["Make it yours", "Your income", "Your starting plan"];
 const FREQS = [["weekly", "Weekly"], ["fortnightly", "Fortnightly"], ["monthly", "Monthly"]];
@@ -67,7 +68,9 @@ export function endSetup() { app.setup = null; document.body.classList.remove("s
 /** "Set up later": an empty budget in memory (nothing saved, nothing invented), straight into the app. */
 function skip() {
   endSetup();
-  if (!app.hasData) { const me = app.members.find(m => m.user_id === app.meId); app.state = blankBudget({ name: (me && me.display_name) || (ans && ans.people[0].name) || "" }); }
+  if (!app.hasData) {
+    // the empty budget is saved together with your first edit: that first save is the starting point, not an undo
+    holdUndoForSetup(); const me = app.members.find(m => m.user_id === app.meId); app.state = blankBudget({ name: (me && me.display_name) || (ans && ans.people[0].name) || "" }); }
   app.render();
   window.scrollTo({ top: 0 });
 }
@@ -223,6 +226,7 @@ async function finishBudget() {
     app.reloadHouseholds(app.household.id); return;
   }
   saving = true; saveErr = ""; draw();
+  holdUndoForSetup(); // the plan becomes the budget's starting point, not something Undo can take back
   ans.people.forEach(p => { p.name = (p.name || "").trim(); });
   app.state = buildBudget({ purpose: ans.people.length > 1 ? "household" : "solo", people: ans.people, have: {} }, split, app.today);
   app.hasData = true;
