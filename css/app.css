@@ -1545,3 +1545,218 @@ body.setting-up .top{ display:none; }                                  /* setup 
 @media (max-width:360px){ .ob-b-amt{ min-width:0; } .ob-buckets li{ flex-wrap:wrap; } .ob-b-name{ flex-basis:calc(100% - 20px); } .ob-b-amt{ margin-left:auto; } .ob-card h2, .ob-auth h2{ font-size:1.4rem; } .ob-amount input{ font-size:1.6rem; } }
 @media (prefers-reduced-motion: reduce){ .ob-in, .ob-done-ic{ animation:none !important; } }
 h2[tabindex="-1"]:focus, h2[tabindex="-1"]:focus-visible{ outline:none !important; }   /* focused only so screen readers announce the new step */
+
+/* =====================================================================
+   PHASE 7C: fitting the phone screen, illustrations, motion, the settings sheet and tours
+   ===================================================================== */
+/* --- motion conventions (one set, used everywhere below) ---
+   tap feedback .1s · selection .18s · step change .18–.26s · progress .35s · sheets .26s
+   Only transform and opacity animate where possible. "Reduce motion" turns all of it off (see the
+   rule near the top of this file, and the ones at the end of this section). */
+:root{ --m-fast:.1s; --m-sel:.18s; --m-step:.24s; --m-sheet:.26s; --ease-out:cubic-bezier(.16,1,.3,1);
+  --art-coin:#F2C14E; --art-coin-edge:#CF9425; }
+
+/* --- the visible screen height ---
+   100vh on iPhone Safari is the screen with the toolbars hidden, so a page that is "100vh tall" is
+   taller than what you see while the toolbars show, and can be dragged up and down. dvh is the height
+   actually visible now. The page already pads itself for the notch and home bar (:root, above), so
+   those are taken off too. Browsers without dvh fall back to vh. */
+:root{ --vh:100vh; --safe-y:calc(env(safe-area-inset-top,0px) + env(safe-area-inset-bottom,0px)); }
+@supports (height:100dvh){ :root{ --vh:100dvh; } }
+#auth{ min-height:calc(var(--vh) - var(--safe-y)); }
+
+/* --- setup: one screen, top / middle / bottom ---
+   The app's pages keep ~110px at the bottom for the tab bar; during setup there is no tab bar, so
+   that space (and a second notch gap at the top) is no longer added. Short steps now fit exactly;
+   longer ones (the plan, details opened, big text, a small phone) scroll as normal. */
+body.setting-up main{ padding-top:0; padding-bottom:16px; }
+.ob{ padding-top:8px; }
+:root:has(body.setting-up), :root:has(body.signed-out){ overscroll-behavior-y:none; }
+@media (max-width:760px){
+  .ob{ min-height:calc(var(--vh) - var(--safe-y) - 16px); display:flex; flex-direction:column; }
+  .ob > .ob-card{ flex:1; display:flex; flex-direction:column; }
+  .ob-nav{ margin-top:auto; padding-top:16px; }
+  /* step 1 (in the sign-in area) */
+  #auth:has(.ob-auth){ place-items:stretch center; padding:8px 16px 16px; }
+  .auth-card.ob-auth{ display:flex; flex-direction:column; }
+  .ob-auth > .ob-in{ flex:1; display:flex; flex-direction:column; }
+  #fHousehold{ flex:1; display:flex; flex-direction:column; }
+  #fHousehold > button[type="submit"]{ margin-top:auto; }
+  #fHousehold > .ob-opts + .ob-name, #fHousehold > .ob-join{ margin-bottom:12px; }
+}
+.ob-top{ margin-bottom:14px; }
+
+/* --- illustrations: sized to the room there is, hidden when there isn't any --- */
+.ob-art{ height:clamp(84px, 19vh, 150px); margin:0 auto 8px; width:100%; max-width:300px; }
+.ob-art .art{ width:100%; height:100%; }
+.ob-card:has(.ob-pay + .ob-pay) .ob-art{ display:none; }   /* two people's pay: the room goes to the form */
+.art{ display:block; overflow:visible; }
+.ar-bg{ fill:var(--accent-soft); }
+.ar-shadow{ fill:var(--ink); opacity:.07; }
+.ar-coin{ fill:var(--art-coin); } .ar-coin-e{ fill:var(--art-coin-edge); }
+.ar-coin-i{ fill:none; stroke:var(--art-coin-edge); stroke-width:1.4; opacity:.75; }
+.ar-spark{ fill:var(--art-coin); } .ar-spark.j{ fill:var(--accent); }
+.ar-a{ fill:var(--accent); opacity:.92; } .ar-j{ fill:var(--joint); opacity:.82; } .ar-mix{ fill:var(--surface); opacity:.38; }
+.ar-glass{ fill:color-mix(in srgb, var(--surface) 72%, transparent); stroke:var(--accent); stroke-width:2.6; }
+.ar-glass-hi{ fill:none; stroke:var(--accent); stroke-width:3; stroke-linecap:round; opacity:.25; }
+.ar-lid{ fill:var(--accent); }
+.ar-pot{ fill:var(--c-coral); } .ar-pot-rim{ fill:var(--c-coral); filter:brightness(.88); }
+.ar-stem{ fill:none; stroke:var(--ok); stroke-width:4; stroke-linecap:round; }
+.ar-leaf{ fill:var(--accent); } .ar-leaf.l2{ fill:var(--ok); }
+.ar-card.c1{ fill:var(--joint); } .ar-card.c2{ fill:var(--invest); }
+.ar-wal{ fill:var(--accent); } .ar-wal-flap{ fill:var(--accent); filter:brightness(.82); } .ar-wal-dot{ fill:var(--art-coin); }
+.ar-ring{ fill:none; stroke:var(--accent); stroke-width:9; } .ar-ring.r1{ opacity:.22; } .ar-ring.r2{ opacity:.5; } .ar-ring.r3{ fill:var(--accent); stroke:none; }
+.ar-trail{ fill:none; stroke:var(--accent); stroke-width:2.5; stroke-dasharray:1 7; stroke-linecap:round; opacity:.7; }
+.ar-panel{ fill:var(--surface); stroke:var(--line-strong); stroke-width:1.2; }
+.ar-bar{ fill:color-mix(in srgb, var(--accent) 28%, var(--surface)); }
+.ar-line{ fill:none; stroke:var(--accent); stroke-width:4; stroke-linecap:round; stroke-linejoin:round; }
+.ar-dot{ fill:var(--surface); stroke:var(--accent); stroke-width:3; }
+/* one-off entrances only: nothing loops */
+@keyframes ar-rise{ from{ opacity:0; transform:translateY(8px); } }
+@keyframes ar-drop{ from{ opacity:0; transform:translateY(-14px); } }
+@keyframes ar-pop{ from{ opacity:0; transform:scale(.4); } }
+@keyframes ar-draw{ from{ stroke-dashoffset:60; } }
+.art .ar-float, .art .ar-drop, .art .ar-leaf, .art .ar-bloom, .art .ar-burst > *{ transform-box:fill-box; transform-origin:center; }
+.art .ar-float{ animation:ar-rise .5s var(--ease-out) .1s both; } .art .ar-float.d2{ animation-delay:.2s; }
+.art .ar-drop{ animation:ar-drop .55s var(--ease-out) .15s both; }
+.art-grow .ar-stem{ stroke-dasharray:60; animation:ar-draw .5s var(--ease-out) .1s both; }
+.art-grow .ar-leaf{ transform-origin:right bottom; animation:ar-pop .4s var(--ease-out) .35s both; } .art-grow .ar-leaf.l2{ transform-origin:left bottom; animation-delay:.45s; }
+.art-grow .ar-bloom{ animation:ar-pop .4s var(--ease-out) .55s both; }
+.art-grow .ar-burst > *{ animation:ar-pop .45s var(--ease-out) .6s both; }
+.art-grow .ar-burst .b1{ fill:var(--accent); } .art-grow .ar-burst .b2{ fill:var(--joint); } .art-grow .ar-burst .b3{ fill:var(--c-coral); } .art-grow .ar-burst .b4{ fill:var(--invest); }
+.art-grow .ar-burst > :nth-child(2n){ animation-delay:.7s; }
+
+/* --- step changes: the old card slides out as the new one comes in ---
+   (View Transitions, where the browser has them; the plain ".ob-in" entrance otherwise) */
+.ob-card{ view-transition-name:ob-card; }
+@keyframes ob-out{ to{ opacity:0; transform:translateX(-18px); } }
+@keyframes ob-out-back{ to{ opacity:0; transform:translateX(18px); } }
+::view-transition-old(root), ::view-transition-new(root){ animation:none; }
+::view-transition-group(ob-card){ animation-duration:var(--m-step); }
+::view-transition-old(ob-card){ animation:ob-out .16s var(--ease) both; }
+::view-transition-new(ob-card){ animation:ob-in var(--m-step) var(--ease-out) .06s both; }
+:root[data-ob-dir="back"]::view-transition-old(ob-card){ animation-name:ob-out-back; }
+:root[data-ob-dir="back"]::view-transition-new(ob-card){ animation-name:ob-in-back; }
+.ob-prog span{ transition:width .4s var(--ease-out); }
+
+/* --- choice cards: a calm, quick response --- */
+.ob-opt{ transition:border-color var(--m-sel) var(--ease), background-color var(--m-sel) var(--ease), box-shadow var(--m-sel) var(--ease), transform var(--m-fast) var(--ease); }
+.ob-opt:active{ transform:scale(.98); }
+.ob-opt:has(input:checked){ box-shadow:0 8px 20px -14px color-mix(in srgb, var(--accent) 70%, transparent); }
+.ob-opt-ic{ transition:background-color var(--m-sel), color var(--m-sel); }
+.ob-opt:has(input:checked) .ob-opt-ic{ background:var(--accent); color:var(--on-accent); }
+.ob-tick svg{ transform:scale(.4); opacity:0; transition:transform var(--m-sel) var(--ease-out), opacity var(--m-sel); }
+.ob-opt:has(input:checked) .ob-tick svg{ transform:none; opacity:1; }
+@media (hover:hover){ .ob-opt:hover:not(:has(input:checked)){ border-color:color-mix(in srgb, var(--accent) 45%, var(--line-strong)); } }
+
+/* --- inputs: a soft ring in your colour while you type --- */
+.ob-amount, .unit.ob-pct{ transition:border-color var(--m-sel), background-color var(--m-sel), box-shadow var(--m-sel); }
+.ob-amount:focus-within{ box-shadow:0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent); }
+.unit.ob-pct{ border:1.5px solid transparent; }
+.unit.ob-pct:focus-within{ border-color:var(--accent); background:var(--surface); box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent); }
+@keyframes ob-reveal{ from{ opacity:0; transform:translateY(-6px); } }
+.ob-more[open] > :not(summary){ animation:ob-reveal var(--m-sel) var(--ease-out) both; }
+.ob-status .chip{ transition:background-color var(--m-sel), color var(--m-sel); }
+.ob-bar span{ transition:width .3s var(--ease-out); }
+.ob-buckets li{ min-height:60px; }
+
+/* --- done: picture and words in the middle, the two choices at the bottom --- */
+.ob-done{ flex:1; display:flex; flex-direction:column; padding-top:0; }
+.ob-done-mid{ flex:1; display:flex; flex-direction:column; justify-content:center; padding:8px 0 4px; }
+.ob-done-art{ position:relative; width:min(260px, 72%); aspect-ratio:3 / 2; margin:0 auto 12px; }
+.ob-done-art .art{ width:100%; height:100%; }
+.ob-done-art .ob-done-ic{ position:absolute; right:4%; bottom:4%; width:46px; height:46px; margin:0; box-shadow:0 0 0 4px var(--bg); animation:ob-pop .35s var(--ease-out) .75s both; }
+.ob-done-art .ob-done-ic svg{ width:22px; height:22px; }
+.ob-done-acts{ padding-top:12px; }
+.ob-done-acts .btn:first-child{ margin-top:0; }
+@media (max-height:600px){ .ob-done-art{ width:150px; } }
+
+/* --- sign-in: the tagline wraps instead of being cut off; even spacing --- */
+.auth-brand .brand small{ display:block; white-space:normal; overflow:visible; text-overflow:clip; line-height:1.35; margin-top:3px; }
+.auth-brand{ align-items:center; }
+.auth-brand .logo{ flex:none; }
+@media (max-width:760px){
+  #auth{ padding:16px; }
+  #auth:not(:has(.ob-auth)) .auth-card{ padding:24px 20px 20px; }
+}
+
+@media (prefers-reduced-motion: reduce){
+  .art *, .ob-done-ic, .ob-more[open] > :not(summary){ animation:none !important; }
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*){ animation:none !important; }
+}
+
+/* --- keeping your place on longer steps --- */
+.ob-top{ position:sticky; top:env(safe-area-inset-top,0px); z-index:5; background:var(--bg); padding-bottom:10px; margin-bottom:6px; }
+.ob-foot{ position:sticky; bottom:0; z-index:4; margin:auto -16px 0; padding:14px 16px calc(10px + env(safe-area-inset-bottom,0px)); background:linear-gradient(to bottom, transparent, var(--bg) 18px); }
+.ob-foot .ob-nav{ margin-top:0; padding-top:0; }
+.ob-foot .ob-status{ margin:0 0 8px; text-align:center; }
+/* the picture takes only the room that's left over (svh: the steady height, so it never jumps while
+   Safari's toolbars come and go); on a short screen it simply isn't shown */
+:root{ --svh:100vh; } @supports (height:100svh){ :root{ --svh:100svh; } }
+.ob-art{ --ob-rest:520px; height:clamp(0px, calc(var(--svh) - var(--safe-y) - var(--ob-rest)), 150px); margin-bottom:6px; }
+.ob-card.st-1 .ob-art{ --ob-rest:470px; }
+.ob-auth .ob-art{ --ob-rest:600px; }
+@media (max-height:700px){ .ob-auth .ob-art{ display:none !important; } }
+
+/* --- menus as a bottom sheet on phones (⋯ menu, Fill, Add a goal to) --- */
+.scroll-locked, .scroll-locked body{ overflow:hidden; overscroll-behavior:none; }
+.scroll-locked{ overflow-anchor:none; }   /* nothing behind the sheet may nudge the page while it's open */
+body.setting-up::before, body.signed-out::before{ background:var(--bg); }   /* the strip under the phone's status bar matches the setup screen */
+.pop-back{ position:fixed; inset:0; z-index:34; background:rgba(12,16,14,.42); opacity:0; transition:opacity var(--m-sheet) var(--ease); -webkit-tap-highlight-color:transparent; }
+.pop-back.on{ opacity:1; }
+.pop-back[hidden]{ display:none; }
+@media (max-width:760px){
+  .pop.as-sheet{ display:flex; flex-direction:column; padding:0; overflow:hidden; max-height:min(86vh, calc(var(--vh) - var(--safe-y) - 24px));
+    transform:translateY(0); transition:transform var(--m-sheet) var(--ease-out); will-change:transform; outline:none; border-bottom:0; }
+  .pop.as-sheet[hidden]{ display:none; }
+  .pop.as-sheet::before{ display:none; }
+  .pop.as-sheet.entering, .pop.as-sheet.closing{ transform:translateY(100%) !important; }
+  .pop.as-sheet.closing{ transition:transform .22s var(--ease); pointer-events:none; }
+  .pop-grab{ flex:none; position:relative; height:44px; display:grid; place-items:center; touch-action:none; cursor:grab; }
+  .pop-handle{ width:40px; height:5px; border-radius:3px; background:var(--line-strong); }
+  .pop-x{ position:absolute; right:6px; top:0; width:44px; height:44px; display:grid; place-items:center; border:0; background:none; color:var(--muted); border-radius:12px; cursor:pointer; }
+  .pop-x:active{ background:var(--surface-2); }
+  .pop-body{ flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; padding:0 10px calc(14px + env(safe-area-inset-bottom,0px)); }
+}
+@media (prefers-reduced-motion: reduce){ .pop.as-sheet, .pop-back{ transition:none !important; } }
+
+/* --- guided tours: the spotlight, the card, and the first-visit invitation --- */
+.tour{ z-index:60; }
+.tour-spot{ border-radius:14px; box-shadow:0 0 0 9999px rgba(12,16,14,.5); outline:2px solid var(--accent); outline-offset:0;
+  transition:top var(--m-step) var(--ease-out), left var(--m-step) var(--ease-out), width var(--m-step) var(--ease-out), height var(--m-step) var(--ease-out); }
+.tour-card{ width:min(340px, calc(100vw - 16px)); border:1px solid var(--line); box-shadow:0 18px 40px -18px rgba(0,0,0,.45);
+  transition:top var(--m-step) var(--ease-out), left var(--m-step) var(--ease-out); }
+.tour-top{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin:-4px -8px 0 0; }
+.tour-x{ width:36px; height:36px; display:grid; place-items:center; border:0; background:none; color:var(--muted); border-radius:10px; cursor:pointer; }
+.tour-x:hover{ background:var(--surface-2); }
+.tour-n{ text-transform:none; letter-spacing:0; font-size:var(--fs-xs); }
+.tour-card p{ margin-bottom:10px; }
+.tour-dots{ display:flex; gap:5px; margin:0 0 12px; }
+.tour-dots i{ width:6px; height:6px; border-radius:3px; background:var(--line-strong); transition:width var(--m-sel) var(--ease-out), background-color var(--m-sel); }
+.tour-dots i.on{ width:16px; background:var(--accent); }
+.tour-acts .btn{ min-height:40px; }
+.tour.calm .tour-spot, .tour.calm .tour-card{ transition:none; }
+
+.tinv{ position:fixed; z-index:33; left:50%; bottom:calc(20px + env(safe-area-inset-bottom,0px)); transform:translateX(-50%); width:min(420px, calc(100vw - 24px));
+  display:flex; gap:12px; align-items:flex-start; padding:14px 14px 12px; background:var(--surface); color:var(--ink); border:1px solid var(--line); border-radius:20px;
+  box-shadow:0 16px 40px -18px rgba(0,0,0,.45); transition:transform var(--m-sheet) var(--ease-out), opacity var(--m-sheet) var(--ease); }
+.tinv.in{ transform:translate(-50%, 24px); opacity:0; }
+.tinv.out{ transform:translate(-50%, 16px); opacity:0; transition-duration:.2s; }
+.tinv-ic{ width:40px; height:40px; flex:none; border-radius:13px; display:grid; place-items:center; background:var(--accent-soft); color:var(--accent); }
+.tinv-ic svg{ width:22px; height:22px; }
+.tinv-t{ flex:1; min-width:0; }
+.tinv-t b{ display:block; font:650 var(--fs-md) var(--display); }
+.tinv-t p{ margin:2px 0 10px; color:var(--muted); font-size:var(--fs-sm); line-height:1.4; }
+.tinv-acts{ display:flex; gap:8px; flex-wrap:wrap; }
+.tinv-acts .btn{ min-height:40px; }
+@media (max-width:760px){ .tinv{ bottom:calc(76px + env(safe-area-inset-bottom,0px)); } }
+@media (prefers-reduced-motion: reduce){ .tinv, .tour-spot, .tour-card, .tour-dots i{ transition:none !important; } }
+
+/* --- first-use empty states: a small picture, a short line, one action --- */
+.empty-art{ width:min(220px, 70%); aspect-ratio:3 / 2; margin:0 auto 6px; }
+.empty-art .art{ width:100%; height:100%; }
+.sp-empty, .pg-start, .gl-first{ text-align:center; }
+.gl-first{ padding:18px 18px 20px; }
+.gl-first h3{ margin:4px 0 4px; font:650 var(--fs-md) var(--display); }
+.gl-first p{ margin:0 0 12px; color:var(--muted); font-size:var(--fs-sm); }
+.iv-empty .empty-art{ width:min(180px, 60%); }

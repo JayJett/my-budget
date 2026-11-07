@@ -13,6 +13,7 @@ import { money, m0, monthYear } from "../../model/format.js";
 import { drawMixChart, drawHistory, sparkline } from "../charts.js";
 import { addMonths } from "../../model/util.js";
 import { itemIcon } from "../icons.js";
+import { ART } from "../art.js";
 
 const CACHE = id => `mb-snaps-v1-${id}`;
 const MIX = [
@@ -102,6 +103,7 @@ export function view() {
   if (!snaps.length) return `<div class="pg-page"><section class="card pg-hero pg-start">
       <span class="eyebrow">Your progress</span>
       <div class="sp-head"><span class="amt">${money(nowSum.netWorth)}</span><span class="lab">net worth today</span></div>
+      <div class="empty-art" aria-hidden="true">${ART.growth()}</div>
       <h2>Your journey starts here</h2>
       <p class="lead">A snapshot keeps a copy of your balances and goals. One is saved automatically on the 1st of every month, and each one adds a point to your history.</p>
       <div class="pg-save">${saveBtn(true, "Save your first snapshot")}<small>${esc(saveHelp())}</small></div>

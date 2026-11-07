@@ -5,6 +5,7 @@ import { render } from "./render.js";
 import { createStore, isNetworkError, clearDeviceCopies } from "../sync/store.js";
 import { blankBudget } from "../model/schema.js";
 import { startSetup, endSetup, obHeader, modeChoices, rememberMode } from "./onboarding.js";
+import { ART } from "./art.js";
 import { loadSnapshots, ensureMonthly } from "./views/progress.js";
 import { rememberChange, resetUndo, updateUndo, historyNoticeRemote } from "./history.js";
 import { loadReminders, resetReminders, openFromHash } from "./reminders.js";
@@ -176,17 +177,16 @@ export function showAuth(mode, msg, kind) {
     const email = app.session ? app.session.user.email : "";
     const md = (app.session && app.session.user.user_metadata) || {};
     const nm = md.name || (md.full_name || "").trim().split(/\s+/)[0] || ""; // Google/Apple may give a full name, or none at all
-    body = `<h2 id="obTitle" tabindex="-1">${nm ? `Welcome, ${esc(nm)}!` : "Welcome to Moni Money!"} Let’s make this yours</h2><p class="lead">Are you budgeting on your own or with someone else?</p>${m}
+    body = `<div class="ob-art" aria-hidden="true">${ART.together()}</div><h2 id="obTitle" tabindex="-1">${nm ? `Welcome, ${esc(nm)}!` : "Welcome to Moni Money!"} Let’s make this yours</h2><p class="lead">Are you budgeting on your own or with someone else?</p>${m}
     <form id="fHousehold" data-suggest="${esc(nm ? nm + "’s budget" : "My budget")}">${modeChoices(null, true)}
       <div class="ob-name" hidden><label class="field"><span>Household name</span><input type="text" name="name" value="${esc(nm ? nm + "’s budget" : "My budget")}" autocomplete="off" required></label>
         <small class="field-help">You can invite people and rename it later.</small></div>
       <div class="ob-join" hidden><p class="ob-note">Ask the person who set it up to invite <b>${esc(email)}</b> (they’ll find Invite in Household settings). Then come back here.</p>
         <button class="btn block" type="button" data-auth="recheck">Check for my invitation</button></div>
-      <button class="btn primary block" type="submit" disabled>Continue</button></form>
-    <div class="auth-foot"><span></span><button class="linkish" type="button" data-auth="signout">Sign out</button></div>`;
+      <button class="btn primary block" type="submit" disabled>Continue</button></form>`;
   }
   else if (mode === "loading") body = `<p class="lead" style="margin:0">Loading…</p>`;
-  el.innerHTML = mode === "household" ? `<div class="auth-card ob-auth">${obHeader(1, 0)}<div class="ob-in">${body}</div></div>` : `<div class="auth-card">${brand}${body}</div>`;
+  el.innerHTML = mode === "household" ? `<div class="auth-card ob-auth">${obHeader(1, 0, `<button class="linkish ob-later" type="button" data-auth="signout">Sign out</button>`)}<div class="ob-in">${body}</div></div>` : `<div class="auth-card">${brand}${body}</div>`;
   const first = mode === "household" ? el.querySelector("#obTitle") : el.querySelector('form input:not([type="hidden"]):not([hidden])'); if (first) first.focus({ preventScroll: true });
   if (mode === "verify") tickResend(); // a wait from an earlier "send a new code" carries on after a refresh
 }

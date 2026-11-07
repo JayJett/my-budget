@@ -15,6 +15,7 @@ import { drawSplit } from "../charts.js";
 import { nwStatus as nwStatusOf } from "../../model/calc.js"; // the status wording is the model's own, unchanged
 import { money, MONTHS } from "../../model/format.js";
 import { n, blank, parseDate, daysBetween } from "../../model/util.js";
+import { ART } from "../art.js";
 
 /** The account types (exactly the stored ones), their fixed colours and short help. Never the accent. */
 export const NW_TYPES = [
@@ -82,7 +83,7 @@ export function view() {
   </section>`;
 
   let list;
-  if (!L.length) list = `<section class="card sp-empty"><div class="sp-empty-ic" aria-hidden="true">${nwIcon("Savings")}</div><h2>No accounts yet</h2>
+  if (!L.length) list = `<section class="card sp-empty"><div class="empty-art" aria-hidden="true">${ART.wallet()}</div><h2>Start with an account</h2>
     <p class="dim">Add your bank accounts, savings, KiwiSaver and any debts to see where you stand.</p>${ro ? "" : `<button class="btn primary" type="button" data-nw-new="Savings">+ Add account</button>`}</section>`;
   else if (ui.reorder) list = `<section class="sp-list">
     <div class="b-row sec"><h2>Accounts</h2><button class="btn small ghost" type="button" data-reorder aria-pressed="true">Done</button></div>

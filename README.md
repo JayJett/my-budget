@@ -181,6 +181,27 @@ The closing audit's findings, fixes and remaining items are in `docs/phase6-audi
 - **Existing budgets.** Setup only starts for an empty budget, and it keeps someone else's budget if they finish first.
 - Tests: `tests/browser/phase7b.test.js`.
 
+### Phone polish, menu sheet and tours for every tab (Phase 7C)
+
+- **Setup fits the screen.** Short steps no longer scroll into empty space; long ones still scroll as normal.
+  - What caused the scrolling: the sign-in area used `100vh`, which on iPhone Safari is taller than the visible screen; setup kept ~110px at the bottom for a tab bar it doesn't have; and the notch gap was added twice.
+  - Now the setup screen is the visible height (`dvh`, falling back to `vh`, minus the notch and home bar). The step's button sits at the bottom when there's room.
+  - On the plan step the header and "Use this plan" (with its status) stay on screen while the list scrolls.
+- **Illustrations** (`js/ui/art.js`): small original SVG drawings (a jar of coins, overlapping circles, a plant, a wallet, a target, a growth line). They're coloured by the theme, so they follow light/dark and each person's accent. They only take room that's spare and are hidden on very short screens.
+- **Motion.** One small set of timings is used everywhere. Steps slide between each other (View Transitions where the browser has them). The progress bar and plan bar glide. Choice cards respond and tick, and "More pay details" eases open. "Reduce motion" turns all of it off.
+- **Sign-in.** The tagline wraps instead of being cut off; spacing is evened out.
+- **Menus on phones are a bottom sheet** (`js/ui/dom.js`): the ⋯ menu, Fill and "Add a goal to".
+  - It has a dimmed backdrop, and the page behind can't scroll, be tapped or be focused. Your scroll position is kept exactly.
+  - It closes with ✕, a tap on the backdrop, Escape, or a drag down on the handle (or on the list when it's already at the top).
+  - Focus goes back to the button that opened it. On wide screens it's still a small menu beside the button.
+- **Guided tours for all six tabs** (`js/ui/tour.js`).
+  - The first time you open a tab, a small card offers its tour ("Take a quick tour" / "Not now"). It's shown once per tab, never during setup, a sheet or menu, another tour, a save or typing, and never more than one at a time.
+  - Each tour is 3–6 spotlight stops that only point things out; stops for things not on screen are skipped. Changing tab ends a tour cleanly.
+  - Replay any tab's tour from ⋯ → **Guided tours**.
+  - Progress is personal: it's kept on your login (`user_metadata.tours`, no new table) and on the device under your user id. The old Budget tour's "done" still counts.
+- **First-use empty states** with a picture and one action: Net worth ("Start with an account"), Goals ("Create your first goal"), Progress and Investments.
+- Tests: `tests/browser/phase7c.test.js`.
+
 ## How saving works
 
 The whole budget lives in one row (`budgets.state`), but the app never overwrites it. Each edit is
@@ -191,7 +212,7 @@ whole budget (the version 4 upgrade, importing a file) first saves a copy in `bu
 
 ## On phones, and offline
 
-- On a phone the tabs move to a bar at the bottom, tables become cards, and menus slide up from the bottom.
+- On a phone the tabs move to a bar at the bottom, tables become cards, and menus slide up from the bottom as a sheet you can swipe away.
 - **Add to Home Screen** (Safari's Share button on iPhone, or the install prompt on Android) gives a full-screen app with its own icon.
 - The app opens without a connection. Your budget's last copy is kept on the device, and edits made offline are kept
   (even if you close the app) and sent when you're back online, merging with anyone else's changes.

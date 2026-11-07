@@ -138,7 +138,7 @@ test("review: shows when balances were last checked, and 'Reviewed today' still 
 
 test("no accounts: a friendly empty state with one way to add, and no empty breakdowns", { skip }, async () => {
   const { page, errors, ctx } = await nwTab(CASES.empty, { width: 390 });
-  assert.equal(await page.isVisible("text=No accounts yet"), true);
+  assert.equal(await page.isVisible("text=Start with an account"), true);
   assert.equal(await page.locator(".sp-empty [data-nw-new]").count(), 1);
   assert.equal(await page.locator(".nw-gm, .ex-group").count(), 0);
   assert.equal(await page.isVisible("#nwBar"), false);

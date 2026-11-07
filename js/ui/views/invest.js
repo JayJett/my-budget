@@ -12,6 +12,7 @@ import { WORDS } from "../../model/periods.js";
 import { money, m0, pct } from "../../model/format.js";
 import { blank } from "../../model/util.js";
 import { drawGrowth } from "../charts.js";
+import { ART } from "../art.js";
 
 export const HORIZONS = [5, 10, 20, 30];          // milestones in the projection (it runs to 30 years)
 const horizon = () => HORIZONS.includes(app.ivH) ? app.ivH : 30;
@@ -26,7 +27,7 @@ export function view() {
       <div class="seg iv-h" role="group" aria-label="Years ahead">${HORIZONS.map(y => `<button type="button" data-iv-h="${y}" aria-pressed="${y === h}">${y}y</button>`).join("")}</div></div>
     <div class="sp-head"><span class="amt">${K("iv.h.bal")}</span></div>
     <p class="iv-lab">${K("iv.h.lab")}</p>
-    ${empty ? `<div class="iv-empty"><span class="sp-empty-ic" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12l3.5-4 3 2.5 4.5-6"/><path d="M10.5 4.5h3v3"/></svg></span><p><b>Nothing invested yet</b>Add an Investment account on Net worth, or give an Investment allocation a share of pay on Budget, to see a forecast.</p></div>` : ""}
+    ${empty ? `<div class="iv-empty"><div class="empty-art" aria-hidden="true">${ART.growth()}</div><p><b>Nothing invested yet</b>Add an Investment account on Net worth, or give an Investment allocation a share of pay on Budget, to see a forecast.</p></div>` : ""}
     ${empty ? "" : `<div class="sp-figs iv-figs"><div><small><i class="dot dash"></i>You put in</small><b>${K("iv.h.c")}</b></div><div><small><i class="dot" style="background:var(--invest)"></i>Growth after fees</small><b>${K("iv.h.g")}</b></div></div>
     <div class="iv-chart" id="ivChart" tabindex="0" role="group" aria-label="Forecast chart. Use the left and right arrow keys to pick a year." aria-describedby="ivRead"></div>
     <div class="iv-read" id="ivRead" aria-live="polite"></div>`}
