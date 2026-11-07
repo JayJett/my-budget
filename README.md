@@ -216,6 +216,20 @@ The closing audit's findings, fixes and remaining items are in `docs/phase6-audi
   - Each person's accent still colours buttons and highlights (a lighter version on the dark card).
   - Dark mode matches. Readability is checked in `tests/accent.test.js`.
 
+### Quality pass (Phase 7D)
+
+- Audited every tab across 4 kinds of household, at 9 widths (320–1280) in light and dark, with axe. The full report is in `docs/phase-7d-quality-report.md`.
+- **Fixes:**
+  - The browser Back button can't leave a sheet or menu open over another tab.
+  - Each tab remembers your scroll position; tap the current tab to go to its top.
+  - Editing and settings sheets hold the page still, like the menu does.
+  - Money boxes never save Infinity, and the mouse wheel doesn't change % boxes.
+  - Net worth's date box fits narrow phones, and the header gives a long household name room.
+- **New tests:**
+  - `tests/finance-matrix.test.js`: a hand-worked four-person household across every tab, in NZ, UTC and US Pacific time.
+  - `tests/sql/isolation.test.js`: every table has row-level security, and no household can see another's rows.
+  - `tests/browser/phase7d.test.js`.
+
 ## How saving works
 
 The whole budget lives in one row (`budgets.state`), but the app never overwrites it. Each edit is

@@ -10,11 +10,29 @@ import { pct, possessive } from "../model/format.js";
 import { mainMenu, menuAct } from "./menu.js";
 import { startSetup } from "./onboarding.js";
 
+/* Phase 7D: each tab remembers how far down you were, so coming back puts you where you left off.
+   Switching tab also closes anything left open over the old one (an editing sheet, the menu, a
+   confirm box), so the browser's Back button can't leave a sheet stranded over a different tab.
+   Sheets save as you type, so closing one never loses anything. */
+const tabScroll = {};
+export function switchTab(t) {
+  if (!t) return;
+  tabScroll[app.tab] = window.scrollY;
+  const sheet = $("#sheet"); if (sheet && sheet.open) sheet.close();
+  const dlg = $("#dlg"); if (dlg && dlg.open) $("#dlgNo").click();
+  closePop();
+  app.tab = t;
+  if (app.household) render();
+  window.scrollTo({ top: tabScroll[t] || 0 });
+}
+
 function readVal(el) {
   const t = el.dataset.t, raw = el.value;
-  if (t === "num") { const c = raw.replace(/[,$\s]/g, ""); return c === "" || isNaN(Number(c)) ? null : Number(c); }
-  if (t === "pct") return raw === "" ? null : Number(raw) / 100;
-  if (t === "month") return raw === "" ? null : Number(raw);
+  // Only real, finite numbers are kept (Phase 7D: "1e400" used to save as Infinity)
+  const fin = x => Number.isFinite(x) ? x : null;
+  if (t === "num") { const c = raw.replace(/[,$\s]/g, ""); return c === "" ? null : fin(Number(c)); }
+  if (t === "pct") return raw === "" ? null : fin(Number(raw) / 100);
+  if (t === "month") return raw === "" ? null : fin(Number(raw));
   return raw;
 }
 /** Set obj["a.b.c"] = v, creating objects along the way. */
@@ -77,7 +95,13 @@ export function initEvents() {
     if (!path.includes(pop) && !e.target.closest("#menuBtn") && !e.target.closest("[data-fill]") && !e.target.closest('[data-goal-new="pick"]')) closePop();
     if (path.includes(pop)) return;
     const tb = e.target.closest("[data-tab]");
-    if (tb) { const h = TAB_HASH[tb.dataset.tab]; if (location.hash !== "#" + h) location.hash = h; else { app.tab = tb.dataset.tab; render(); } window.scrollTo({ top: 0 }); return; }
+    if (tb) {
+      const h = TAB_HASH[tb.dataset.tab];
+      // tapping the tab you're already on goes back to its top (like a phone app); otherwise switch
+      if (tb.dataset.tab === app.tab) { tabScroll[app.tab] = 0; window.scrollTo({ top: 0, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }); return; }
+      if (location.hash !== "#" + h) location.hash = h; else switchTab(tb.dataset.tab);
+      return;
+    }
     if (e.target.closest('[data-act="import"]')) { $("#importFile").click(); return; }
     if (e.target.closest('[data-act="setup"]') && !readOnly()) { startSetup(); render(); window.scrollTo({ top: 0 }); return; }
     if (e.target.closest("#menuBtn")) { if (!pop.hidden) { closePop(); return; } openPop(e.target.closest("#menuBtn"), mainMenu(), menuAct, { label: "Menu" }); return; }
@@ -188,6 +212,8 @@ export function initEvents() {
 
   window.addEventListener("hashchange", () => {
     const h = location.hash.replace(/^#/, ""), t = Object.keys(TAB_HASH).find(k => TAB_HASH[k] === h);
-    if (t && t !== app.tab) { app.tab = t; if (app.household) render(); window.scrollTo({ top: 0 }); }
+    if (t && t !== app.tab) switchTab(t);
   });
+  // a mouse wheel over a focused % box would quietly change the number: scroll the page instead
+  document.addEventListener("wheel", e => { const el = e.target; if (el.matches && el.matches('input[type="number"]') && el === document.activeElement) el.blur(); }, { passive: true });
 }

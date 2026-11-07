@@ -55,7 +55,7 @@ export function view() {
     <div class="sp-head" id="spHead"><span class="amt">${K("sp.head")}</span><span class="lab">${K("sp.head.lab")}</span></div>
     <p class="sp-nopool" data-k="sp.nopool" data-base="sp-nopool"></p>
     <div class="sp-figs"><div><small>Planned</small><b>${K("sp.com")}</b></div><div><small>Budget</small><b>${K("sp.pool")}</b></div><div><small>Used</small><b>${K("sp.used")}</b></div></div>
-    <div class="sp-bar-wrap"><div class="split sp-bar" id="poolsplit" role="img" aria-label=""></div></div>
+    <div class="sp-bar-wrap"><div class="split sp-bar" id="poolsplit" role="img" aria-label="Spending budget breakdown"></div></div>
     <div class="split-key" id="poolkey"></div>
     <details class="more"><summary>See the numbers</summary>
       <p>Budget: ${K("sp.pool.y")}. It comes from the ${esc(spendLabel(S).toLowerCase())} allocation on the Budget tab.</p>
@@ -145,7 +145,7 @@ export function draw(C) {
   drawSplit(pp, parts, total, over ? [v(C.pool.spending) / total] : []);
   pp.classList.toggle("over", over);
   const words = parts.filter(p => p.v > 0).map(p => `${p.name} ${money(p.v)}`);
-  pp.setAttribute("aria-label", `${words.join(", ")}${over ? `. Over budget by ${money(v(-C.spBuffer))}` : ""}`);
+  pp.setAttribute("aria-label", (`${words.join(", ")}${over ? `. Over budget by ${money(v(-C.spBuffer))}` : ""}`) || "Nothing planned yet");
   $("#poolkey").innerHTML = parts.filter(p => p.v > 0 || p.name !== "Remaining").map(p => `<span><i style="background:${p.col}"></i>${p.name} ${money(p.v)}</span>`).join("")
     + (over ? `<span class="over-tag">▲ Over by ${money(v(-C.spBuffer))}</span>` : "");
 }

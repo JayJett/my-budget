@@ -1942,3 +1942,13 @@ body.setting-up::before, body.signed-out::before{ background:transparent; }
 @media (max-width:360px){ .ob-slot{ min-height:108px; } }   /* the invitation note takes an extra line on narrow phones */
 .im-form:has(.im-back) .auth-brand{ padding-left:46px; margin-top:4px; }   /* room for the back arrow */
 .im-form .auth-brand{ justify-content:flex-start; margin:8px 0 26px; }
+
+/* =====================================================================
+   PHASE 7D: quality pass
+   ===================================================================== */
+/* Net worth "Pick a date": the date box stays inside narrow phones (it overflowed by 9–18px at 320–375px) */
+.nw-rv-act{ flex-wrap:wrap; }
+.nw-rv-date{ min-width:0; max-width:100%; }
+.nw-rv-date input{ max-width:100%; min-width:0; box-sizing:border-box; }
+/* Header on narrow phones: the household name gets the room (the avatars are repeated in the names line) */
+@media (max-width:380px){ .top .avatars{ display:none; } }
