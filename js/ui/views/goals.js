@@ -32,7 +32,8 @@ export function goalGroups(S) {
   return [
     { key: "ef", kind: "ef", title: "Emergency fund", goals: [S.goals.ef] },
     { key: "gj", kind: "joint", title: jointGoalsLabel(S), goals: S.goals.joint },
-    ...S.people.map(p => ({ key: "gp:" + p.id, kind: p, title: `${possessive(p.name || "Unnamed")} goals`, goals: S.goals.personal[p.id] || [] })),
+    // (Phase 7D.2) on your own, your personal pot is just "Personal goals"; with others, it's named after its person
+    ...S.people.map(p => ({ key: "gp:" + p.id, kind: p, title: S.people.length > 1 ? `${possessive(p.name || "Unnamed")} goals` : "Personal goals", goals: S.goals.personal[p.id] || [] })),
   ];
 }
 export const groupOf = (S, key) => goalGroups(S).find(g => g.key === key);
@@ -53,24 +54,30 @@ function card(g, grp, ui, i) {
     </button></li>`;
 }
 
-/** Which person-groups to show: anyone with goals, or with money going to their goals pool. */
-const shown = (S, grp) => grp.kind === "ef" || grp.kind === "joint" || grp.goals.length > 0 || (app.C && app.C.pool.personalGoals[grp.kind.id] > 0);
-
 /** No goals at all yet (the emergency fund doesn't count: it's always there). */
 const size = x => Array.isArray(x) ? x.length : Object.keys(x || {}).length;
 const anyGoals = S => size(S.goals.joint) > 0 || Object.values(S.goals.personal || {}).some(g => size(g) > 0);
+/** Which person-groups to show: anyone with goals, or with money going to their goals pool. */
+const shown = (S, grp) => grp.kind === "ef" || grp.kind === "joint" || grp.goals.length > 0
+  || (app.C && app.C.pool.personalGoals[grp.kind.id] > 0 && (S.people.length > 1 || anyGoals(S))); // on your own, with no goals yet, the one card below is the place to start
+
+
+/** Where the first goal's money can come from: straight to the goals fund when that's the only pot with
+    money going to it, otherwise ask (see the "pick" chooser in budget-sheets.js). */
+export const goalPots = S => goalGroups(S).filter(g => g.kind !== "ef" && (g.kind === "joint" || (app.C && app.C.pool.personalGoals[g.kind.id] > 0)));
+const firstGoalKey = S => goalPots(S).length > 1 ? "pick" : "gj";
 
 function section(S, grp, ui, ro) {
   const isPerson = grp.kind !== "ef" && grp.kind !== "joint", P = S.people;
   const pool = grp.kind === "ef" ? K("g.ef.fn") : grp.kind === "joint" ? K("gp.jg") : K(`gpool.${grp.kind.id}`);
-  const addBtn = ro || grp.kind === "ef" ? "" : `<button class="icon-add" type="button" data-goal-new="${esc(grp.key)}" aria-label="Add a goal to ${esc(grp.title)}">+</button>`;
+  const addBtn = ro || grp.kind === "ef" || (grp.kind === "joint" && !anyGoals(S)) ? "" : `<button class="icon-add" type="button" data-goal-new="${esc(grp.key)}" aria-label="Add a goal to ${esc(grp.title)}">+</button>`;
   // How much of each pool is shared out between the goals (unchanged checks: 100%, % left, over)
   const alloc = ui.reorder || !grp.goals.length ? "" : grp.kind === "joint"
     ? `<p class="gl-alloc"><span>Shared out</span>${P.map(p => `<span class="${pc(p)}">${P.length > 1 ? `<i class="gl-dot"></i>${esc(p.name || "Unnamed")} ` : ""}${K(`gj.c.${p.id}`, "chip")}</span>`).join("")}${tipq("Each goal gets a % of the fund. Below 100%, the rest stays in reserve; over 100%, goals are promised more than the fund has.")}</p>`
     : isPerson ? `<p class="gl-alloc"><span>Shared out</span>${K(`gp.${grp.kind.id}.c`, "chip")}</p>` : "";
   const spare = grp.kind === "joint" ? `<p class="gl-spare" data-k="gl.gj.spare" data-base="gl-spare"></p>` : isPerson ? `<p class="gl-spare" data-k="gl.${esc(grp.kind.id)}.spare" data-base="gl-spare"></p>` : "";
   const body = grp.goals.length ? `<ul class="gl-list">${grp.goals.map((g, i) => card(g, grp, ui, i)).join("")}</ul>`
-    : grp.kind === "joint" && !anyGoals(S) ? `<div class="card gl-first"><div class="empty-art" aria-hidden="true">${ART.target()}</div><h3>Create your first goal</h3><p>Saving for something? Set a target and track your progress.</p>${ro ? "" : `<button class="btn primary gl-first-btn" type="button" data-goal-new="${esc(grp.key)}">+ Add a goal</button>`}</div>`
+    : grp.kind === "joint" && !anyGoals(S) ? `<div class="card gl-first"><div class="empty-art" aria-hidden="true">${ART.target()}</div><h3>Start saving for something</h3><p>A holiday, a car, a house deposit: set a target and watch it fill.</p>${ro ? "" : `<button class="btn primary gl-first-btn" type="button" data-goal-new="${firstGoalKey(S)}">+ Add a goal</button>`}</div>`
     : `<div class="card gl-none"><p>${isPerson ? "No personal goals yet." : "No goals yet."}</p>${ro ? "" : `<button class="btn small soft" type="button" data-goal-new="${esc(grp.key)}">+ Add a goal</button>`}</div>`;
   return `<section class="gl-group ${isPerson ? pc(grp.kind) : grp.kind === "ef" ? "ef" : "joint"}">
     <div class="ex-gh"><span class="ex-dot" aria-hidden="true"></span><h3>${esc(grp.title)}</h3>${grp.kind === "ef" ? "" : `<small>${grp.goals.length}</small>`}
@@ -93,7 +100,7 @@ export function view() {
     ${ui.reorder ? `<p class="dim small-note">Goals higher in a list are funded first. When one is reached, its share moves to the next unfinished goal below it (or above, if it’s last).</p>` : ""}`;
   const sections = groups.filter(g => !ui.reorder || g.kind !== "ef").map(g => section(S, g, ui, ro)).join("");
   const hidden = goalGroups(S).filter(g => !shown(S, g));
-  const addAny = ro || ui.reorder ? "" : `<button class="add-row" type="button" data-goal-new="${groups.length + hidden.length > 2 ? "pick" : "gj"}">+ Add goal</button>`;
+  const addAny = ro || ui.reorder || !anyGoals(S) ? "" : `<button class="add-row" type="button" data-goal-new="${groups.length + hidden.length > 2 ? "pick" : "gj"}">+ Add goal</button>`;
   const help = `<details class="help"><summary>How goals are funded</summary><ul>
     <li>The Budget tab decides how much goes to the emergency fund, ${S.people.length > 1 ? "the joint goals fund and each person’s goals pool" : "and to your goals"}. Each goal gets a % of its fund.</li>
     <li>Goals higher in a list are funded first. When a goal is reached, its share moves to the next unfinished goal below it (or above, if it’s last). If every goal is reached, the money shows as spare.</li>

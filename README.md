@@ -241,6 +241,25 @@ The closing audit's findings, fixes and remaining items are in `docs/phase6-audi
 - **Progress savings cards** only draw a trend line once there are two real snapshots.
 - Tests: `tests/browser/phase7d1.test.js` (undo after setup, header, and overlap / tappable / footer checks at 320–430px).
 
+### Personal touches and navigation (Phase 7D.2)
+
+- **Menu is a drawer from the left** (`js/ui/drawer.js`, `js/ui/menu.js`), opened from your avatar.
+  - It has a profile header, short rows with icons, households to switch between, and "Data & backups" and "Guided tours" as sub-lists. Sign out is at the bottom.
+  - It closes with a swipe left, a tap on the dimmed page, Escape or ✕. The page behind stays still and keeps its place.
+- **Bell:** a plain icon with a 44px tap area. A small dot shows only when you have unread reminders, and the count is in its label. It opens **Notifications**, a drawer from the right listing your real reminders, with mark as read and links to tabs.
+- **My profile** (menu → your name): your photo, your name, and your email (security stays in Account settings).
+- **Profile pictures** (`js/ui/profile.js`):
+  - Choose a photo, then drag and zoom to crop it to a circle. It's saved as a small JPEG with no hidden photo details. You can replace or remove it, and your initial is always the fallback.
+  - Pictures are kept in a **private** Supabase Storage bucket, `avatars`, under your user id. Only you can read or change your folder (`supabase/migrations/20261113000900_avatars.sql`, tested in `tests/sql/avatars.test.js`).
+  - **The bucket must be created on the live project before pictures can be saved.** Until then, the app says "Profile pictures aren't switched on yet".
+- **Goals:**
+  - On your own with no goals yet, one "Start saving for something" card is the single way to add the first goal.
+  - Adding a goal asks "Where should the money come from?", with what each pot gets. Nothing moves between pots.
+  - On your own, your personal pot is called "Personal goals".
+- **Hero cards** (Budget, Spending, Goals, Invest): the period switch sits on its own row above, and the label sits right on its big number.
+- **Header save dot:** its words ("Saved", "Saving…", "Offline") are still read out on phones.
+- Tests: `tests/browser/phase7d2.test.js`, `tests/sql/avatars.test.js`.
+
 ## How saving works
 
 The whole budget lives in one row (`budgets.state`), but the app never overwrites it. Each edit is

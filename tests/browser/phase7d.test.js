@@ -23,10 +23,10 @@ test("the browser's Back button never leaves a sheet or the menu open over anoth
   await page.waitForSelector('[data-tab="networth"][aria-selected="true"]');
   assert.equal(await page.evaluate(() => document.querySelector("#sheet").open), false, "sheet closed");
   assert.equal(await locked(page), false, "and the page isn't left locked");
-  await page.click("#menuBtn"); await page.waitForSelector("#pop:not([hidden])");
+  await page.click("#menuBtn"); await page.waitForSelector("#drawer:not([hidden])");
   await page.goForward();
   await page.waitForSelector('[data-tab="budget"][aria-selected="true"]');
-  await page.waitForSelector("#pop", { state: "hidden" });
+  await page.waitForSelector("#drawer", { state: "hidden" });
   assert.equal(await locked(page), false);
   assert.deepEqual(errors, []); await ctx.close();
 });

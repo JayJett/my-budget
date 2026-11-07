@@ -82,7 +82,7 @@
 
   const fake = window.__fake = {
     households, rpcCalls: [], authCalls: [], backups: [], remUpdates: [], prefSaves: [], devices: copy(init.devices || []), fnCalls: [],
-    pushKey: init.pushKey === undefined ? "BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4" : init.pushKey, listeners: [], failNext: 0, deleted: false, createMode: init.createMode || null, invite: init.invite || null, failMembers: init.failMembers || 0, createDelay: init.createDelay || 0, resendWait: init.resendWait || 0,
+    pushKey: init.pushKey === undefined ? "BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4" : init.pushKey, listeners: [], failNext: 0, files: copy(init.files || {}), storageCalls: [], failUpload: 0, storageOn: init.storageOn !== false, deleted: false, createMode: init.createMode || null, invite: init.invite || null, failMembers: init.failMembers || 0, createDelay: init.createDelay || 0, resendWait: init.resendWait || 0,
     get budget() { return households[0].budget; },
     get seq() { return households[0].seq; },
     hh: id => households.find(h => h.id === id),
@@ -308,6 +308,19 @@
           },
         },
         from: query,
+        // Storage (profile pictures): like the avatars bucket's rules, you can only use your own folder
+        storage: { from(bucket) { return {
+          async upload(path, blob, opts) {
+            fake.storageCalls.push({ op: "upload", bucket, path, type: opts && opts.contentType, size: blob.size });
+            if (fake.failUpload) { fake.failUpload--; return { data: null, error: { message: "Upload failed" } }; }
+            if (!fake.storageOn) return { data: null, error: { message: "Bucket not found" } };
+            if (!path.startsWith(user.id + "/")) return { data: null, error: { message: "new row violates row-level security policy" } };
+            fake.files[path] = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(blob); });
+            return { data: { path }, error: null };
+          },
+          async remove(paths) { fake.storageCalls.push({ op: "remove", bucket, paths }); paths.forEach(p => { if (p.startsWith(user.id + "/")) delete fake.files[p]; }); return { data: [], error: null }; },
+          async createSignedUrl(path) { fake.storageCalls.push({ op: "sign", bucket, path }); const u = path.startsWith(user.id + "/") && fake.files[path]; return u ? { data: { signedUrl: u }, error: null } : { data: null, error: { message: "Object not found" } }; },
+        }; } },
         rpc,
         // Edge Functions: the reminders function's "public key" and "send a test" jobs
         functions: { async invoke(name, opts) {

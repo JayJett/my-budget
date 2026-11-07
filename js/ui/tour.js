@@ -262,7 +262,7 @@ function quietMoment() {
   if (!app.session) return false;
   if (!app.household || !app.loaded || app.setup || cur) return false;
   if (document.body.classList.contains("signed-out")) return false;
-  if (document.querySelector("dialog[open]") || !$("#pop").hidden || document.querySelector(".update-bar:not([hidden])")) return false;
+  if (document.querySelector("dialog[open]") || !$("#pop").hidden || document.querySelector("#drawer:not([hidden])") || document.querySelector(".update-bar:not([hidden])")) return false;
   if (app.saveStatus === "saving") return false;
   const a = document.activeElement; if (a && a.matches && a.matches("input, textarea, select, [contenteditable]")) return false;
   if (app.tab === "progress" && !app.snapshots) return false; // still loading

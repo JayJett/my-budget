@@ -4,6 +4,7 @@
    The rules and wording live in js/model/reminders.js. */
 import { app, TAB_HASH } from "./ctx.js";
 import { $, esc, toast } from "./dom.js";
+import { openDrawer, setDrawerContent, closeDrawer, drawerOpen } from "./drawer.js";
 import { remindersFor, REMINDER_TYPES, DEFAULT_PREFS, DUE_WEEKS } from "../model/reminders.js";
 import { pushSupport, currentSubscription, enablePush, disablePush, myDevices, removeDevice, sendTest } from "./push.js";
 
@@ -25,7 +26,7 @@ export async function loadReminders() {
   app.reminders = data || [];
   try { localStorage.setItem(REM_CACHE + hh.id, JSON.stringify(app.reminders)); } catch (_) {}
   updateBell();
-  if (R.view === "inbox" && isOpen()) drawInbox();
+  if (R.view === "inbox") drawInbox();
 }
 export function resetReminders() { app.reminders = null; R.prefs = null; updateBell(); }
 
@@ -33,8 +34,8 @@ export function updateBell() {
   const b = $("#bellBtn"); if (!b) return;
   b.hidden = !app.household;
   const unread = (app.reminders || []).filter(r => !r.read_at).length;
-  const n = $("#bellCount"); n.textContent = unread > 9 ? "9+" : String(unread); n.hidden = !unread;
-  b.setAttribute("aria-label", unread ? `Reminders, ${unread} unread` : "Reminders");
+  const n = $("#bellCount"); n.hidden = !unread; // a small dot when something's unread (the number is in the label)
+  b.setAttribute("aria-label", unread ? `Notifications, ${unread} unread` : "Notifications");
   b.dataset.tip = unread ? `${unread} new reminder${unread === 1 ? "" : "s"}` : "Reminders";
 }
 
@@ -51,20 +52,44 @@ const ago = iso => {
 };
 const TAB_NAME = { budget: "Budget", networth: "Net worth", spending: "Joint spending", goals: "Goals", invest: "Investments", progress: "Progress" };
 
-export function openInbox() { R.view = "inbox"; drawInbox(); loadReminders(); }
+/* Phase 7D.2: the bell opens a notification centre, a drawer from the right with the same look as the
+   menu. It shows your real reminders for this household (nothing made up): unread ones stand out, each
+   can be marked read or take you to its tab, and "Reminder settings" is at the bottom. Reminders are
+   per person and per household, as before (the database only lets you read your own). */
+let inboxOpen = false;
+export function openInbox() {
+  R.view = "inbox"; inboxOpen = true;
+  const sh = $("#sheet"); if (sh.open && sh.querySelector(".rem")) sh.close();
+  openDrawer({ html: inboxHTML(), label: "Notifications", from: "right", trigger: $("#bellBtn"), onAction: remAct, className: "dr-inbox" });
+  loadReminders();
+}
+function drawInbox() { if (inboxOpen && drawerOpen() && document.querySelector("#drawer.dr-inbox")) setDrawerContent(inboxHTML(), { focus: false }); }
+function remAct(b) {
+  const id = Number(b.dataset.id), act = b.dataset.rem; if (!act) return;
+  if (act === "read") { markRead([id]); drawInbox(); }
+  if (act === "readall") { markRead((app.reminders || []).filter(r => !r.read_at).map(r => r.id)); drawInbox(); }
+  if (act === "settings") { inboxOpen = false; closeDrawer({ focus: false }); openReminderSettings(); }
+  if (act === "go") {
+    const r = (app.reminders || []).find(x => x.id === id); if (!r) return;
+    if (!r.read_at) markRead([id]);
+    inboxOpen = false; closeDrawer({ focus: false });
+    if (TAB_HASH[r.tab]) location.hash = TAB_HASH[r.tab];
+  }
+}
 
-function drawInbox() {
+function inboxHTML() {
   const list = app.reminders || [], unread = list.filter(r => !r.read_at).length;
   const items = list.map(r => `<li class="rem-item${r.read_at ? " read" : ""}">
       <div class="rem-top"><b>${esc(r.title)}</b><small>${esc(ago(r.created_at))}</small></div>
       ${r.body ? `<p>${esc(r.body)}</p>` : ""}
       <div class="rem-acts">${r.tab && TAB_NAME[r.tab] ? `<button class="btn small" type="button" data-rem="go" data-id="${r.id}">Take me to ${esc(TAB_NAME[r.tab])}</button>` : ""}
         ${r.read_at ? "" : `<button class="btn small" type="button" data-rem="read" data-id="${r.id}">Mark as read</button>`}</div></li>`).join("");
-  sheet("Reminders", `${offline() ? `<p class="set-note">You’re offline: these are the reminders saved on this device.</p>` : ""}
-    ${list.length ? `<div class="rem-bar"><span class="set-note">${unread ? `${unread} new` : "All caught up"}</span>${unread ? `<button class="btn small" type="button" data-rem="readall">Mark all as read</button>` : ""}</div><ul class="rem-list">${items}</ul>`
-      : `<div class="rem-empty"><div class="rem-bell" aria-hidden="true">🔔</div><b>No reminders yet</b>
-        <p class="set-note">Gentle reminders show up here: a yearly bill coming up, a goal reached, time to update your balances. They’re all off until you choose which ones you’d like.</p></div>`}
-    <div class="rem-foot"><button class="btn${list.length ? "" : " primary"}" type="button" data-rem="settings">Reminder settings</button></div>`);
+  return `<div class="dr-sub-h dr-inbox-h"><h2>Notifications</h2><button class="dr-x" type="button" data-dr-close aria-label="Close notifications"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>
+    <div class="rem">${offline() ? `<p class="set-note">You’re offline: these are the reminders saved on this device.</p>` : ""}
+    ${list.length ? `<div class="rem-bar"><span class="set-note">${unread ? `${unread} new` : "All caught up"}</span>${unread ? `<button class="btn small ghost" type="button" data-rem="readall">Mark all as read</button>` : ""}</div><ul class="rem-list">${items}</ul>`
+      : `<div class="rem-empty"><span class="rem-bell" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 1.5h-15z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/></svg></span><b>You’re all caught up</b>
+        <p class="set-note">Reminders you switch on show up here: a bill coming up, a goal reached, time to check your balances.</p></div>`}
+    <div class="rem-foot"><button class="btn block${list.length ? "" : " primary"}" type="button" data-rem="settings">Reminder settings</button></div></div>`;
 }
 
 async function markRead(ids) {
@@ -181,7 +206,7 @@ export function initReminders() {
     if (act === "read") { markRead([id]); drawInbox(); }
     if (act === "readall") { markRead((app.reminders || []).filter(r => !r.read_at).map(r => r.id)); drawInbox(); }
     if (act === "settings") openReminderSettings();
-    if (act === "inbox") openInbox();
+    if (act === "inbox") { d.close(); openInbox(); }
     if (act === "go") {
       const r = (app.reminders || []).find(x => x.id === id); if (!r) return;
       if (!r.read_at) markRead([id]);
