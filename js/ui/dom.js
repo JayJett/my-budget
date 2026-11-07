@@ -156,7 +156,20 @@ function dragEnd() {
   pop.style.transition = ""; pop.style.transform = "";
 }
 
+/** Phase 7D: the editing and settings sheets (<dialog>) keep the page still too (as the menu does):
+    no scrolling behind them on iPhone, and the page is exactly where it was when they close. */
+function lockWithDialogs() {
+  const locked = new WeakSet();
+  const sync = d => {
+    if (d.open && !locked.has(d)) { locked.add(d); d.setAttribute("data-scroll-ok", ""); lockScroll(); }
+    else if (!d.open && locked.has(d)) { locked.delete(d); unlockScroll(); }
+  };
+  const mo = new MutationObserver(list => list.forEach(m => sync(m.target)));
+  document.querySelectorAll("dialog").forEach(d => { mo.observe(d, { attributes: true, attributeFilter: ["open"] }); sync(d); });
+}
+
 export function initPop() {
+  lockWithDialogs();
   const pop = $("#pop");
   if (!$("#popBack")) { const b = document.createElement("div"); b.id = "popBack"; b.className = "pop-back"; b.hidden = true; pop.before(b); b.addEventListener("click", closePop); }
   pop.addEventListener("click", e => {

@@ -17,7 +17,7 @@ jobs:
         with:
           node-version: 22
       - name: Run the calculation, migration and saving tests
-        run: TZ=Pacific/Auckland npm test
+        run: TZ=Pacific/Auckland npm test && TZ=UTC npm test   # dates must give the same answers in any time zone
 
   database:
     name: Database changes (throwaway Postgres)
