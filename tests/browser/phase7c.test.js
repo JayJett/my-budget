@@ -13,7 +13,11 @@ const RICH = toStored(migrate(RICH_V3));
 const PHONE = { device: { viewport: { width: 390, height: 664 } } };       // iPhone Safari, toolbars showing
 const SMALL = { device: { viewport: { width: 320, height: 568 } } };
 const shot = (page, name) => page.screenshot({ path: join(SHOTS, `p7c-${name}.png`) });
-const fits = page => page.evaluate(() => ({ h: document.documentElement.scrollHeight, vh: innerHeight, w: document.documentElement.scrollWidth, vw: innerWidth }));
+/** Setup and sign-in are a full-screen layer that scrolls by itself (Phase 7C redesign); the page behind never scrolls. */
+const fits = page => page.evaluate(() => {
+  const s = document.querySelector("#auth:not([hidden]), .ob.im"), d = document.documentElement;
+  return { h: s.scrollHeight, vh: s.clientHeight, w: Math.max(s.scrollWidth, d.scrollWidth), vw: innerWidth, page: d.scrollHeight <= innerHeight };
+});
 /** Everyone in the older tests has "seen" every tour; these tests start with none seen. */
 const fresh = { "mb-tours-u-me": JSON.stringify({ tabs: {} }) };
 const writes = page => fake(page, () => window.__fake.rpcCalls.filter(c => c.name === "apply_budget_ops").length);
@@ -45,11 +49,12 @@ test("setup: short steps fit the screen exactly; long ones scroll and every butt
   f = await fits(page); assert.ok(f.h > f.vh, "the plan is longer than the screen, so it scrolls");
   // the plan's status and button stay on screen while scrolling the list
   for (const y of [0, 300, 99999]) {
-    await page.evaluate(v => scrollTo(0, v), y);
+    await page.evaluate(v => { document.querySelector(".ob.im").scrollTop = v; }, y);
     const r = await page.$eval('[data-obact="next"]', el => el.getBoundingClientRect().bottom);
     assert.ok(r <= 664, `"Use this plan" on screen at scroll ${y}`);
   }
-  await page.evaluate(() => scrollTo(0, 0));
+  await page.evaluate(() => { document.querySelector(".ob.im").scrollTop = 0; });
+  assert.equal((await fits(page)).page, true, "the page behind doesn't scroll");
   await shot(page, "3-plan");
   await page.fill('[data-ob="split.0"]', "45");
   assert.match(await page.textContent('[data-obk="status"]'), /5% left to plan/, "percent logic unchanged");
@@ -298,6 +303,55 @@ test("after setup: 'Open my budget' doesn't ask about the Budget tour again; 'Sh
       await page.waitForTimeout(1800);
       assert.equal(await page.locator(".tinv").count(), 0);
     }
+    assert.deepEqual(errors, []); await ctx.close();
+  }
+});
+
+/* ---------------- Phase 7C redesign: the dark welcome and setup ---------------- */
+test("welcome: three swipeable slides, buttons always there, shown once per device; sign-in has a way back", { skip }, async () => {
+  const { page, errors, ctx } = await open(null, { init: { signedOut: true }, waitFor: ".wl", welcome: true, ...PHONE });
+  assert.equal(await page.locator(".wl-slide").count(), 3);
+  assert.equal(await page.isVisible('.wl-acts [data-auth="signup"]'), true);
+  assert.equal(await page.isVisible('.wl-acts [data-auth="signin"]'), true);
+  let f = await fits(page); assert.ok(f.h <= f.vh && f.page, `the welcome fits (${f.h} ≤ ${f.vh})`);
+  assert.equal(await page.getAttribute('meta[name="theme-color"]', "content"), "#123F36", "Safari's toolbar matches");
+  await shot(page, "welcome-1");
+  // swipe (scroll the track) and the dots follow; the dots also move the slides
+  await page.$eval("#wlTrack", el => el.scrollTo({ left: el.clientWidth * 2 }));
+  await page.waitForFunction(() => document.querySelector('[data-wl="2"]').getAttribute("aria-current") === "true");
+  await page.click('[data-wl="1"]');
+  await page.waitForFunction(() => document.querySelector('[data-wl="1"]').getAttribute("aria-current") === "true");
+  await shot(page, "welcome-2");
+  // keyboard
+  await page.focus("#wlTrack"); await page.keyboard.press("ArrowLeft");
+  await page.waitForFunction(() => document.querySelector('[data-wl="0"]').getAttribute("aria-current") === "true");
+  // Sign in → the form, with a back arrow; the welcome isn't shown again on this device
+  await page.click('.wl-acts [data-auth="signin"]');
+  await page.waitForSelector("#fSignin");
+  f = await fits(page); assert.ok(f.h <= f.vh, "the sign-in form fits");
+  await shot(page, "signin-dark");
+  await page.click(".im-back"); await page.waitForSelector(".wl");
+  await page.click('.wl-acts [data-auth="signup"]'); await page.waitForSelector("#fSignup");
+  assert.equal(await page.evaluate(() => localStorage.getItem("mb-welcome-seen")), "1");
+  await page.reload(); await page.waitForSelector("#fSignin");
+  assert.equal(await page.locator(".wl").count(), 0, "straight to sign-in next time");
+  assert.deepEqual(errors, []); await ctx.close();
+});
+
+test("step 1: picking an option never makes the screen taller; 'joining' swaps the button, not the layout", { skip }, async () => {
+  for (const size of [PHONE, SMALL]) {
+    const { page, errors, ctx } = await open(null, { init: { households: [] }, waitFor: "#fHousehold", ...size });
+    const h0 = (await fits(page)).h;
+    for (const v of ["solo", "with", "join", "solo"]) {
+      await page.check(`input[name="obmode"][value="${v}"]`);
+      const f = await fits(page);
+      assert.ok(f.h <= h0 + 1, `${v}: no taller than before (${f.h} vs ${h0})`);
+      assert.equal(f.page, true, "the page behind never scrolls");
+      if (size === PHONE) assert.ok(f.h <= f.vh, `${v}: fits a 390×664 screen (${f.h})`);
+      assert.equal(await page.isVisible('#fHousehold button[type="submit"]'), v !== "join");
+      assert.equal(await page.isVisible(".ob-join-act"), v === "join");
+    }
+    if (size === PHONE) await shot(page, "step1-dark");
     assert.deepEqual(errors, []); await ctx.close();
   }
 });

@@ -1,7 +1,7 @@
 /* ============ tokens ============ */
 :root{
-  --bg:#F2F4EE; --surface:#FFFFFF; --surface-2:#F7F8F4; --ink:#1F2622; --muted:#5F675F; --faint:#98A095;
-  --line:#E3E7DE; --line-strong:#CCD3C6;
+  --bg:#F3F4F1; --surface:#FFFFFF; --surface-2:#F5F6F3; --ink:#1D2523; --muted:#5D6662; --faint:#949C97;
+  --line:#E6E9E4; --line-strong:#D0D5CE;
   --accent:#2F6B4F; --accent-hover:#245840; --accent-soft:#E2EFE6; --on-accent:#FFFFFF;
   --c-blue:#2F6DB5; --c-blue-tint:#EDF4FC; --c-blue-edge:#C3D7EE;
   --c-gold:#8F6007; --c-gold-tint:#FCF5E6; --c-gold-edge:#EAD3A3;   /* darkened in phase 6 for AA text contrast */
@@ -13,7 +13,9 @@
   --nw-op:var(--c-blue); --nw-sav:var(--joint); --nw-inv:var(--invest); --nw-sup:var(--c-gold); --nw-debt:var(--c-coral);   /* account types (never the accent) */
   --ok:#2E7A4B; --ok-soft:#E3F2E8; --warn:#95580A; --warn-soft:#FBEEDA; --bad:#BE3A2C; --bad-soft:#FBE5E1;
   --attn:#E2672C; --unalloc:#D7DCD2;
-  --shadow:0 1px 2px rgba(31,38,34,.05);
+  --shadow:0 1px 2px rgba(29,37,35,.04), 0 10px 28px -18px rgba(29,37,35,.22);
+  /* Phase 7C redesign: the dark "hero" card at the top of each tab, a warm highlight, and soft pastel tiles */
+  --hero:#2D3C3F; --hl:#F2C14E; --p-mint:#DDEBE5; --p-sky:#DCE7EF; --p-mauve:#ECE5EA; --p-sand:#F5EEDB;
   --r-lg:16px; --r:12px; --r-sm:9px;
   --display:ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --body:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -23,7 +25,7 @@
   --r-xl:20px; --tap:44px;
   --fs-xs:.75rem; --fs-sm:.84rem; --fs-md:.95rem; --fs-lg:1.1rem; --fs-xl:1.45rem; --fs-hero:2.35rem;
   --ease:cubic-bezier(.2,.8,.2,1); --dur:.18s;
-  --surface-3:#EEF1EA;                     /* pressed / inset */
+  --surface-3:#ECEEEA;                     /* pressed / inset */
   --glass:rgba(255,255,255,.82);           /* header and tab bar, over content */
 }
 @media (prefers-color-scheme: dark){
@@ -40,6 +42,7 @@
     --ok:#8FD3A6; --ok-soft:#18291F; --warn:#E9B86A; --warn-soft:#2B2314; --bad:#F2998C; --bad-soft:#2E1B18;
     --attn:#F08A55; --unalloc:#323A35; --shadow:none; color-scheme:dark;
     --surface-3:#242B27; --glass:rgba(22,27,24,.86);
+    --hero:#243433; --p-mint:#1B2A25; --p-sky:#1A242C; --p-mauve:#272127; --p-sand:#2A2517;
   }
 }
 :root[data-theme="dark"]{
@@ -55,6 +58,7 @@
   --ok:#8FD3A6; --ok-soft:#18291F; --warn:#E9B86A; --warn-soft:#2B2314; --bad:#F2998C; --bad-soft:#2E1B18;
   --attn:#F08A55; --unalloc:#323A35; --shadow:none; color-scheme:dark;
   --surface-3:#242B27; --glass:rgba(22,27,24,.86);
+  --hero:#243433; --p-mint:#1B2A25; --p-sky:#1A242C; --p-mauve:#272127; --p-sand:#2A2517;
 }
 
 /* ============ accent colours (each person picks one; js/ui/accent.js) ============
@@ -79,6 +83,10 @@
 :root[data-theme="dark"][data-accent="coral"]{ --accent:#F4A285; --accent-hover:#F7B8A1; --accent-soft:#3A2219; --on-accent:#1E110C; }
 :root[data-theme="dark"][data-accent="rose"]{ --accent:#F29CC3; --accent-hover:#F6B6D3; --accent-soft:#3A1D2B; --on-accent:#1F0E16; }
 :root[data-theme="dark"][data-accent="amber"]{ --accent:#F2C46B; --accent-hover:#F6D28E; --accent-soft:#352912; --on-accent:#1C1508; }
+/* each accent's light version, for the dark hero cards (Phase 7C redesign): the same in light and dark mode */
+:root{ --acc-d:#86C69F; --on-acc-d:#0F1412; }
+:root[data-accent="mint"]{ --acc-d:#7FD4A8; --on-acc-d:#0D1611; } :root[data-accent="ocean"]{ --acc-d:#7FB9F2; --on-acc-d:#0B1420; } :root[data-accent="lavender"]{ --acc-d:#B9A6F5; --on-acc-d:#14101F; }
+:root[data-accent="coral"]{ --acc-d:#F4A285; --on-acc-d:#1E110C; } :root[data-accent="rose"]{ --acc-d:#F29CC3; --on-acc-d:#1F0E16; } :root[data-accent="amber"]{ --acc-d:#F2C46B; --on-acc-d:#1C1508; }
 .acc-sw[data-accent-pick="mint"]{ --sw:#2E7553; } .acc-sw[data-accent-pick="ocean"]{ --sw:#2766AE; } .acc-sw[data-accent-pick="lavender"]{ --sw:#6A4FBF; } .acc-sw[data-accent-pick="coral"]{ --sw:#A9472A; } .acc-sw[data-accent-pick="rose"]{ --sw:#AE3D6E; } .acc-sw[data-accent-pick="amber"]{ --sw:#875A00; }
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .acc-sw[data-accent-pick="mint"]{ --sw:#7FD4A8; } :root:not([data-theme="light"]) .acc-sw[data-accent-pick="ocean"]{ --sw:#7FB9F2; } :root:not([data-theme="light"]) .acc-sw[data-accent-pick="lavender"]{ --sw:#B9A6F5; } :root:not([data-theme="light"]) .acc-sw[data-accent-pick="coral"]{ --sw:#F4A285; } :root:not([data-theme="light"]) .acc-sw[data-accent-pick="rose"]{ --sw:#F29CC3; } :root:not([data-theme="light"]) .acc-sw[data-accent-pick="amber"]{ --sw:#F2C46B; } }
 :root[data-theme="dark"] .acc-sw[data-accent-pick="mint"]{ --sw:#7FD4A8; } :root[data-theme="dark"] .acc-sw[data-accent-pick="ocean"]{ --sw:#7FB9F2; } :root[data-theme="dark"] .acc-sw[data-accent-pick="lavender"]{ --sw:#B9A6F5; } :root[data-theme="dark"] .acc-sw[data-accent-pick="coral"]{ --sw:#F4A285; } :root[data-theme="dark"] .acc-sw[data-accent-pick="rose"]{ --sw:#F29CC3; } :root[data-theme="dark"] .acc-sw[data-accent-pick="amber"]{ --sw:#F2C46B; }
@@ -1760,3 +1768,177 @@ body.setting-up::before, body.signed-out::before{ background:var(--bg); }   /* t
 .gl-first h3{ margin:4px 0 4px; font:650 var(--fs-md) var(--display); }
 .gl-first p{ margin:0 0 12px; color:var(--muted); font-size:var(--fs-sm); }
 .iv-empty .empty-art{ width:min(180px, 60%); }
+
+/* =====================================================================
+   PHASE 7C REDESIGN, part 1: the dark, immersive welcome, sign-in and setup
+   Always dark, whatever the phone's light/dark setting: a deep forest-green to teal gradient, big
+   pictures (js/ui/hero-art.js), headline at the top, buttons at the bottom.
+   The screen is pinned to the visible screen and only its own content scrolls, and only when it
+   really doesn't fit. So a screen that fits can't be dragged up and down into empty space.
+   ===================================================================== */
+.im{
+  --bg:#0B2621; --surface:#15382F; --surface-2:#19413A; --surface-3:#204A41; --ink:#F2F8F5; --muted:#A9C4B9; --faint:#76968A;
+  --line:#24473E; --line-strong:#356055;
+  --accent:#8FE0B9; --accent-hover:#A9E8C9; --accent-soft:#1E4A3E; --on-accent:#08201A;
+  --ok:#8FD3A6; --ok-soft:#173A2C; --warn:#E9B86A; --warn-soft:#3A3020; --bad:#F6A396; --bad-soft:#45282A;
+  --c-blue:#8AB7EA; --c-gold:#E5B85E; --c-coral:#EC9A7A; --c-rose:#E592BC; --c-slate:#9BB6C4; --joint:#6CC4A6; --invest:#B59EE0;
+  --unalloc:#2B4A42; --shadow:none; color-scheme:dark; color:var(--ink);
+  --glass:rgba(255,255,255,.065); --glass-line:rgba(255,255,255,.15);
+}
+#auth.im, .ob.im{ position:fixed; inset:0; z-index:20; overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain; -webkit-overflow-scrolling:touch;
+  background:radial-gradient(130% 75% at 50% -5%, #22695A 0%, #134239 38%, #0A2620 70%, #061612 100%) #0A2620; }
+#auth.im{ display:block; min-height:0; padding:0; }
+#auth.im[hidden]{ display:none; }
+.ob.im{ max-width:none; margin:0; padding:0; min-height:0; display:block; }
+:root:has(body.setting-up), :root:has(body.signed-out), body.setting-up, body.signed-out{ overflow:hidden; }
+body.setting-up::before, body.signed-out::before{ background:transparent; }
+.ob-in-wrap, #auth.im > .auth-card{ box-sizing:border-box; width:min(520px, 100%); margin:0 auto; min-height:100%; display:flex; flex-direction:column;
+  padding:calc(env(safe-area-inset-top,0px) + 8px) 20px calc(env(safe-area-inset-bottom,0px) + 16px); background:none; border:0; box-shadow:none; border-radius:0; }
+.ob-in-wrap > .ob-card{ flex:1; display:flex; flex-direction:column; }
+.im .ob-top{ position:static; background:none; margin:0 0 6px; padding:0; }
+.im .ob-nav{ margin-top:auto; padding-top:16px; }
+.im .ob-auth > .ob-in{ flex:1; display:flex; flex-direction:column; }
+.im #fHousehold{ flex:1; display:flex; flex-direction:column; }
+.im #fHousehold > button.block{ margin-top:auto; }
+.im #fHousehold > button.block + button.block{ margin-top:auto; }
+.ob-slot{ min-height:80px; margin:4px 0 10px; }
+.im .ob-opts{ gap:8px; margin-bottom:12px; }
+.im .ob-opt{ min-height:62px; padding:11px 14px; }
+.im .ob-opt-ic{ width:38px; height:38px; border-radius:12px; }
+.ob-slot .field{ margin:0; }
+.ob-slot .field em{ font-style:normal; color:var(--muted); font-weight:500; }
+.ob-slot .ob-note{ margin:0; }
+
+/* type */
+.im h2{ font:750 1.85rem/1.12 var(--display); letter-spacing:-.025em; color:var(--ink); text-align:center; margin:4px 0 8px; }
+.im .lead{ color:var(--muted); font-size:1rem; text-align:center; margin:0 auto 18px; max-width:32ch; }
+.im .ob-brand{ color:var(--ink); }
+.im .logo{ background:var(--accent); color:var(--on-accent); }
+.im .ob-stage{ color:var(--muted); } .im .ob-stage b{ color:var(--accent); }
+.im .ob-prog{ background:rgba(255,255,255,.14); height:5px; }
+.im .linkish, .im .ob-later{ color:var(--accent); }
+
+/* buttons: white pill first, outline pill second (like the welcome) */
+.im .btn{ border-radius:99px; min-height:52px; justify-content:center; font-weight:650; background:transparent; color:var(--ink); border:1.5px solid rgba(255,255,255,.4); }
+.im .btn.primary{ background:#fff; color:#0B2621; border-color:#fff; font-weight:700; }
+.im .btn.primary:hover{ background:#EAF6F0; }
+.im .btn.primary:disabled, .im .btn.primary[disabled]{ background:rgba(255,255,255,.2); border-color:transparent; color:rgba(255,255,255,.62); opacity:1; }
+.im .btn.ghost{ border-color:transparent; color:var(--accent); }
+.im .btn.small{ min-height:40px; }
+.im .btn:focus-visible{ outline:2px solid var(--accent); outline-offset:3px; }
+
+/* glass surfaces: choice cards, boxes, inputs */
+.im .ob-opt{ background:var(--glass); border-color:var(--glass-line); border-radius:20px; min-height:68px; }
+.im .ob-opt-ic{ background:rgba(255,255,255,.1); color:var(--accent); }
+.im .ob-opt:has(input:checked){ background:rgba(143,224,185,.13); border-color:var(--accent); box-shadow:0 10px 28px -18px rgba(143,224,185,.6); }
+.im .ob-opt:has(input:checked) .ob-opt-ic{ background:var(--accent); color:var(--on-accent); }
+.im .ob-tick{ border-color:rgba(255,255,255,.3); }
+.im .ob-opt:has(input:checked) .ob-tick{ background:var(--accent); border-color:var(--accent); color:var(--on-accent); }
+.im .ob-note, .im .ob-pay, .im .ob-sum > div, .im .ob-buckets{ background:var(--glass); border-color:var(--glass-line); }
+.im .field input, .im .ob-field input[type=text], .im .ob-field input[type=date], .im .bs-in{ background:rgba(255,255,255,.07); border:1.5px solid rgba(255,255,255,.18); color:var(--ink); border-radius:14px; min-height:50px; font-size:16px; }
+.im .field input:focus, .im .ob-field input:focus{ border-color:var(--accent); background:rgba(255,255,255,.1); }
+.im .field span, .im .ob-field span{ color:var(--muted); }
+.im .ob-amount{ background:rgba(255,255,255,.07); border-color:rgba(255,255,255,.18); }
+.im .ob-amount:focus-within{ border-color:var(--accent); background:rgba(255,255,255,.1); box-shadow:0 0 0 4px rgba(143,224,185,.16); }
+.im .unit.ob-pct{ background:rgba(255,255,255,.08); }
+.im .seg-radio{ background:rgba(255,255,255,.07); }
+.im .seg-radio input:checked + span{ background:rgba(255,255,255,.18); color:var(--ink); box-shadow:none; }
+.im .auth-tabs{ background:rgba(255,255,255,.07); border-color:var(--glass-line); border-radius:99px; }
+.im .auth-tabs button{ border-radius:99px; }
+.im .auth-tabs button[aria-pressed="true"]{ background:#fff; color:#0B2621; box-shadow:none; }
+.im .auth-or{ color:var(--muted); } .im .auth-or::before, .im .auth-or::after{ background:rgba(255,255,255,.18); }
+.im .msg.err{ background:var(--bad-soft); color:var(--bad); }
+.im .ob-b-dot{ box-shadow:0 0 0 2px rgba(255,255,255,.1); }
+.im .ob-foot{ background:linear-gradient(to bottom, rgba(7,26,22,0), #081E19 22px); margin:auto -20px 0; padding:14px 20px calc(10px + env(safe-area-inset-bottom,0px)); }
+.ob-in-wrap:has(.st-3) .ob-top{ position:sticky; top:0; z-index:6; margin:calc(-8px - env(safe-area-inset-top,0px)) -20px 6px; padding:calc(8px + env(safe-area-inset-top,0px)) 20px 10px;
+  background:rgba(17,60,52,.92); -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px); }
+
+/* big pictures: as large as the room allows (svh: steady while Safari's toolbars come and go) */
+/* The picture takes only the space left over on the screen (flex), up to a maximum; when what's left is
+   too small to be worth it, it isn't drawn at all. So it can never be the reason a screen scrolls. */
+.im .ob-art{ flex:1 1 0; min-height:0; height:auto; max-height:230px; width:100%; max-width:340px; margin:0 auto 6px; container-type:size; }
+@container (max-height: 76px){ .hart{ display:none; } }
+.im .ob-art svg, .hart{ display:block; width:100%; height:100%; overflow:visible; }
+
+/* done */
+.im .ob-done-mid{ min-height:0; }
+.im .ob-done-art{ flex:1 1 0; min-height:0; max-height:260px; width:min(300px, 86%); aspect-ratio:auto; container-type:size; }
+.im .ob-done-art .ob-done-ic{ background:var(--accent); color:var(--on-accent); box-shadow:0 0 0 5px #0B2621; right:2%; bottom:6%; }
+.im .ob-done h2{ font-size:1.75rem; }
+
+/* sign-in forms */
+.im-form{ position:relative; }
+.im-form .auth-brand{ justify-content:center; text-align:left; margin:8px auto 26px; }
+.im-form h2{ text-align:left; font-size:1.7rem; }
+.im-form .lead{ text-align:left; margin-left:0; max-width:none; }
+.im-form form{ margin-top:4px; }
+.im-form .btn.block{ margin-top:18px; }
+.im-back{ position:absolute; left:8px; top:calc(env(safe-area-inset-top,0px) + 6px); width:44px; height:44px; display:grid; place-items:center; border:0; border-radius:14px; background:none; color:var(--ink); cursor:pointer; }
+.im-back:active{ background:rgba(255,255,255,.08); }
+
+/* the welcome slides */
+.im-welcome .ob-top-row{ justify-content:center; }
+.wl{ flex:1; display:flex; flex-direction:column; min-height:0; }
+.wl-track{ flex:1; display:flex; overflow-x:auto; overflow-y:hidden; scroll-snap-type:x mandatory; scrollbar-width:none; margin:0 -20px; overscroll-behavior-x:contain; outline:none; }
+.wl-track::-webkit-scrollbar{ display:none; }
+.wl-track:focus-visible{ outline:2px solid var(--accent); outline-offset:-2px; border-radius:20px; }
+.wl-slide{ flex:0 0 100%; box-sizing:border-box; scroll-snap-align:center; scroll-snap-stop:always; display:flex; flex-direction:column; padding:6px 28px 0; text-align:center; }
+.wl-text h2{ font-size:2rem; margin:10px 0 8px; }
+.wl-text p{ margin:0 auto; color:var(--muted); font-size:1.02rem; max-width:30ch; line-height:1.45; }
+.wl-art{ flex:1; display:grid; place-items:center; padding:10px 0 4px; min-height:0; }
+.wl-art .hart{ width:100%; max-width:340px; height:clamp(150px, calc(var(--svh) - var(--safe-y) - 410px), 300px); }
+.wl-dots{ display:flex; justify-content:center; gap:4px; padding:4px 0 14px; }
+.wl-dots button{ width:24px; height:24px; padding:0; border:0; background:none; display:grid; place-items:center; cursor:pointer; transition:width var(--m-sel) var(--ease-out); }
+.wl-dots button::before{ content:""; width:7px; height:7px; border-radius:4px; background:rgba(255,255,255,.32); transition:width var(--m-sel) var(--ease-out), background-color var(--m-sel); }
+.wl-dots button[aria-current="true"]{ width:40px; }
+.wl-dots button[aria-current="true"]::before{ width:30px; background:#fff; }
+.wl-acts .btn{ margin:0; }
+.wl-acts .btn + .btn{ margin-top:10px; }
+
+/* one-off entrances for the pictures (nothing loops) */
+.hart .hp-pop{ transform-box:fill-box; transform-origin:center; animation:ar-pop .5s var(--ease-out) .15s both; }
+.hart .hp-a{ animation:ar-rise .7s var(--ease-out) .1s both; } .hart .hp-b{ animation:ar-rise .7s var(--ease-out) .25s both; }
+.hart .hp-rise{ animation:ar-rise .6s var(--ease-out) .2s both; }
+.hart .hp-drop{ animation:ar-drop .6s var(--ease-out) .15s both; }
+@media (prefers-reduced-motion: reduce){ .hart *{ animation:none !important; } .wl-dots button, .wl-dots button::before{ transition:none; } }
+
+/* =====================================================================
+   PHASE 7C REDESIGN, part 2: the app's new look
+   Clean white cards on a soft warm grey, a dark slate "hero" card at the top of every tab, soft pastel
+   tiles, and a warm yellow highlight. Each person's accent still colours buttons and highlights (on the
+   dark hero card, its lighter version). Dark mode has a matching set.
+   ===================================================================== */
+.card{ border-color:transparent; border-radius:22px; box-shadow:var(--shadow); }
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .card{ border-color:var(--line); } }
+:root[data-theme="dark"] .card{ border-color:var(--line); }
+.top::before{ background:var(--glass); }
+
+/* the hero card: a dark slate card, whatever the theme; everything inside it reads the dark colours */
+:is(.b-income, .nw-hero, .sp-sum, .gl-sum, .iv-hero, .pg-hero).card{
+  --bg:var(--hero); --surface:var(--hero); --surface-2:#38494C; --surface-3:#405256; --ink:#F3F7F5; --muted:#BAC7C3; --faint:#8C9A96;
+  --line:#435559; --line-strong:#56696D;
+  --accent:var(--acc-d); --accent-hover:var(--acc-d); --accent-soft:color-mix(in srgb, var(--acc-d) 20%, var(--hero)); --on-accent:var(--on-acc-d);
+  --ok:#8FD3A6; --ok-soft:#2D4A3F; --warn:#F0C27A; --warn-soft:#4A4130; --bad:#F6A396; --bad-soft:#553B39;
+  --c-blue:#8AB7EA; --c-blue-tint:#34475A; --c-gold:#E9C06A; --c-gold-tint:#4A4430; --c-coral:#EFA185; --c-coral-tint:#4F3B34;
+  --c-rose:#E99AC2; --c-rose-tint:#4D3545; --c-slate:#A9C3D0; --c-slate-tint:#37494F;
+  --joint:#72CBAD; --invest:#BBA6E6; --cat-fixed:#9BBAC6; --unalloc:#4A5B5E;
+  --p-mint:#38494C; --p-sky:#38494C; --p-mauve:#38494C; --p-sand:#38494C;
+  color-scheme:dark; color:var(--ink); background:var(--hero); border-color:transparent; box-shadow:0 22px 44px -26px rgba(16,26,26,.6);
+}
+.gl-sum .gl-bar span{ background:var(--hl); }
+:is(.b-income, .nw-hero, .sp-sum, .gl-sum, .iv-hero, .pg-hero) .seg{ background:rgba(255,255,255,.08); }
+:is(.b-income, .nw-hero, .sp-sum, .gl-sum, .iv-hero, .pg-hero) .seg button[aria-pressed="true"]{ background:rgba(255,255,255,.18); color:#fff; box-shadow:none; }
+:is(.b-income, .nw-hero, .sp-sum, .gl-sum, .iv-hero, .pg-hero) .member-row:hover{ background:rgba(255,255,255,.06); }
+
+/* soft pastel tiles for the small figure boxes */
+.sp-figs > div:nth-child(3n+1){ background:var(--p-mint); }
+.sp-figs > div:nth-child(3n+2){ background:var(--p-sky); }
+.sp-figs > div:nth-child(3n){ background:var(--p-mauve); }
+/* icon tiles: a touch bigger and softer */
+.ex-ic, .gl-ic{ width:40px; height:40px; border-radius:14px; }
+.im [hidden]{ display:none !important; }
+.im .lead{ margin-bottom:14px; }
+.im .ob-auth .ob-top{ margin-bottom:2px; }
+@media (max-width:360px){ .ob-slot{ min-height:108px; } }   /* the invitation note takes an extra line on narrow phones */
+.im-form:has(.im-back) .auth-brand{ padding-left:46px; margin-top:4px; }   /* room for the back arrow */
+.im-form .auth-brand{ justify-content:flex-start; margin:8px 0 26px; }

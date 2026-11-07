@@ -22,7 +22,8 @@ import { blankBudget, MAX_PEOPLE } from "../model/schema.js";
 import { WORDS, freqToView, perYear } from "../model/periods.js";
 import { money as fmtMoney } from "../model/format.js";
 import { n, blank } from "../model/util.js";
-import { ART } from "./art.js";
+import { HERO } from "./hero-art.js";
+import { setThemeColour } from "./auth.js";
 import { markTour } from "./tour.js";
 
 export const STAGES = ["Make it yours", "Your income", "Your starting plan"];
@@ -59,9 +60,9 @@ export function startSetup() {
   ans = { mode, people: [{ name: myName, pay: null, freq: "fortnightly", payday: "" }], needName: !myName };
   stage = 2; done = 1; split = null; dir = 1; saving = false; saveErr = ""; shownStage = 0;
   app.setup = { render: draw };
-  document.body.classList.add("setting-up");
+  document.body.classList.add("setting-up"); setThemeColour(true);
 }
-export function endSetup() { app.setup = null; document.body.classList.remove("setting-up"); }
+export function endSetup() { app.setup = null; document.body.classList.remove("setting-up"); setThemeColour(false); }
 
 /** "Set up later": an empty budget in memory (nothing saved, nothing invented), straight into the app. */
 function skip() {
@@ -93,13 +94,13 @@ function draw() {
   const el = $("#app"), html = body(), moved = shownStage !== stage;
   let shell = el.querySelector(":scope > .ob");
   const swap = () => {
-    if (!shell) { el.innerHTML = `<div class="ob">${obHeader(stage, done, "")}<div class="ob-card" role="group" aria-labelledby="obTitle"></div></div>`; shell = el.firstElementChild; }
+    if (!shell) { el.innerHTML = `<div class="ob im"><div class="ob-in-wrap">${obHeader(stage, done, "")}<div class="ob-card" role="group" aria-labelledby="obTitle"></div></div></div>`; shell = el.firstElementChild; }
     header(shell);
     const card = shell.querySelector(".ob-card");
     card.className = `ob-card st-${stage}`; card.innerHTML = html;
     // Tell screen readers where they are, without popping up the keyboard
     const h = $("#obTitle"); if (h && moved) h.focus({ preventScroll: true });
-    if (moved) window.scrollTo({ top: 0 });
+    if (moved) { window.scrollTo({ top: 0 }); shell.scrollTop = 0; }
   };
   const animate = shell && moved && shownStage && !calm();
   shownStage = stage;
@@ -119,18 +120,18 @@ export const ICONS = {
   join: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3.5" width="12" height="9" rx="1.6"/><path d="M2.4 4.2L8 8.6l5.6-4.4"/></svg>',
 };
 export const modeChoices = (cur, withJoin) => `<fieldset class="ob-opts"><legend class="sr-only">Who’s budgeting</legend>
-  ${choice("solo", "Just me", "A budget for one person", ICONS.solo, cur === "solo")}
-  ${choice("with", "With someone", "A shared budget, like with a partner or family", ICONS.with, cur === "with")}
-  ${withJoin ? choice("join", "Joining a household", "Someone has invited you to theirs", ICONS.join, cur === "join") : ""}</fieldset>`;
+  ${choice("solo", "Just me", "A budget for one", ICONS.solo, cur === "solo")}
+  ${choice("with", "With someone", "Shared with a partner or family", ICONS.with, cur === "with")}
+  ${withJoin ? choice("join", "Joining a household", "Someone has invited you", ICONS.join, cur === "join") : ""}</fieldset>`;
 
 function body() {
   const P = ans.people;
-  if (stage === 1) return `<div class="ob-art" aria-hidden="true">${ART.together()}</div><h2 id="obTitle" tabindex="-1">Let’s make this yours</h2><p class="lead">Are you budgeting on your own or with someone else?</p>
+  if (stage === 1) return `<div class="ob-art" aria-hidden="true">${HERO.together()}</div><h2 id="obTitle" tabindex="-1">Let’s make this yours</h2><p class="lead">Are you budgeting on your own or with someone else?</p>
     ${modeChoices(ans.mode, false)}
     <p class="ob-hint">${app.household ? `Your household: <b>${esc(app.household.name)}</b>. You can rename it or invite people in Household settings.` : ""}</p>
     ${nav("Continue", { back: false })}`;
 
-  if (stage === 2) return `<div class="ob-art" aria-hidden="true">${ART.jar()}</div><h2 id="obTitle" tabindex="-1">Let’s start with your income</h2><p class="lead">How much do you usually take home after tax?</p>
+  if (stage === 2) return `<div class="ob-art" aria-hidden="true">${HERO.jar()}</div><h2 id="obTitle" tabindex="-1">Let’s start with your income</h2><p class="lead">How much do you usually take home after tax?</p>
     ${ans.needName ? `<label class="ob-field"><span>Your first name</span><input type="text" data-ob="people.0.name" value="${esc(P[0].name)}" autocomplete="given-name" placeholder="First name"></label>` : ""}
     ${P.map((p, i) => payBlock(p, i)).join("")}
     ${ans.mode === "with" && P.length < MAX_PEOPLE ? `<button class="add-row ob-add" type="button" data-obact="addperson">+ Add ${P.length > 1 ? "someone else’s" : "their"} pay too <small>optional</small></button>` : ""}
@@ -161,7 +162,7 @@ function body() {
   // Step 4: saved. The picture and words sit in the middle; the two choices sit where "Continue" was.
   const first = (P[0].name || "").trim();
   return `<div class="ob-done"><div class="ob-done-mid">
-      <div class="ob-done-art" aria-hidden="true">${ART.grow()}<span class="ob-done-ic"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5l3 3 6-7"/></svg></span></div>
+      <div class="ob-done-art" aria-hidden="true">${HERO.grow()}<span class="ob-done-ic"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5l3 3 6-7"/></svg></span></div>
       <h2 id="obTitle" tabindex="-1">Your budget is ready${first ? `, ${esc(first)}` : ""}!</h2>
       <p class="lead">It’s saved. You can adjust everything whenever you like, and add your accounts and goals when you’re ready.</p></div>
     <div class="ob-done-acts"><button class="btn primary block" type="button" data-obact="finish">Open my budget</button>

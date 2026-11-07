@@ -202,6 +202,20 @@ The closing audit's findings, fixes and remaining items are in `docs/phase6-audi
 - **First-use empty states** with a picture and one action: Net worth ("Start with an account"), Goals ("Create your first goal"), Progress and Investments.
 - Tests: `tests/browser/phase7c.test.js`.
 
+### A bolder look (Phase 7C redesign)
+
+- **Welcome, sign-in and setup are a dark, immersive set of screens.**
+  - They use a deep green-to-teal gradient whatever the phone's setting, with a big headline, a large picture and white pill buttons at the bottom.
+  - Each screen is pinned to the visible screen, so only its own content scrolls, and only if it doesn't fit. Choosing an option on Step 1 never makes it taller.
+  - Safari's toolbar turns the same green while these screens show.
+- **Welcome slides** for someone new on a device: three swipeable slides (or use the dots or arrow keys), with "Create account" and "Sign in" always visible. They aren't shown again on that device, and a remembered person goes straight to "Welcome back".
+- **Pictures** (`js/ui/hero-art.js`): original, code-drawn glossy shapes (a twisted ring, overlapping spheres, stepped pedestals, a glass jar of coins). They take only the leftover space on a screen and hide when there isn't enough.
+- **The app's new palette.**
+  - White cards on a soft warm grey, with a dark slate "hero" card at the top of every tab.
+  - Pastel tiles for the small figures, and a warm yellow highlight.
+  - Each person's accent still colours buttons and highlights (a lighter version on the dark card).
+  - Dark mode matches. Readability is checked in `tests/accent.test.js`.
+
 ## How saving works
 
 The whole budget lives in one row (`budgets.state`), but the app never overwrites it. Each edit is

@@ -5,7 +5,7 @@ import { render } from "./render.js";
 import { createStore, isNetworkError, clearDeviceCopies } from "../sync/store.js";
 import { blankBudget } from "../model/schema.js";
 import { startSetup, endSetup, obHeader, modeChoices, rememberMode } from "./onboarding.js";
-import { ART } from "./art.js";
+import { HERO } from "./hero-art.js";
 import { loadSnapshots, ensureMonthly } from "./views/progress.js";
 import { rememberChange, resetUndo, updateUndo, historyNoticeRemote } from "./history.js";
 import { loadReminders, resetReminders, openFromHash } from "./reminders.js";
@@ -15,6 +15,25 @@ import { SUPABASE_URL, SUPABASE_ANON_KEY } from "../config.js";
 
 const here = () => location.origin + location.pathname;
 const brand = `<div class="auth-brand"><div class="logo" aria-hidden="true">$</div><div class="brand">Moni Money<small>Give every dollar a purpose, on your own or together</small></div></div>`;
+/* The welcome (Phase 7C redesign): three slides you can swipe through, with the two buttons always
+   underneath. Shown to someone new on this device; after they tap either button it isn't shown again
+   here (anyone already remembered on this device gets "Welcome back" instead). */
+const WELCOME_KEY = "mb-welcome-seen";
+const welcomeSeen = () => { try { return localStorage.getItem(WELCOME_KEY) === "1"; } catch (_) { return true; } };
+const markWelcome = () => { try { localStorage.setItem(WELCOME_KEY, "1"); } catch (_) {} };
+const SLIDES = [
+  ["plan", "Give every dollar a job", "Plan your pay in minutes, and see exactly where it goes."],
+  ["together", "Better together", "Share one budget with a partner, each with your own login."],
+  ["grow", "Watch it grow", "Goals, net worth and progress, all in one calm place."],
+];
+const welcomeHTML = () => `<div class="wl">
+  <div class="wl-track" id="wlTrack" tabindex="0" role="region" aria-roledescription="carousel" aria-label="About Moni Money">
+    ${SLIDES.map(([art, h, t], i) => `<section class="wl-slide" role="group" aria-roledescription="slide" aria-label="${i + 1} of ${SLIDES.length}"><div class="wl-text">${i === 0 ? `<h2 id="obTitle" tabindex="-1">${h}</h2>` : `<h2>${h}</h2>`}<p>${t}</p></div><div class="wl-art">${HERO[art]()}</div></section>`).join("")}
+  </div>
+  <div class="wl-dots" role="group" aria-label="Choose a slide">${SLIDES.map((_, i) => `<button type="button" data-wl="${i}" aria-label="Slide ${i + 1} of ${SLIDES.length}" aria-current="${i === 0}"></button>`).join("")}</div>
+  <div class="wl-acts"><button class="btn primary block" type="button" data-auth="signup" data-welcome-done>Create account</button><button class="btn block im-outline" type="button" data-auth="signin" data-welcome-done>Sign in</button></div>
+</div>`;
+const backToWelcome = `<button class="im-back" type="button" data-auth="welcome" aria-label="Back"><svg viewBox="0 0 16 16" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3L5 8l5 5"/></svg></button>`;
 
 /* ---------- "Welcome back, Jarden": remembered on this device only ---------- */
 const WELCOME = "mb-welcome";
@@ -122,7 +141,9 @@ function applyRemoteView(meta) {
 /* ---------- sign-in screens ---------- */
 let recovering = false, entering = false;
 export function showAuth(mode, msg, kind) {
-  document.body.classList.add("signed-out"); const el = $("#auth"); el.hidden = false;
+  document.body.classList.add("signed-out"); const el = $("#auth"); el.hidden = false; el.classList.add("im");
+  setThemeColour(true);
+  if (mode === "signin" && !msg && !remembered() && !welcomeSeen()) mode = "welcome";
   const m = `<div class="msg ${kind || "err"}" id="authMsg">${msg ? esc(msg) : ""}</div>`;
   const tabs = `<div class="auth-tabs"><button type="button" data-auth="signin" aria-pressed="${mode === "signin"}">Sign in</button><button type="button" data-auth="signup" aria-pressed="${mode === "signup"}">Create account</button></div>`;
   const me = remembered();
@@ -177,19 +198,45 @@ export function showAuth(mode, msg, kind) {
     const email = app.session ? app.session.user.email : "";
     const md = (app.session && app.session.user.user_metadata) || {};
     const nm = md.name || (md.full_name || "").trim().split(/\s+/)[0] || ""; // Google/Apple may give a full name, or none at all
-    body = `<div class="ob-art" aria-hidden="true">${ART.together()}</div><h2 id="obTitle" tabindex="-1">${nm ? `Welcome, ${esc(nm)}!` : "Welcome to Moni Money!"} Let’s make this yours</h2><p class="lead">Are you budgeting on your own or with someone else?</p>${m}
+    // Choosing never makes the screen taller: the name box and the invitation note share one slot,
+    // and "Continue" and "Check for my invitation" share the button's place.
+    body = `<div class="ob-art" aria-hidden="true">${HERO.together()}</div><h2 id="obTitle" tabindex="-1">Let’s make this yours</h2><p class="lead">${nm ? `Hi ${esc(nm)}! ` : ""}Are you budgeting on your own or with someone?</p>${m}
     <form id="fHousehold" data-suggest="${esc(nm ? nm + "’s budget" : "My budget")}">${modeChoices(null, true)}
-      <div class="ob-name" hidden><label class="field"><span>Household name</span><input type="text" name="name" value="${esc(nm ? nm + "’s budget" : "My budget")}" autocomplete="off" required></label>
-        <small class="field-help">You can invite people and rename it later.</small></div>
-      <div class="ob-join" hidden><p class="ob-note">Ask the person who set it up to invite <b>${esc(email)}</b> (they’ll find Invite in Household settings). Then come back here.</p>
-        <button class="btn block" type="button" data-auth="recheck">Check for my invitation</button></div>
-      <button class="btn primary block" type="submit" disabled>Continue</button></form>`;
+      <div class="ob-slot"><div class="ob-name"><label class="field"><span>Household name <em>(you can change it later)</em></span><input type="text" name="name" value="${esc(nm ? nm + "’s budget" : "My budget")}" autocomplete="off" required></label></div>
+      <div class="ob-join" hidden><p class="ob-note">Ask whoever set it up to invite <b>${esc(email)}</b> from Household settings, then check here.</p></div></div>
+      <button class="btn primary block" type="submit" disabled>Continue</button>
+      <button class="btn primary block ob-join-act" type="button" data-auth="recheck" hidden>Check for my invitation</button></form>`;
   }
   else if (mode === "loading") body = `<p class="lead" style="margin:0">Loading…</p>`;
-  el.innerHTML = mode === "household" ? `<div class="auth-card ob-auth">${obHeader(1, 0, `<button class="linkish ob-later" type="button" data-auth="signout">Sign out</button>`)}<div class="ob-in">${body}</div></div>` : `<div class="auth-card">${brand}${body}</div>`;
-  const first = mode === "household" ? el.querySelector("#obTitle") : el.querySelector('form input:not([type="hidden"]):not([hidden])'); if (first) first.focus({ preventScroll: true });
+  if (mode === "welcome") body = welcomeHTML();
+  const back = ["signin", "signup", "codein", "forgot"].includes(mode) && !remembered() ? backToWelcome : "";
+  el.innerHTML = mode === "household" ? `<div class="auth-card ob-auth">${obHeader(1, 0, `<button class="linkish ob-later" type="button" data-auth="signout">Sign out</button>`)}<div class="ob-in">${body}</div></div>`
+    : mode === "welcome" ? `<div class="auth-card im-welcome"><div class="ob-top-row"><span class="ob-brand"><span class="logo sm" aria-hidden="true">$</span>Moni Money</span></div>${body}</div>`
+    : `<div class="auth-card im-form">${back}${brand}${body}</div>`;
+  if (mode === "welcome") initWelcome(el);
+  const first = mode === "household" || mode === "welcome" ? el.querySelector("#obTitle") : el.querySelector('form input:not([type="hidden"]):not([hidden])'); if (first) first.focus({ preventScroll: true });
   if (mode === "verify") tickResend(); // a wait from an earlier "send a new code" carries on after a refresh
 }
+/** Safari's toolbar colour matches the dark screens while they're showing. */
+const LIGHT_BAR = "#FFFFFF", IM_BAR = "#123F36";
+export function setThemeColour(dark) {
+  document.querySelectorAll('meta[name="theme-color"]').forEach(m => {
+    if (!m.dataset.orig) m.dataset.orig = m.getAttribute("content") || LIGHT_BAR;
+    m.setAttribute("content", dark ? IM_BAR : m.dataset.orig);
+  });
+}
+/** The welcome slides: swipe (or use the dots, or the arrow keys); the dots follow along. */
+function initWelcome(el) {
+  const track = el.querySelector("#wlTrack"), dots = [...el.querySelectorAll("[data-wl]")];
+  if (!track) return;
+  const at = () => Math.round(track.scrollLeft / Math.max(1, track.clientWidth));
+  const show = i => { const k = Math.max(0, Math.min(dots.length - 1, i)); track.scrollTo({ left: k * track.clientWidth, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }); };
+  let raf = 0;
+  track.addEventListener("scroll", () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => { const i = at(); dots.forEach((d, k) => d.setAttribute("aria-current", String(k === i))); }); }, { passive: true });
+  dots.forEach((d, k) => d.addEventListener("click", () => show(k)));
+  track.addEventListener("keydown", e => { if (e.key === "ArrowRight") { e.preventDefault(); show(at() + 1); } if (e.key === "ArrowLeft") { e.preventDefault(); show(at() - 1); } });
+}
+
 const authMsg = (text, kind) => { const m = $("#authMsg"); if (m) { m.className = "msg " + (kind || "err"); m.textContent = text; } };
 export function friendly(err) {
   const t = (err && (err.message || err.error_description)) || "Something went wrong.";
@@ -254,7 +301,7 @@ async function openHH(id) {
     onSaved: data => rememberChange(data),
   });
   const loaded = await app.store.load();
-  document.body.classList.remove("signed-out"); $("#auth").hidden = true;
+  document.body.classList.remove("signed-out"); $("#auth").hidden = true; setThemeColour(false);
   app.loaded = true;
   app.offline = !!loaded.offline;
   app.snapshots = null; app.compareId = null;
@@ -485,6 +532,7 @@ export function initAuth(sb) {
   document.addEventListener("click", e => {
     const a = e.target.closest("[data-auth]"); if (!a) return;
     const m = a.dataset.auth;
+    if (a.dataset.welcomeDone !== undefined) markWelcome();
     if (a.dataset.forget) clearPending();
     if (m === "resend") { resendCode(a); return; }
     if (m === "signout") signOut();
@@ -498,6 +546,7 @@ export function initAuth(sb) {
     const f = r.closest("#fHousehold"), join = r.value === "join", nameIn = f.querySelector('[name="name"]');
     f.querySelector(".ob-name").hidden = join; f.querySelector(".ob-join").hidden = !join;
     f.querySelector('button[type="submit"]').hidden = join; f.querySelector('button[type="submit"]').disabled = join;
+    f.querySelector(".ob-join-act").hidden = !join;
     if (!join && !nameIn.dataset.edited) nameIn.value = r.value === "with" ? "Our budget" : f.dataset.suggest;
   });
   document.addEventListener("input", e => { if (e.target.name === "name" && e.target.closest("#fHousehold")) e.target.dataset.edited = "1"; });
