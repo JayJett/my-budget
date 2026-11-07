@@ -4,7 +4,7 @@ import { $, esc, toast, closePop } from "./dom.js";
 import { render } from "./render.js";
 import { createStore, isNetworkError, clearDeviceCopies } from "../sync/store.js";
 import { blankBudget } from "../model/schema.js";
-import { startSetup, endSetup } from "./onboarding.js";
+import { startSetup, endSetup, obHeader, modeChoices, rememberMode } from "./onboarding.js";
 import { loadSnapshots, ensureMonthly } from "./views/progress.js";
 import { rememberChange, resetUndo, updateUndo, historyNoticeRemote } from "./history.js";
 import { loadReminders, resetReminders, openFromHash } from "./reminders.js";
@@ -13,7 +13,7 @@ import { useAccentOf, resetAccent } from "./accent.js";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "../config.js";
 
 const here = () => location.origin + location.pathname;
-const brand = `<div class="auth-brand"><div class="logo" aria-hidden="true">$</div><div class="brand">My Budget<small>Plan where every dollar goes, together</small></div></div>`;
+const brand = `<div class="auth-brand"><div class="logo" aria-hidden="true">$</div><div class="brand">Moni Money<small>Give every dollar a purpose, on your own or together</small></div></div>`;
 
 /* ---------- "Welcome back, Jarden": remembered on this device only ---------- */
 const WELCOME = "mb-welcome";
@@ -134,7 +134,7 @@ export function showAuth(mode, msg, kind) {
     <input type="text" name="username" value="${esc(me.email)}" autocomplete="username" hidden>
     <button class="btn primary block" type="submit">Sign in</button></form>${oauthButtons()}
     <div class="auth-foot"><button class="linkish" type="button" data-auth="forgot">Forgot your password?</button><button class="linkish" type="button" data-auth="codein">Email me a sign-in code instead</button></div>`;
-  else if (mode === "signin") body = `<h2>Welcome</h2><p class="lead">Sign in to see your budget.</p>${tabs}${m}
+  else if (mode === "signin") body = `<h2>Welcome to Moni Money</h2><p class="lead">Sign in to see your budget.</p>${tabs}${m}
     <form id="fSignin"><label class="field"><span>Email</span><input type="email" name="email" autocomplete="email" required></label>
     <label class="field"><span>Password</span><input type="password" name="password" autocomplete="current-password" required></label>
     <button class="btn primary block" type="submit">Sign in</button></form>${oauthButtons()}
@@ -171,17 +171,23 @@ export function showAuth(mode, msg, kind) {
     <form id="fNewpass"><label class="field"><span>New password</span><input type="password" name="password" autocomplete="new-password" minlength="8" required><small>At least 8 characters.</small></label>
     <button class="btn primary block" type="submit">Save password</button></form>`;
   else if (mode === "household") {
+    // Setup step 1 (Phase 7B): who's budgeting, and the household's name. Creating it is the same
+    // reliable createHousehold() as Phase 7A. Nothing is chosen for you: pick the one that fits.
     const email = app.session ? app.session.user.email : "";
     const md = (app.session && app.session.user.user_metadata) || {};
     const nm = md.name || (md.full_name || "").trim().split(/\s+/)[0] || ""; // Google/Apple may give a full name, or none at all
-    body = `<h2>Welcome${nm ? ", " + esc(nm) : ""}!</h2><p class="lead">A household holds one budget. Give yours a name, and we’ll help you set it up.</p>${m}
-    <form id="fHousehold"><label class="field"><span>Household name</span><input type="text" name="name" value="${esc(nm ? nm + "’s budget" : "Our budget")}" required></label>
-    <button class="btn primary block" type="submit">Create household</button></form>
-    <div class="auth-foot"><span>Joining someone else’s? Ask them to invite <b>${esc(email)}</b>, then <button class="linkish" type="button" data-auth="recheck">check again</button>.</span><button class="linkish" type="button" data-auth="signout">Sign out</button></div>`;
+    body = `<h2 id="obTitle" tabindex="-1">${nm ? `Welcome, ${esc(nm)}!` : "Welcome to Moni Money!"} Let’s make this yours</h2><p class="lead">Are you budgeting on your own or with someone else?</p>${m}
+    <form id="fHousehold" data-suggest="${esc(nm ? nm + "’s budget" : "My budget")}">${modeChoices(null, true)}
+      <div class="ob-name" hidden><label class="field"><span>Household name</span><input type="text" name="name" value="${esc(nm ? nm + "’s budget" : "My budget")}" autocomplete="off" required></label>
+        <small class="field-help">You can invite people and rename it later.</small></div>
+      <div class="ob-join" hidden><p class="ob-note">Ask the person who set it up to invite <b>${esc(email)}</b> (they’ll find Invite in Household settings). Then come back here.</p>
+        <button class="btn block" type="button" data-auth="recheck">Check for my invitation</button></div>
+      <button class="btn primary block" type="submit" disabled>Continue</button></form>
+    <div class="auth-foot"><span></span><button class="linkish" type="button" data-auth="signout">Sign out</button></div>`;
   }
   else if (mode === "loading") body = `<p class="lead" style="margin:0">Loading…</p>`;
-  el.innerHTML = `<div class="auth-card">${brand}${body}</div>`;
-  const first = el.querySelector('form input:not([type="hidden"]):not([hidden])'); if (first) first.focus();
+  el.innerHTML = mode === "household" ? `<div class="auth-card ob-auth">${obHeader(1, 0)}<div class="ob-in">${body}</div></div>` : `<div class="auth-card">${brand}${body}</div>`;
+  const first = mode === "household" ? el.querySelector("#obTitle") : el.querySelector('form input:not([type="hidden"]):not([hidden])'); if (first) first.focus({ preventScroll: true });
   if (mode === "verify") tickResend(); // a wait from an earlier "send a new code" carries on after a refresh
 }
 const authMsg = (text, kind) => { const m = $("#authMsg"); if (m) { m.className = "msg " + (kind || "err"); m.textContent = text; } };
@@ -466,7 +472,7 @@ export function initAuth(sb) {
     });
     if (f.id === "fForgot") await busy(f, async () => { const { error } = await sb.auth.resetPasswordForEmail(v.email.trim(), { redirectTo: here() }); if (error) return authMsg(friendly(error)); showAuth("check", `If there’s an account for ${v.email.trim()}, a reset link is on its way.`); });
     if (f.id === "fNewpass") await busy(f, async () => { const { error } = await sb.auth.updateUser({ password: v.password }); if (error) return authMsg(friendly(error)); recovering = false; toast("Password updated"); enterApp(); });
-    if (f.id === "fHousehold") await createHousehold(f, v.name);
+    if (f.id === "fHousehold") { if (!v.obmode || v.obmode === "join") return; rememberMode(v.obmode); await createHousehold(f, v.name); }
     if (f.id === "fVerify") await verifyCode(f, (v.code || "").replace(/\D/g, ""));
     if (f.id === "fCodeIn") await busy(f, async () => {
       const email = v.email.trim();
@@ -486,6 +492,15 @@ export function initAuth(sb) {
     else if (m === "notme") { forgetMe(); showAuth("signin"); }
     else showAuth(m);
   });
+  // Setup step 1: show the name box for "just me" / "with someone", the invitation note for "joining"
+  document.addEventListener("change", e => {
+    const r = e.target; if (r.name !== "obmode" || !r.closest("#fHousehold")) return;
+    const f = r.closest("#fHousehold"), join = r.value === "join", nameIn = f.querySelector('[name="name"]');
+    f.querySelector(".ob-name").hidden = join; f.querySelector(".ob-join").hidden = !join;
+    f.querySelector('button[type="submit"]').hidden = join; f.querySelector('button[type="submit"]').disabled = join;
+    if (!join && !nameIn.dataset.edited) nameIn.value = r.value === "with" ? "Our budget" : f.dataset.suggest;
+  });
+  document.addEventListener("input", e => { if (e.target.name === "name" && e.target.closest("#fHousehold")) e.target.dataset.edited = "1"; });
   // Google / Apple: leaves for the provider and comes back here signed in (or with an error, handled on return)
   document.addEventListener("click", async e => {
     const b = e.target.closest("[data-oauth]"); if (!b || b.disabled) return;

@@ -41,7 +41,7 @@ Deno.serve(async (req) => {
     const sb = createClient(url, anon, { auth: { persistSession: false }, global: { headers: { Authorization: auth } } });
     const { data: devices, error } = await sb.rpc("push_test_targets"); // checks you're signed in, and the once-a-minute limit
     if (error) return json({ error: error.message }, 400);
-    const message = { title: "🔔 Test from My Budget", body: "Notifications are working on this device. Reminders arrive around 8:30am.", url: "./#budget", tag: "mb-test" };
+    const message = { title: "🔔 Test from Moni Money", body: "Notifications are working on this device. Reminders arrive around 8:30am.", url: "./#budget", tag: "mb-test" };
     let sent = 0, failed = 0; const gone: number[] = [];
     for (const d of devices || []) {
       try { const r = await sendPush(d, message, { jwk, subject: SUBJECT }); if (r.ok) sent++; else if (r.gone) gone.push(d.id); else failed++; }

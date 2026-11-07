@@ -164,6 +164,23 @@ The closing audit's findings, fixes and remaining items are in `docs/phase6-audi
 - **Returning from a link with an error** (expired or cancelled) shows a plain message and tidies the address bar.
 - Setup steps for the dashboards: `docs/auth-setup.md`. Tests: `tests/browser/auth-7a.test.js`.
 
+### Setup in three steps, and Moni Money (Phase 7B)
+
+- **The app is now called Moni Money** (moni is the Māori word for money). This covers the tab title, Home Screen name, manifest, sign-in and setup.
+  - Technical names are unchanged: repository, URL, Supabase project, storage keys.
+  - Email template wording is done in Supabase; see `docs/auth-setup.md`.
+- **Setup** (`js/ui/onboarding.js`) is three steps under one slim progress bar:
+  1. **Make it yours**: just me / with someone / joining, plus a household name. This is the create-household screen in `auth.js`, using the same reliable `createHousehold()` as 7A.
+  2. **Your income**: one large amount box, weekly/fortnightly/monthly, and an optional payday under "More pay details". "With someone" can add their pay (optional). Your name comes from your account and is only asked for if it's missing.
+  3. **Your starting plan**: the same `suggestSplit` / `buildBudget` as before, shown as rows of % and $, with a live total and "x% left / x% over".
+- **Saving.** "Your budget is ready" only appears after the save comes back from the database (or is kept offline). A failed save says so, with Try again.
+- **Optional parts.**
+  - "Set up later" goes in with an empty budget and saves nothing.
+  - The tour is optional ("Show me around").
+- **Removed from setup.** The purpose question and the savings/KiwiSaver/debts step are gone. Those balances are filled in on Net worth and Goals.
+- **Existing budgets.** Setup only starts for an empty budget, and it keeps someone else's budget if they finish first.
+- Tests: `tests/browser/phase7b.test.js`.
+
 ## How saving works
 
 The whole budget lives in one row (`budgets.state`), but the app never overwrites it. Each edit is

@@ -2,7 +2,7 @@
    so it runs the same in the Supabase function (Deno) and in the tests (Node). No outside library.
 
    Two standards are involved:
-   - VAPID (RFC 8292): we sign a short note ("this is My Budget, valid for 12 hours") with our private key,
+   - VAPID (RFC 8292): we sign a short note ("this is Moni Money, valid for 12 hours") with our private key,
      so Apple's and Google's push services know the message really comes from this app.
    - Message encryption (RFC 8291, with RFC 8188 "aes128gcm"): the reminder is encrypted so only the
      receiving device can read it. Apple and Google just pass on a locked box.

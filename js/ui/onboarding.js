@@ -1,125 +1,197 @@
-/* The setup guide shown when a household's budget is empty: six short screens that end in a
-   ready-made budget. The thinking lives in js/model/onboarding.js; this file is just the screens. */
+/* Setup (Phase 7B): three short steps from a new household to a first budget.
+
+     Step 1  Make it yours     who's budgeting (just me / with someone / joining), and the household's
+                               name. Creating the household is the same reliable create_household path as
+                               Phase 7A; that screen lives in ui/auth.js (it comes before there's a budget).
+     Step 2  Your income       take-home pay and how often (payday tucked under "More pay details").
+                               Optional: leave it blank and set it up later.
+     Step 3  Your starting plan  the starter split, as % of pay with the $ it means. Adjust any number.
+
+   Then "Your budget is ready!", shown only once the save has actually reached the database.
+
+   The money thinking is unchanged and lives in js/model/onboarding.js (suggestSplit, buildBudget).
+   Savings, KiwiSaver, investments and debts are no longer asked for here: they're filled in later on
+   Net worth and Goals. Setup only ever starts for a household whose budget is empty, so it can never
+   replace a budget that exists; and if someone else in the household sets theirs up meanwhile, theirs
+   is kept and opened. Answers live in memory only (never stored on the device) until they're saved. */
 import { app, changed } from "./ctx.js";
 import { $, esc, toast } from "./dom.js";
 import { fmtNum } from "./inputs.js";
-import { PURPOSES, suggestSplit, buildBudget, splitTotal, householdIncome } from "../model/onboarding.js";
+import { suggestSplit, buildBudget, splitTotal, householdIncome } from "../model/onboarding.js";
 import { blankBudget, MAX_PEOPLE } from "../model/schema.js";
 import { WORDS, freqToView, perYear } from "../model/periods.js";
-import { m0 } from "../model/format.js";
+import { money as fmtMoney } from "../model/format.js";
 import { n, blank } from "../model/util.js";
 
-const STEPS = ["What it’s for", "Who’s in it", "Pay", "What you have", "Your split", "All set"];
-let ans, step, split;
+export const STAGES = ["Make it yours", "Your income", "Your starting plan"];
+const FREQS = [["weekly", "Weekly"], ["fortnightly", "Fortnightly"], ["monthly", "Monthly"]];
+/** Colours for the starter buckets (fixed, so they never follow the personal accent). */
+const BUCKET_COL = { essentials: "var(--c-blue)", fun: "var(--c-coral)", emergency: "var(--c-slate)", goals: "var(--joint)", invest: "var(--invest)", personalGoals: "var(--c-gold)", debt: "var(--bad)" };
+const SHORT_HELP = { essentials: "Rent, power, groceries, transport", fun: "Each person’s own spending", emergency: "A safety net for surprises", goals: "Things you’re saving for", invest: "Long-term growth", personalGoals: "Each person’s own savings goals", debt: "Extra debt repayments" };
 
-const num = v => { const c = String(v ?? "").replace(/[,$\s]/g, ""); return c === "" || isNaN(Number(c)) ? null : Number(c); };
-const money = (key, v, label, ph = "0") => `<label class="ob-field"><span>${esc(label)}</span><span class="unit wide ob-money"><i>$</i><input type="text" inputmode="decimal" autocomplete="off" data-ob="${esc(key)}" data-obt="num" value="${blank(v) ? "" : fmtNum(v)}" placeholder="${ph}"></span></label>`;
+let ans = null, stage = 2, done = 1, split = null, dir = 1, saving = false, saveErr = "";
+
+/* ---------- the shared look: a small header with the step, and a slim progress bar ----------
+   doneCount: how many of the three steps are finished (and saved where that matters). */
+export function obHeader(current, doneCount, extra = "") {
+  const label = current <= 3 ? `Step ${current} of 3` : "All set";
+  const name = current <= 3 ? STAGES[current - 1] : "Your budget is ready";
+  return `<header class="ob-top">
+    <div class="ob-top-row"><span class="ob-brand"><span class="logo sm" aria-hidden="true">$</span>Moni Money</span>${extra}</div>
+    <p class="ob-stage"><b>${label}</b><span>${esc(name)}</span></p>
+    <div class="ob-prog" role="progressbar" aria-label="Setup progress" aria-valuemin="0" aria-valuemax="3" aria-valuenow="${doneCount}" aria-valuetext="${doneCount} of 3 steps done"><span style="width:${(doneCount / 3) * 100}%"></span></div>
+  </header>`;
+}
+
+/* ---------- who's budgeting: chosen on the create-household screen, remembered for this person ----------
+   Only the choice (not any money), in this tab's session, keyed to the signed-in person. */
+const MODE_KEY = () => `mb-ob-mode-${app.meId}`;
+export function rememberMode(mode) { try { sessionStorage.setItem(MODE_KEY(), mode); } catch (_) {} }
+function savedMode() { try { return sessionStorage.getItem(MODE_KEY()); } catch (_) { return null; } }
 
 export function startSetup() {
   const me = app.members.find(m => m.user_id === app.meId);
-  ans = { purpose: null, people: [{ name: (me && me.display_name) || "", pay: null, freq: "fortnightly", payday: "" }], have: { debts: [] }, goal: { name: "", target: null, deadline: "" } };
-  step = 0; split = null;
+  const md = (app.session && app.session.user && app.session.user.user_metadata) || {};
+  const myName = (me && me.display_name) || md.name || (md.full_name || "").trim().split(/\s+/)[0] || "";
+  const mode = savedMode() || (app.members.length > 1 ? "with" : "solo");
+  ans = { mode, people: [{ name: myName, pay: null, freq: "fortnightly", payday: "" }], needName: !myName };
+  stage = 2; done = 1; split = null; dir = 1; saving = false; saveErr = "";
   app.setup = { render: draw };
   document.body.classList.add("setting-up");
 }
 export function endSetup() { app.setup = null; document.body.classList.remove("setting-up"); }
 
+/** "Set up later": an empty budget in memory (nothing saved, nothing invented), straight into the app. */
 function skip() {
   endSetup();
-  if (!app.hasData) { const me = app.members.find(m => m.user_id === app.meId); app.state = blankBudget({ name: (me && me.display_name) || "" }); }
+  if (!app.hasData) { const me = app.members.find(m => m.user_id === app.meId); app.state = blankBudget({ name: (me && me.display_name) || (ans && ans.people[0].name) || "" }); }
   app.render();
+  window.scrollTo({ top: 0 });
 }
 
+/* ---------- drawing ---------- */
 function draw() {
   const el = $("#app");
-  const dots = STEPS.map((s, i) => `<li class="${i < step ? "done" : i === step ? "on" : ""}" aria-current="${i === step ? "step" : "false"}"><span>${i + 1}</span>${esc(s)}</li>`).join("");
-  el.innerHTML = `<div class="ob">
-    <ol class="ob-steps" aria-label="Setup steps">${dots}</ol>
-    <div class="ob-card" role="group" aria-labelledby="obTitle">${body()}</div>
-    ${step < 5 ? `<p class="ob-skip"><button class="linkish" type="button" data-obact="skip">Skip setup and start with a blank budget</button></p>` : ""}
-  </div>`;
-  // Put the cursor in the first box so people can just start typing.
-  const first = step >= 1 && step <= 3 ? el.querySelector(".ob-card input") : null;
-  if (first) first.focus();
+  el.innerHTML = `<div class="ob">${obHeader(stage, done, stage <= 3 ? `<button class="linkish ob-later" type="button" data-obact="skip">Set up later</button>` : "")}
+    <div class="ob-card ob-in ${dir < 0 ? "back" : ""}" role="group" aria-labelledby="obTitle">${body()}</div></div>`;
+  // Tell screen readers where they are, without popping up the keyboard
+  const h = $("#obTitle"); if (h) h.focus({ preventScroll: true });
+  window.scrollTo({ top: 0 });
 }
 
-const nav = (nextLabel = "Next", disabled = false) => `<div class="ob-nav">${step > 0 ? `<button class="btn" type="button" data-obact="back">Back</button>` : "<span></span>"}<button class="btn primary" type="button" data-obact="next"${disabled ? " disabled" : ""}>${nextLabel}</button></div>`;
+const nav = (next, { disabled = false, back = true, cls = "" } = {}) => `<div class="ob-nav">${back ? `<button class="btn ob-back" type="button" data-obact="back">Back</button>` : ""}<button class="btn primary ${cls}" type="button" data-obact="next"${disabled ? " disabled" : ""}>${next}</button></div>`;
+const choice = (value, title, blurb, icon, checked) => `<label class="ob-opt"><input type="radio" name="obmode" value="${value}"${checked ? " checked" : ""}><span class="ob-opt-ic" aria-hidden="true">${icon}</span><span class="ob-opt-t"><b>${title}</b><small>${blurb}</small></span><span class="ob-tick" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5l3 3 6-7"/></svg></span></label>`;
+export const ICONS = {
+  solo: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="8" cy="5.2" r="2.6"/><path d="M3 13.8a5 5 0 0 1 10 0"/></svg>',
+  with: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="5.6" cy="5.4" r="2.2"/><circle cx="11" cy="6" r="1.8"/><path d="M1.8 13.6a3.8 3.8 0 0 1 7.6 0M9.4 10.4a3 3 0 0 1 4.8 2.6"/></svg>',
+  join: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3.5" width="12" height="9" rx="1.6"/><path d="M2.4 4.2L8 8.6l5.6-4.4"/></svg>',
+};
+export const modeChoices = (cur, withJoin) => `<fieldset class="ob-opts"><legend class="sr-only">Who’s budgeting</legend>
+  ${choice("solo", "Just me", "A budget for one person", ICONS.solo, cur === "solo")}
+  ${choice("with", "With someone", "A shared budget, like with a partner or family", ICONS.with, cur === "with")}
+  ${withJoin ? choice("join", "Joining a household", "Someone has invited you to theirs", ICONS.join, cur === "join") : ""}</fieldset>`;
 
 function body() {
   const P = ans.people;
-  if (step === 0) return `<h2 id="obTitle">Hi! What’s this budget for?</h2><p class="lead">Pick the closest one. It just shapes the suggestions you’ll see; you can change anything later.</p>
-    <div class="ob-choices">${Object.entries(PURPOSES).map(([k, p]) => `<button type="button" class="ob-choice" data-purpose="${k}" aria-pressed="${ans.purpose === k}"><b>${esc(p.label)}</b><small>${esc(p.blurb)}</small></button>`).join("")}</div>
-    ${nav("Next", !ans.purpose)}`;
+  if (stage === 1) return `<h2 id="obTitle" tabindex="-1">Let’s make this yours</h2><p class="lead">Are you budgeting on your own or with someone else?</p>
+    ${modeChoices(ans.mode, false)}
+    <p class="ob-hint">${app.household ? `Your household: <b>${esc(app.household.name)}</b>. You can rename it or invite people in Household settings.` : ""}</p>
+    ${nav("Continue", { back: false })}`;
 
-  if (step === 1) {
-    const solo = ans.purpose === "solo";
-    return `<h2 id="obTitle">${solo ? "What should we call you?" : "Who’s in this budget?"}</h2><p class="lead">${solo ? "Just your first name is fine." : "Everyone whose pay goes into the plan (up to four). Kids who don’t earn don’t need to be added."}</p>
-    <div class="ob-people">${P.map((p, i) => `<div class="ob-row"><label class="ob-field grow"><span>${i === 0 ? "You" : "Person " + (i + 1)}</span><input type="text" autocomplete="${i === 0 ? "given-name" : "off"}" data-ob="people.${i}.name" value="${esc(p.name)}" placeholder="First name"></label>${i > 0 ? `<button class="person-x" type="button" data-obact="rmperson" data-i="${i}" aria-label="Remove ${esc(p.name || "this person")}">×</button>` : ""}</div>`).join("")}</div>
-    ${!solo && P.length < MAX_PEOPLE ? `<button class="add" type="button" data-obact="addperson">+ Add someone</button>` : ""}
-    ${nav("Next", P.every(p => blank((p.name || "").trim())))}`;
+  if (stage === 2) return `<h2 id="obTitle" tabindex="-1">Let’s start with your income</h2><p class="lead">How much do you usually take home after tax?</p>
+    ${ans.needName ? `<label class="ob-field"><span>Your first name</span><input type="text" data-ob="people.0.name" value="${esc(P[0].name)}" autocomplete="given-name" placeholder="First name"></label>` : ""}
+    ${P.map((p, i) => payBlock(p, i)).join("")}
+    ${ans.mode === "with" && P.length < MAX_PEOPLE ? `<button class="add-row ob-add" type="button" data-obact="addperson">+ Add ${P.length > 1 ? "someone else’s" : "their"} pay too <small>optional</small></button>` : ""}
+    <p class="ob-hint">You can change this anytime, or leave it blank for now.</p>
+    ${nav("Continue")}`;
+
+  if (stage === 3) {
+    split = split || suggestSplit({ purpose: P.length > 1 ? "household" : "solo", people: P, have: {} });
+    const yr = householdIncome(P), t = splitTotal(split.buckets), v = view();
+    return `<h2 id="obTitle" tabindex="-1">Here’s your starting plan</h2><p class="lead">A simple way to divide ${P.length > 1 ? "everyone’s" : "your"} pay. Change anything you like.</p>
+    <div class="ob-sum">
+      <div><small>${P.length > 1 ? "Your pay together" : "Your pay"}</small><b>${yr ? `${fmtMoney(yr / perYear(v), true)}<i>${WORDS[v].short}</i>` : "Not added yet"}</b></div>
+      <div><small>Planned</small><b data-obk="tot">${fmtNum(t)}%</b></div>
+    </div>
+    <div class="split ob-bar" data-obk="bar" aria-hidden="true">${barHTML()}</div>
+    <p class="ob-status" data-obk="status" aria-live="polite">${statusHTML(t)}</p>
+    ${yr ? "" : `<p class="ob-note">Add your income to see what each part is in dollars. <button class="linkish" type="button" data-obact="back">Add income</button></p>`}
+    <ul class="ob-buckets">${split.buckets.map((b, i) => `<li style="--bc:${BUCKET_COL[b.key] || "var(--faint)"}">
+      <span class="ob-b-dot" aria-hidden="true"></span>
+      <span class="ob-b-name"><b>${esc(b.name)}</b><small>${esc(SHORT_HELP[b.key] || b.help)}${b.perPerson && P.length > 1 ? " · one each" : ""}</small></span>
+      <span class="unit ob-pct"><input type="text" inputmode="decimal" data-ob="split.${i}" value="${fmtNum(b.pct)}" aria-label="${esc(b.name)}, percent of pay"><i>%</i></span>
+      <span class="ob-b-amt" data-obk="amt.${i}">${bucketAmount(b)}</span></li>`).join("")}</ul>
+    ${saveErr ? `<p class="msg err" role="alert">${esc(saveErr)}</p>` : ""}
+    ${nav(saving ? "Saving your budget…" : saveErr ? "Try again" : "Use this plan", { disabled: saving || Math.round(t * 100) !== 10000 })}
+    <p class="ob-skip"><button class="linkish" type="button" data-obact="skip">Start with a blank budget instead</button></p>`;
   }
 
-  if (step === 2) return `<h2 id="obTitle">How much does everyone take home?</h2><p class="lead">After tax, and however often it arrives. A recent payday is optional; it lets us spot years with an extra pay.</p>
-    <div class="ob-pay">${P.map((p, i) => `<fieldset class="ob-person"><legend>${esc(p.name || "Person " + (i + 1))}</legend>
-      <div class="ob-row">${money(`people.${i}.pay`, p.pay, "Take-home pay")}
-      <label class="ob-field"><span>Paid</span><select class="freq" data-ob="people.${i}.freq">${[["weekly", "every week"], ["fortnightly", "every fortnight"], ["monthly", "every month"]].map(([v, l]) => `<option value="${v}"${p.freq === v ? " selected" : ""}>${l}</option>`).join("")}</select></label>
-      <label class="ob-field"><span>A recent payday <em>(optional)</em></span><input type="date" data-ob="people.${i}.payday" value="${esc(p.payday)}"></label></div></fieldset>`).join("")}</div>
-    <p class="ob-hint" data-obk="paytotal">${payTotal()}</p>
-    ${nav()}`;
+  // Step 4: saved
+  const first = (P[0].name || "").trim();
+  return `<div class="ob-done"><span class="ob-done-ic" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5l3 3 6-7"/></svg></span>
+    <h2 id="obTitle" tabindex="-1">Your budget is ready${first ? `, ${esc(first)}` : ""}!</h2>
+    <p class="lead">It’s saved. You can adjust everything whenever you like, and add your accounts and goals when you’re ready.</p>
+    <button class="btn primary block" type="button" data-obact="finish">Open my budget</button>
+    <button class="btn ghost block" type="button" data-obact="tour">Show me around</button></div>`;
+}
 
-  if (step === 3) {
-    const h = ans.have;
-    return `<h2 id="obTitle">What do you already have?</h2><p class="lead">Rough numbers are fine, and you can leave anything blank. This fills in your Net worth tab.</p>
-    <div class="ob-grid">${money("have.savings", h.savings, "Savings")}${money("have.emergency", h.emergency, "Emergency fund")}${money("have.kiwisaver", h.kiwisaver, "KiwiSaver")}${money("have.investments", h.investments, "Other investments")}</div>
-    <h3 class="ob-h3">Anything you owe? <small>Credit cards, loans, mortgage…</small></h3>
-    <div class="ob-debts">${(h.debts || []).map((d, i) => `<div class="ob-row"><label class="ob-field grow"><span>What it is</span><input type="text" data-ob="have.debts.${i}.name" value="${esc(d.name)}" placeholder="e.g. Car loan"></label>${money(`have.debts.${i}.balance`, d.balance, "Still owing")}<button class="person-x" type="button" data-obact="rmdebt" data-i="${i}" aria-label="Remove">×</button></div>`).join("")}</div>
-    <button class="add" type="button" data-obact="adddebt">+ Add a debt</button>
-    ${ans.purpose === "saving" ? `<h3 class="ob-h3">What are you saving for?</h3><div class="ob-grid"><label class="ob-field"><span>Goal</span><input type="text" data-ob="goal.name" value="${esc(ans.goal.name)}" placeholder="e.g. House deposit"></label>${money("goal.target", ans.goal.target, "How much you need")}<label class="ob-field"><span>By when <em>(optional)</em></span><input type="date" data-ob="goal.deadline" value="${esc(ans.goal.deadline)}"></label></div>` : ""}
-    ${nav("See my suggested split")}`;
-  }
-
-  if (step === 4) {
-    split = split || suggestSplit(ans);
-    const t = splitTotal(split.buckets);
-    return `<h2 id="obTitle">Here’s a suggested starting split</h2><p class="lead">Each payday, ${P.length > 1 ? "everyone puts" : "you put"} these percentages of ${P.length > 1 ? "their own" : "your"} pay into each bucket. Change any number; it’s a starting point, not a rule.</p>
-    <ul class="ob-why">${split.why.map(w => `<li>${esc(w)}</li>`).join("")}</ul>
-    <div class="ob-split">${split.buckets.map((b, i) => `<div class="ob-bucket"><div><b>${esc(b.name)}</b>${b.perPerson && P.length > 1 ? ` <small class="dim">(one each)</small>` : ""}<small>${esc(b.help)}</small></div>
-      <span class="unit"><input type="number" inputmode="decimal" step="any" min="0" max="100" data-ob="split.${i}" value="${b.pct}" aria-label="${esc(b.name)} percent"><i>%</i></span>
-      <span class="ob-amt" data-obk="amt.${i}">${bucketAmount(b)}</span></div>`).join("")}
-      <div class="ob-bucket total"><b>Total</b><span class="chip ${Math.round(t * 100) === 10000 ? "ok" : "bad"}" data-obk="total">${fmtNum(t)}%</span><span></span></div></div>
-    ${nav("Use this split", Math.round(t * 100) !== 10000)}`;
-  }
-
-  return `<h2 id="obTitle">You’re all set${P[0] && P[0].name ? ", " + esc(P[0].name) : ""}!</h2>
-    <p class="lead">Your budget is ready, and it’s saved. Everything you entered can be changed on the Budget, Net worth and Goals tabs.</p>
-    <ul class="ob-why"><li>Your people, pay and suggested split are on the <b>Budget</b> tab.</li><li>What you already have is on <b>Net worth</b>.</li><li>Your emergency fund${ans.purpose === "saving" && ans.goal.name ? " and " + esc(ans.goal.name) : ""} ${ans.purpose === "saving" && ans.goal.name ? "are" : "is"} on <b>Goals</b>.</li></ul>
-    <div class="ob-nav"><button class="btn" type="button" data-obact="finish">Skip the tour</button><button class="btn primary" type="button" data-obact="tour">Show me around (1 minute)</button></div>`;
+function payBlock(p, i) {
+  const other = i > 0;
+  return `<section class="ob-pay" aria-label="${other ? esc(p.name || "Their") + " pay" : "Your pay"}">
+    ${other ? `<div class="ob-pay-h"><label class="ob-field grow"><span>Their first name</span><input type="text" data-ob="people.${i}.name" value="${esc(p.name)}" autocomplete="off" placeholder="First name"></label><button class="icon-x" type="button" data-obact="rmperson" data-i="${i}" aria-label="Remove ${esc(p.name || "this person")}">×</button></div>`
+      : ans.people.length > 1 ? `<p class="ob-who">${esc(p.name || "You")}</p>` : ""}
+    <label class="ob-amount"><span class="sr-only">${other ? "Their" : "Your"} take-home pay</span><span class="ob-cur" aria-hidden="true">$</span><input type="text" inputmode="decimal" autocomplete="off" data-ob="people.${i}.pay" data-obt="num" value="${blank(p.pay) ? "" : fmtNum(p.pay)}" placeholder="0"></label>
+    <div class="seg seg-radio ob-freq" role="radiogroup" aria-label="How often">${FREQS.map(([v, l]) => `<label><input type="radio" name="freq${i}" value="${v}" data-ob="people.${i}.freq"${p.freq === v ? " checked" : ""}><span>${l}</span></label>`).join("")}</div>
+    <details class="ob-more"${p.payday ? " open" : ""}><summary>More pay details</summary>
+      <label class="ob-field"><span>A recent payday <em>(optional)</em></span><input type="date" data-ob="people.${i}.payday" value="${esc(p.payday)}"></label>
+      <small class="ob-small">Lets the app spot years with an extra payday.</small></details>
+  </section>`;
 }
 
 const view = () => freqToView((ans.people[0] || {}).freq || "fortnightly");
-function payTotal() {
-  const yr = householdIncome(ans.people); if (!yr) return "";
-  const v = view();
-  return `Together that’s about <b>${m0(yr / perYear(v))}</b> ${WORDS[v].per}, or ${m0(yr)} a year.`;
-}
 function bucketAmount(b) {
   const yr = householdIncome(ans.people); if (!yr) return "";
   const v = view();
-  return `${m0(yr * n(b.pct) / 100 / perYear(v))}${WORDS[v].short}`;
+  return `${fmtMoney(yr * n(b.pct) / 100 / perYear(v), true)}<small>${WORDS[v].short}</small>`;
+}
+function barHTML() {
+  const t = Math.max(100, splitTotal(split.buckets));
+  return split.buckets.filter(b => n(b.pct) > 0).map(b => `<span style="width:${n(b.pct) / t * 100}%;background:${BUCKET_COL[b.key] || "var(--faint)"}"></span>`).join("");
+}
+function statusHTML(t) {
+  const r = Math.round(t * 100) / 100;
+  if (Math.round(t * 100) === 10000) return `<span class="chip ok">✓ All planned</span>`;
+  return r < 100 ? `<span class="chip warn">${fmtNum(Math.round((100 - r) * 100) / 100)}% left to plan</span>` : `<span class="chip bad">${fmtNum(Math.round((r - 100) * 100) / 100)}% over</span>`;
 }
 
+const num = v => { const c = String(v ?? "").replace(/[,$\s]/g, ""); return c === "" || isNaN(Number(c)) ? null : Number(c); };
 function setAns(path, v) {
   const p = path.split("."); let o = ans;
   for (let i = 0; i < p.length - 1; i++) o = o[p[i]];
   o[p[p.length - 1]] = v;
 }
+function go(to) { dir = to > stage ? 1 : -1; stage = to; draw(); }
 
-function finishBudget() {
-  app.state = buildBudget(ans, split, app.today);
+/* ---------- saving: only "ready" once the database has it ---------- */
+async function finishBudget() {
+  if (saving) return;
+  // Someone else in the household set the budget up while you were here: keep theirs, open it.
+  const server = app.store && app.store.serverCopy();
+  if (server && server.version && server.people && Object.keys(server.people).length) {
+    endSetup(); toast("Someone in your household has already set up this budget, so we’ve opened it.");
+    app.reloadHouseholds(app.household.id); return;
+  }
+  saving = true; saveErr = ""; draw();
+  ans.people.forEach(p => { p.name = (p.name || "").trim(); });
+  app.state = buildBudget({ purpose: ans.people.length > 1 ? "household" : "solo", people: ans.people, have: {} }, split, app.today);
   app.hasData = true;
   changed({ full: false });
-  step = 5; draw();
-  toast("Your budget is saved.");
+  try { await app.store.flushNow(); } catch (_) {}
+  saving = false;
+  if (app.saveStatus === "saved") { done = 3; stage = 4; dir = 1; draw(); return; }
+  if (app.saveStatus === "offline") { done = 3; stage = 4; draw(); toast("Saved on this device. It’ll sync when you’re back online."); return; }
+  saveErr = "We couldn’t save your budget yet. Check your connection and try again.";
+  draw();
 }
 
 export function initSetupEvents() {
@@ -127,45 +199,55 @@ export function initSetupEvents() {
     const el = e.target; if (!app.setup || !el.dataset || el.dataset.ob === undefined) return;
     const key = el.dataset.ob;
     if (key.startsWith("split.")) {
-      const b = split.buckets[Number(key.slice(6))]; b.pct = el.value === "" ? 0 : Math.max(0, Number(el.value));
-      const t = splitTotal(split.buckets), chip = $('[data-obk="total"]');
-      chip.textContent = fmtNum(t) + "%"; chip.className = "chip " + (Math.round(t * 100) === 10000 ? "ok" : "bad");
-      const amt = $(`[data-obk="amt.${key.slice(6)}"]`); if (amt) amt.textContent = bucketAmount(b);
-      $('[data-obact="next"]').disabled = Math.round(t * 100) !== 10000;
+      const i = Number(key.slice(6)), b = split.buckets[i];
+      const v = num(el.value); b.pct = v === null ? 0 : Math.max(0, v);
+      const t = splitTotal(split.buckets);
+      $('[data-obk="tot"]').textContent = fmtNum(t) + "%";
+      $('[data-obk="status"]').innerHTML = statusHTML(t);
+      $('[data-obk="bar"]').innerHTML = barHTML();
+      const amt = $(`[data-obk="amt.${i}"]`); if (amt) amt.innerHTML = bucketAmount(b);
+      const nx = $('[data-obact="next"]'); if (nx && !saving) nx.disabled = Math.round(t * 100) !== 10000;
       return;
     }
+    if (el.type === "radio" && !el.checked) return;
     setAns(key, el.dataset.obt === "num" ? num(el.value) : el.value);
-    if (key.startsWith("people.") || key.startsWith("goal.") || key.startsWith("have.")) split = null; // answers changed → re-suggest
-    const tot = $('[data-obk="paytotal"]'); if (tot) tot.innerHTML = payTotal();
-    if (step === 1) $('[data-obact="next"]').disabled = ans.people.every(p => blank((p.name || "").trim()));
+    // Pay, how often, payday or a name changed: the plan's percentages (including any you changed) stay;
+    // only the dollars, worked out from the new pay, change. Adding or removing a person redoes the plan.
   });
-  document.addEventListener("change", e => { if (app.setup && e.target.dataset && e.target.dataset.ob && e.target.tagName === "SELECT") { const tot = $('[data-obk="paytotal"]'); if (tot) tot.innerHTML = payTotal(); } });
-  document.addEventListener("focusout", e => { const el = e.target; if (app.setup && el.dataset && el.dataset.obt === "num") el.value = fmtNum(num(el.value)); });
-  document.addEventListener("keydown", e => { if (app.setup && e.key === "Enter" && e.target.matches && e.target.matches(".ob-card input")) { e.preventDefault(); const nx = $('[data-obact="next"]'); if (nx && !nx.disabled) nx.click(); } });
+  // Money boxes: tidy the number only when you leave the box (commas are fine while typing), so the
+  // cursor never jumps and selecting the old amount then typing replaces it
+  document.addEventListener("focusout", e => { const el = e.target; if (app.setup && el.dataset && el.dataset.obt === "num") el.value = blank(num(el.value)) ? "" : fmtNum(num(el.value)); });
+  document.addEventListener("keydown", e => {
+    if (!app.setup || e.key !== "Enter" || !e.target.matches || !e.target.matches(".ob-card input:not([type=radio])")) return;
+    e.preventDefault(); const nx = $('[data-obact="next"]'); if (nx && !nx.disabled) nx.click();
+  });
+  document.addEventListener("change", e => {
+    if (!app.setup || e.target.name !== "obmode") return;
+    ans.mode = e.target.value; rememberMode(ans.mode);
+  });
   document.addEventListener("click", e => {
     if (!app.setup) return;
-    const ch = e.target.closest("[data-purpose]");
-    if (ch) {
-      ans.purpose = ch.dataset.purpose; split = null;
-      if (ans.purpose === "solo") ans.people = ans.people.slice(0, 1);
-      else if (ans.people.length === 1 && ["household", "family"].includes(ans.purpose)) ans.people.push({ name: "", pay: null, freq: "fortnightly", payday: "" });
-      draw(); return;
-    }
-    const b = e.target.closest("[data-obact]"); if (!b) return;
+    const b = e.target.closest("[data-obact]"); if (!b || b.disabled) return;
     const act = b.dataset.obact, i = Number(b.dataset.i);
     if (act === "skip") return skip();
-    if (act === "back") { step = Math.max(0, step - 1); return draw(); }
+    if (act === "back") return go(Math.max(1, stage - 1));
     if (act === "next") {
-      if (step === 1) ans.people = ans.people.filter((p, k) => k === 0 || !blank((p.name || "").trim()));
-      if (step === 4) return finishBudget();
-      step++; return draw();
+      if (stage === 1) { if (ans.mode === "solo") { ans.people = ans.people.slice(0, 1); split = null; } return go(2); }
+      if (stage === 2) {
+        ans.people = ans.people.filter((p, k) => k === 0 || !blank((p.name || "").trim()) || n(p.pay) > 0);
+        done = Math.max(done, 2); return go(3);
+      }
+      if (stage === 3) return finishBudget();
     }
-    if (act === "addperson") { if (ans.people.length < MAX_PEOPLE) ans.people.push({ name: "", pay: null, freq: "fortnightly", payday: "" }); draw(); const ins = document.querySelectorAll('[data-ob$=".name"]'); if (ins.length) ins[ins.length - 1].focus(); return; }
+    if (act === "addperson") {
+      if (ans.people.length < MAX_PEOPLE) ans.people.push({ name: "", pay: null, freq: ans.people[0].freq, payday: "" });
+      split = null; draw();
+      const ins = document.querySelectorAll('[data-ob$=".name"]'); if (ins.length) ins[ins.length - 1].focus();
+      return;
+    }
     if (act === "rmperson") { ans.people.splice(i, 1); split = null; return draw(); }
-    if (act === "adddebt") { ans.have.debts.push({ name: "", balance: null }); draw(); const ins = document.querySelectorAll('[data-ob^="have.debts."][data-ob$=".name"]'); if (ins.length) ins[ins.length - 1].focus(); return; }
-    if (act === "rmdebt") { ans.have.debts.splice(i, 1); split = null; return draw(); }
     if (act === "finish" || act === "tour") {
-      endSetup(); app.render();
+      endSetup(); app.render(); window.scrollTo({ top: 0 });
       if (act === "tour") app.startTour();
     }
   });

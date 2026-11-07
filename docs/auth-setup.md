@@ -89,3 +89,18 @@ The app never makes a second household by accident: one tap at a time, a check f
 - A different name, or the same name later, makes a new household as before.
 
 Tests: `tests/sql/households.test.js`.
+
+## Moni Money in the emails (Phase 7B, owner action)
+
+Sign-in emails are written in Supabase, not in this repository, so the new name has to be added there.
+
+1. **Authentication → Emails → Templates**. In each template (Confirm signup, Magic Link, Reset password, Change email, Invite user), replace any mention of the old name with **Moni Money**. Keep the `{{ .Token }}` and `{{ .ConfirmationURL }}` lines exactly as they are.
+   - Suggested Confirm signup subject: `Your Moni Money code`
+   - Suggested Magic Link subject: `Sign in to Moni Money`
+2. **Sender name** (the "From" name people see):
+   - With Supabase's built-in email, the sender can't be changed.
+   - Once you use your own email service (**Authentication → Emails → SMTP Settings**), set **Sender name** to `Moni Money`.
+
+Verify: sign up with a spare address. The email subject and wording should say Moni Money, and the code should still work.
+
+The app's own name has already changed in code: the browser tab, the Home Screen name, the install details, the sign-in screens and setup. The repository name, the web address (jayjett.github.io/my-budget), the Supabase project and all stored data keep their old names on purpose, so nothing breaks.
