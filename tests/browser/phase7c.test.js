@@ -87,12 +87,14 @@ test("sign-in: the tagline wraps instead of being cut off", { skip }, async () =
 /* ---------------- the menu as a bottom sheet ---------------- */
 test("menu on a phone: a sheet; the page behind stays exactly where it was; backdrop, Escape and drag close it", { skip }, async () => {
   const { page, errors, ctx } = await open(RICH, { ...PHONE, storage: { "mb-tours-u-me": JSON.stringify({ tabs: { budget: "done", networth: "done", spending: "done", goals: "done", invest: "done", progress: "done" } }) } });
+  // a classic (space-taking) scrollbar, like a desktop browser's: hiding it must not reflow or move the page
+  await page.addStyleTag({ content: "::-webkit-scrollbar{ width:15px; } ::-webkit-scrollbar-thumb{ background:#999; }" });
   // let the tab finish loading first (anything that arrives late above the fold would move the page by itself)
   await page.waitForLoadState("networkidle"); await page.waitForTimeout(800);
   await page.evaluate(() => scrollTo(0, 500)); await page.waitForTimeout(300);
   const y0 = await page.evaluate(() => scrollY);
   // record anything that changes size while the menu is open, so a failure says what moved
-  await page.evaluate(() => { window.__moved = []; new ResizeObserver(es => es.forEach(e => window.__moved.push(`${e.target.tagName}.${e.target.className}`))).observe(document.querySelector("#app")); window.addEventListener("scroll", () => window.__moved.push("scroll " + scrollY)); });
+  await page.evaluate(() => { window.__moved = []; let first = true; const ro = new ResizeObserver(es => { if (first) { first = false; return; } es.forEach(e => window.__moved.push(`${e.target.tagName}.${e.target.className} ${Math.round(e.contentRect.height)}`)); }); document.querySelectorAll("#app, #app > *, #app > * > *, #app section").forEach(el => ro.observe(el)); window.addEventListener("scroll", () => window.__moved.push("scroll " + scrollY)); });
   assert.ok(y0 > 300, "scrolled down the Budget tab");
   await page.click("#menuBtn");
   await page.waitForSelector("#pop.as-sheet:not([hidden])");

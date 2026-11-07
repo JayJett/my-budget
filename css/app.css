@@ -1700,7 +1700,7 @@ body.setting-up main{ padding-top:0; padding-bottom:16px; }
 
 /* --- menus as a bottom sheet on phones (⋯ menu, Fill, Add a goal to) --- */
 .scroll-locked, .scroll-locked body{ overflow:hidden; overscroll-behavior:none; }
-.scroll-locked{ scrollbar-gutter:stable; }   /* no jump on screens with a scrollbar */
+.scroll-locked{ overflow-anchor:none; }   /* nothing behind the sheet may nudge the page while it's open */
 body.setting-up::before, body.signed-out::before{ background:var(--bg); }   /* the strip under the phone's status bar matches the setup screen */
 .pop-back{ position:fixed; inset:0; z-index:34; background:rgba(12,16,14,.42); opacity:0; transition:opacity var(--m-sheet) var(--ease); -webkit-tap-highlight-color:transparent; }
 .pop-back.on{ opacity:1; }

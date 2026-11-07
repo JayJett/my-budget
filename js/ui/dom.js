@@ -68,7 +68,10 @@ function wheelGuard(e) {
 }
 export function lockScroll() {
   if (lockCount++) return;
-  document.documentElement.classList.add("scroll-locked");
+  // On a screen with a visible scrollbar, hiding it would widen the page and reflow it; keep its room.
+  const root = document.documentElement, bar = window.innerWidth - root.clientWidth;
+  document.body.style.paddingRight = bar > 0 ? bar + "px" : "";
+  root.classList.add("scroll-locked");
   document.addEventListener("touchstart", touchStart, { passive: true });
   document.addEventListener("touchmove", touchGuard, { passive: false });
   document.addEventListener("wheel", wheelGuard, { passive: false });
@@ -77,6 +80,7 @@ export function unlockScroll() {
   if (!lockCount) return;
   if (--lockCount) return;
   document.documentElement.classList.remove("scroll-locked");
+  document.body.style.paddingRight = "";
   document.removeEventListener("touchstart", touchStart);
   document.removeEventListener("touchmove", touchGuard);
   document.removeEventListener("wheel", wheelGuard);
