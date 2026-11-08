@@ -3,7 +3,10 @@
 import { app } from "./ctx.js";
 import { $, esc, toast, confirmDel, offerFile } from "./dom.js";
 import { ymd } from "../model/util.js";
-import { accentPickerHTML, lookSeg, THEMES, DENSITIES } from "./accent.js";
+import { accentPickerHTML, lookSeg, THEMES, DENSITIES, MOTIONS, FEEDBACKS, resetLook } from "./accent.js";
+import { canVibrate } from "./feedback.js";
+import { modeSection, combineLink } from "./household-mode.js";
+import { lookSection } from "./household-look.js";
 import { avatarHTML, myName, checkFile, loadImage, cropper, savePhoto, removePhoto, refreshAvatars } from "./profile.js";
 
 const ROLE_LABEL = { owner: "Owner", editor: "Editor", viewer: "Viewer" };
@@ -20,12 +23,26 @@ const msg = (id, text, kind = "err") => { const m = $("#" + id); if (m) { m.clas
 const close = () => { const d = $("#sheet"); if (d.open) d.close(); };
 
 /* ---------- appearance (personal: saved to your login, never to the household's budget) ---------- */
+/* Phase 8: grouped (your app's look, how it moves and feels, and where the household's and people's
+   colours live), with a live preview at the top and a way back to the defaults. Everything here is
+   yours alone: it follows you to every household and device, and changes nobody else's view. */
+const PREVIEW = `<div class="ap-prev" aria-hidden="true"><div class="ap-prev-card"><span class="ap-prev-t">Preview</span><span class="chip ok">✓ On track</span>
+  <div class="ap-prev-bar"><i></i></div><div class="ap-prev-row"><span class="btn primary small">Save</span><span class="linkish">Link</span><span class="ap-prev-sw"></span></div></div></div>`;
 export function openAppearance() {
+  const vib = canVibrate();
   open("Appearance", `
-    <section class="set"><h4>Your colour</h4>${accentPickerHTML()}<p class="set-note">Just for you: everyone in the household picks their own. People’s colours in charts and money colours (like debt) don’t change.</p></section>
-    <section class="set"><h4>Light or dark</h4>${lookSeg("theme", THEMES, "Light or dark")}<p class="set-note">Auto follows your phone or computer.</p></section>
+    ${PREVIEW}
+    <section class="set"><h4>Your colour</h4>${accentPickerHTML()}<p class="set-note">Just for you: everyone in the household picks their own. People’s colours, your allocations’ colours and money colours (like over budget) don’t change.</p></section>
+    <section class="set"><h4>Light or dark</h4>${lookSeg("theme", THEMES, "Light or dark")}<p class="set-note">Auto follows your phone, and changes when it does.</p></section>
     <section class="set"><h4>Spacing</h4>${lookSeg("density", DENSITIES, "Spacing")}<p class="set-note">Compact fits a little more on screen.</p></section>
-    ${app.session ? `<p class="set-note">Saved to your login, so it follows you to your other devices.</p>` : ""}`);
+    <section class="set"><h4>Motion</h4>${lookSeg("motion", MOTIONS, "Motion")}<p class="set-note">Auto follows your phone’s Reduce Motion setting. Reduced keeps everything still.</p></section>
+    ${vib ? `<section class="set"><h4>Touch feedback</h4>${lookSeg("feedback", FEEDBACKS, "Touch feedback")}<p class="set-note">A tiny vibration when you choose something or reach a goal.</p></section>` : ""}
+    <section class="set"><h4>Also yours to change</h4><div class="ap-links">
+      ${app.household ? `<button class="dr-row" type="button" data-ap-go="household"><span>Household look<small>Its colour, icon or photo, in Household settings</small></span></button>` : ""}
+      <button class="dr-row" type="button" data-ap-go="people"><span>People’s colours<small>On the Budget tab: tap a person</small></span></button>
+      <p class="set-note">Each allocation, account, goal and expense has its own colour and icon too: open it and look for Appearance.</p></div></section>
+    <section class="set"><button class="btn ghost block" type="button" data-ap-reset>Reset my appearance to the defaults</button>
+    ${app.session ? `<p class="set-note">Saved to your login, so it follows you to your other devices and households.</p>` : ""}</section>`);
 }
 
 /* ---------- my profile (Phase 7D.2): your picture and your name; security stays in Account settings ---------- */
@@ -133,6 +150,8 @@ export async function openHouseholdSettings() {
   open("Household settings", `
     <section class="set"><h4>Name</h4>${isOwner ? `<form id="setHHName" class="set-row"><input type="text" name="name" value="${esc(hh.name)}" required aria-label="Household name"><button class="btn primary" type="submit">Rename</button></form><div class="msg" id="mHH"></div>` : `<p>${esc(hh.name)}</p>`}
       <p class="set-note">You’re ${role === "owner" ? "an owner" : role === "editor" ? "an editor" : "a viewer"} here: ${esc(ROLE_HELP[role].toLowerCase())}.</p></section>
+    ${lookSection()}
+    ${app.hasData ? modeSection() + combineLink() : ""}
     <section class="set"><h4>People</h4><ul class="hh-list">${app.members.map(m => `<li><span>${esc(m.display_name || m.email)}${m.user_id === app.meId ? " (you)" : ""}<small>${esc(m.email)}</small></span>
       <span class="hh-acts">${isOwner && m.user_id !== app.meId ? `${roleSel(m)}<button class="btn small" type="button" data-remove="${esc(m.user_id)}" data-name="${esc(m.display_name || m.email)}">Remove</button>` : `<span class="chip ${m.role === "owner" ? "ok" : ""}" title="${esc(ROLE_HELP[m.role] || "")}">${ROLE_LABEL[m.role] || m.role}</span>`}</span></li>`).join("")}</ul>
       <div class="msg" id="mPeople"></div>
@@ -161,6 +180,12 @@ export function initSettings() {
     if (b.dataset.sheet === "close") return close();
     if (b.dataset.sheet === "download") return downloadAll();
     if (b.dataset.sheet === "appearance") return openAppearance();
+    if ("apReset" in b.dataset) {
+      if (!(await confirmDel("Reset your appearance?", "Your colour, light or dark, spacing, motion and touch feedback go back to how the app starts. Nothing else changes.", "Reset"))) return;
+      resetLook(); openAppearance(); toast("Appearance reset"); return;
+    }
+    if (b.dataset.apGo === "household") { close(); return openHouseholdSettings(); }
+    if (b.dataset.apGo === "people") { close(); location.hash = "budget"; setTimeout(() => { const el = document.querySelector("[data-edit-person]"); if (el) { el.scrollIntoView({ block: "center" }); el.focus({ preventScroll: true }); } }, 60); return; }
     if (b.dataset.sheet === "account") return openAccount();
     if (b.dataset.prof) return profileAction(b.dataset.prof, b);
     if (b.dataset.sheet === "leave") {

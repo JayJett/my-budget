@@ -6,7 +6,14 @@
 import { app, readOnly } from "../ctx.js";
 import { esc } from "../dom.js";
 import { K, attrs, pc } from "../inputs.js";
-import { MAX_PEOPLE } from "../../model/schema.js";
+import { MAX_PEOPLE, isShared } from "../../model/schema.js";
+import { transitionNote } from "../household-mode.js";
+import { itemIcon } from "../icons.js";
+/** An allocation's icon: the one picked for it, or one that fits what it's for (Phase 8). */
+export const accIconKey = a => a.icon && itemIcon(a.icon) ? a.icon
+  : { spending: "home", emergency: "shield", goals: "target", personalGoals: "star", invest: "trend" }[a.role]
+  || (a.type === "Investment" ? "trend" : /debt|loan|card/i.test(a.name || "") ? "card" : /spend|fun/i.test(a.name || "") ? "wallet" : "coins");
+export const accIcon = a => itemIcon(accIconKey(a));
 import { WORDS, VIEWS, perYear, freqToView } from "../../model/periods.js";
 import { money, m0, pct, listNames } from "../../model/format.js";
 import { drawDonuts, drawFlow, drawSplit, personVar } from "../charts.js";
@@ -17,8 +24,12 @@ const CHEV = `<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="
 const TYPE_WORD = { Joint: "Joint", Personal: "Personal", Investment: "Investment" };
 const initial = p => (p.name || "?").trim().charAt(0).toUpperCase() || "?";
 
-/** "Joint", "Personal · Madi", "Investment" */
-function typeLine(a, P) {
+/** On your own, an allocation is described by what it's for, not whose it is (it's all yours). */
+const PURPOSE = { spending: "Bills", emergency: "Safety net", goals: "Goals", personalGoals: "Goals", invest: "Investing" };
+export const purposeWord = a => PURPOSE[a.role] || (a.type === "Investment" ? "Investing" : "Yours");
+/** "Joint", "Personal · Madi", "Investment"; on your own: "Bills & spending", "Goals", "Investing"… */
+function typeLine(a, P, S) {
+  if (!isShared(S)) return purposeWord(a);
   const owner = a.owner && P.length > 1 ? P.find(p => p.id === a.owner) : null;
   return [TYPE_WORD[a.type] || a.type || "", owner ? owner.name || "Unnamed" : ""].filter(Boolean).join(" · ");
 }
@@ -47,13 +58,13 @@ export function view() {
       <span class="st-v">${K(`st.${p.id}.t`, "st-t")}</span>${ro ? "" : `<span data-k="fill.${esc(p.id)}"></span>`}</li>`).join("")}</ul>
   </section>`;
 
-  const allocs = `<section class="b-allocs">
+  const allocs = `${transitionNote()}<section class="b-allocs">
     <div class="b-row sec"><h2>Your allocations</h2>${ro ? "" : `<button class="btn small ghost" type="button" data-reorder aria-pressed="${ui.reorder}">${ui.reorder ? "Done" : "Reorder"}</button>`}</div>
     <ul class="card alloc-list${ui.reorder ? " reordering" : ""}">${S.accounts.map((a, i) => `<li class="alloc">
       <button class="alloc-row" type="button" data-edit-acc="${esc(a.id)}"${ui.reorder ? " disabled" : ""} aria-label="${esc(a.name || "Unnamed")}: edit">
-        <span class="a-sw" data-k="acc.${esc(a.id)}.sw" aria-hidden="true"></span>
+        <span class="a-ic" data-k="acc.${esc(a.id)}.ic" aria-hidden="true">${accIcon(a)}</span>
         <span class="a-main"><span class="a-name">${esc(a.name || "Unnamed")}</span>
-          <span class="a-meta">${esc(typeLine(a, P))}${multi ? "" : ` · ${K(`acc.${a.id}.pct.${P[0].id}`)}`}</span>
+          <span class="a-meta">${esc(typeLine(a, P, S))}${multi ? "" : ` · ${K(`acc.${a.id}.pct.${P[0].id}`)}`}</span>
           ${multi ? `<span class="a-parts">${P.map(p => `<span data-k="acc.${esc(a.id)}.part.${esc(p.id)}" data-base="a-part ${pc(p)}" class="a-part ${pc(p)}"></span>`).join("")}</span>` : ""}</span>
         <span class="a-amt">${K(`acc.${a.id}.t`)}<small>${esc(w.short)}</small></span>${ui.reorder ? "" : CHEV}</button>
       ${ui.reorder ? `<span class="mv-row"><button class="mv-btn" type="button" data-move="up" data-l="acc" data-i="${esc(a.id)}" aria-label="Move ${esc(a.name || "this")} up"${i === 0 ? " disabled" : ""}>↑</button><button class="mv-btn" type="button" data-move="down" data-l="acc" data-i="${esc(a.id)}" aria-label="Move ${esc(a.name || "this")} down"${i === S.accounts.length - 1 ? " disabled" : ""}>↓</button></span>` : ""}
@@ -75,8 +86,9 @@ export function view() {
   const insights = `<section class="card b-insights">
     <details data-ins="where"${open("where")}><summary><span>Where it goes</span><small>${K("ins.where")}</small></summary>
       <ul class="dest">
-        <li><span class="dotc" style="background:var(--joint)"></span><span>Joint accounts</span><b>${K("sum.joint")}</b><small>${K("sum.joint.y")}</small></li>
-        <li><span class="dotc" style="background:var(--c-${esc(P[0].colour)})"></span><span>Personal accounts</span><b>${K("sum.personal")}</b><small>${K("sum.personal.y")}</small></li>
+        ${isShared(S) ? `<li><span class="dotc" style="background:var(--joint)"></span><span>Joint accounts</span><b>${K("sum.joint")}</b><small>${K("sum.joint.y")}</small></li>
+        <li><span class="dotc" style="background:var(--c-${esc(P[0].colour)})"></span><span>Personal accounts</span><b>${K("sum.personal")}</b><small>${K("sum.personal.y")}</small></li>`
+        : `<li><span class="dotc" style="background:var(--joint)"></span><span>Spending and saving</span><b>${K("sum.own")}</b><small>${K("sum.own.y")}</small></li>`}
         <li><span class="dotc" style="background:var(--invest)"></span><span>Investments</span><b>${K("sum.investment")}</b><small>${K("sum.investment.y")}</small></li>
       </ul>
       <h3 class="mini">Investing vs cash savings</h3>
@@ -128,7 +140,7 @@ export function fill(D, C) {
       D[`acc.${r.id}.pct.${p.id}`] = `${pct(Number(r.split[p.id]) || 0, 1)} of pay`;
     });
     D[`acc.${r.id}.t`] = money(v(r.t)); D[`acc.${r.id}.tb`] = { pw: C.incTotal ? r.t / C.incTotal : 0 };
-    D[`acc.${r.id}.sw`] = { bg: app.colours[r.id] };
+    D[`acc.${r.id}.sw`] = { bg: app.colours[r.id] }; D[`acc.${r.id}.ic`] = { oc: app.colours[r.id] };
   });
   const check100 = x => Math.round(x * 1e4) === 1e4 ? { t: "100%", c: "ok" } : { t: pct(x, 1), c: "bad" };
   C.people.forEach(p => { D[`tot.p.${p.id}`] = pct(C.tot.pct[p.id], 1); D[`tot.a.${p.id}`] = money(v(C.tot.amt[p.id])); D[`tot.c.${p.id}`] = check100(C.tot.pct[p.id]); });
@@ -156,7 +168,9 @@ export function fill(D, C) {
   D["sum.joint"] = money(v(C.joint)); D["sum.joint.y"] = `${w.per}, ${yr(C.joint)}`;
   D["sum.personal"] = money(v(C.personal)); D["sum.personal.y"] = `${w.per}, ${yr(C.personal)}`;
   D["sum.investment"] = money(v(C.investment)); D["sum.investment.y"] = `${w.per}, ${yr(C.investment)}`;
-  D["ins.where"] = `Joint ${m0(v(C.joint))} · Personal ${m0(v(C.personal))} · Invest ${m0(v(C.investment))}`;
+  D["sum.own"] = money(v(C.joint + C.personal)); D["sum.own.y"] = `${w.per}, ${yr(C.joint + C.personal)}`;
+  D["ins.where"] = isShared(app.state) ? `Joint ${m0(v(C.joint))} · Personal ${m0(v(C.personal))} · Invest ${m0(v(C.investment))}`
+    : `Spend & save ${m0(v(C.joint + C.personal))} · Invest ${m0(v(C.investment))}`;
   const ivc = C.investment + C.cash;
   D["ivc.inv"] = `Investing ${money(v(C.investment))}${ivc ? ` (${pct(C.investment / ivc)})` : ""}`; D["ivc.cash"] = `Cash savings ${money(v(C.cash))}${ivc ? ` (${pct(C.cash / ivc)})` : ""}`;
 

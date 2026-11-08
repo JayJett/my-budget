@@ -215,7 +215,7 @@ test("before the photo storage is switched on: a clear message, nothing breaks",
 });
 
 /* ---------------- goals ---------------- */
-test("on your own with no goals yet: one card, one 'Add a goal'; it asks where the money comes from; nothing moves between pots", { skip }, async () => {
+test("on your own with no goals yet: one card, one 'Add a goal', straight into the one Goals pot (Phase 8: a solo plan has one)", { skip }, async () => {
   const { page, errors, ctx } = await open({}, { waitFor: ".ob", ...phone(), storage: ALL_DONE });
   await page.fill('[data-ob="people.0.pay"]', "2000");
   await page.click('[data-obact="next"]'); await page.click('[data-obact="next"]'); await page.waitForSelector(".ob-done"); await page.click('[data-obact="finish"]');
@@ -223,22 +223,18 @@ test("on your own with no goals yet: one card, one 'Add a goal'; it asks where t
   await goTab(page, "goals");
   assert.equal(await page.locator("#app [data-goal-new]").count(), 1, "one way to add the first goal");
   assert.match(await page.textContent(".gl-first h3"), /Start saving for something/);
-  assert.deepEqual(await page.$$eval(".gl-group > .ex-gh h3", e => e.map(x => x.textContent)), ["Emergency fund", "Goals"], "no empty 'Jarden’s goals' section yet");
+  assert.deepEqual(await page.$$eval(".gl-group > .ex-gh h3", e => e.map(x => x.textContent)), ["Emergency fund", "Goals"], "no separate personal goals section");
+  assert.equal(await page.locator(".hm-combine").count(), 0, "nothing to combine in a new solo plan");
   const before = await fake(page, () => JSON.stringify(window.__fake.budget.accounts));
   await page.click(".gl-first-btn");
-  await page.waitForSelector("#pop:not([hidden])");
-  assert.match(await page.textContent("#pop .pop-h"), /Where should the money come from\?/);
-  assert.deepEqual(await page.$$eval("#pop [data-pick-goal] span", e => e.map(x => x.textContent)), ["Goals", "Personal goals"]);
-  assert.match(await page.textContent('#pop [data-pick-goal="gj"] small'), /^\$\d[\d,]*\/fn going to it$/);
-  await shot(page, "goal-where-from");
-  await page.click('#pop [data-pick-goal^="gp:"]');
   await page.waitForSelector('#sheet [data-f="name"]');
+  assert.equal(await page.locator("#pop:not([hidden])").count(), 0, "no 'where from?' question: there's only one pot");
   await page.keyboard.type("New bike");
   await page.click('#sheet [data-sheet="close"]'); await settle(page);
   const b = await fake(page, () => window.__fake.budget);
-  assert.equal(Object.keys(b.goals.joint).length, 0); assert.equal(Object.values(Object.values(b.goals.personal)[0]).length, 1, "it joined the personal pot");
+  assert.equal(Object.keys(b.goals.joint).length, 1, "it joined the Goals pot"); assert.equal(Object.values(Object.values(b.goals.personal)[0]).length, 0);
   assert.equal(JSON.stringify(b.accounts), before, "no allocations changed");
-  assert.deepEqual(await page.$$eval(".gl-group > .ex-gh h3", e => e.map(x => x.textContent)), ["Emergency fund", "Goals", "Personal goals"]);
+  assert.deepEqual(await page.$$eval(".gl-group > .ex-gh h3", e => e.map(x => x.textContent)), ["Emergency fund", "Goals"]);
   assert.deepEqual(errors, []); await ctx.close();
 });
 

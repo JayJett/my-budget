@@ -12,6 +12,7 @@ import { loadReminders, resetReminders, openFromHash } from "./reminders.js";
 import { disablePush } from "./push.js";
 import { useAccentOf, resetAccent } from "./accent.js";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "../config.js";
+import { calm } from "./motion.js";
 
 const here = () => location.origin + location.pathname;
 /* Emails with a code to type in (Phase 7A) need Supabase's email templates to include the code, and
@@ -63,6 +64,7 @@ function saveOfflineProfile() {
   if (app.household) members[app.household.id] = app.members;
   try { localStorage.setItem(OFFLINE, JSON.stringify({ user: { id: u.id, email: u.email, user_metadata: u.user_metadata || {} }, households: app.households, members })); } catch (_) {}
 }
+app.saveOfflineProfile = saveOfflineProfile;
 const lastHHKey = () => `mb-household-${app.meId}`;
 
 /* ---------- small helpers (Phase 7A) ---------- */
@@ -240,7 +242,7 @@ function initWelcome(el) {
   const track = el.querySelector("#wlTrack"), dots = [...el.querySelectorAll("[data-wl]")];
   if (!track) return;
   const at = () => Math.round(track.scrollLeft / Math.max(1, track.clientWidth));
-  const show = i => { const k = Math.max(0, Math.min(dots.length - 1, i)); track.scrollTo({ left: k * track.clientWidth, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }); };
+  const show = i => { const k = Math.max(0, Math.min(dots.length - 1, i)); track.scrollTo({ left: k * track.clientWidth, behavior: calm() ? "auto" : "smooth" }); };
   let raf = 0;
   track.addEventListener("scroll", () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => { const i = at(); dots.forEach((d, k) => d.setAttribute("aria-current", String(k === i))); }); }, { passive: true });
   dots.forEach((d, k) => d.addEventListener("click", () => show(k)));
@@ -274,13 +276,16 @@ async function loadMembers() {
   app.members = error && prof && prof.members ? (prof.members[app.household.id] || []) : (data || []);
 }
 async function loadHouseholds() {
-  const { data, error } = await app.sb.from("household_members").select("household_id, role, households(name)").eq("user_id", app.meId).order("joined_at");
+  // Phase 8: each household's look comes too. Until the database has it, ask for the name alone.
+  let { data, error } = await app.sb.from("household_members").select("household_id, role, households(name, appearance)").eq("user_id", app.meId).order("joined_at");
+  if (error && /appearance|42703|column/i.test(`${error.code} ${error.message}`)) ({ data, error } = await app.sb.from("household_members").select("household_id, role, households(name)").eq("user_id", app.meId).order("joined_at"));
   if (error) {
     const prof = offlineProfile();
     if (isNetworkError(error) && prof && prof.user.id === app.meId && prof.households) { app.households = prof.households; return app.households; }
     throw error;
   }
-  app.households = (data || []).map(r => ({ id: r.household_id, role: r.role, name: (r.households && r.households.name) || "Our budget" }));
+  app.households = (data || []).map(r => ({ id: r.household_id, role: r.role, name: (r.households && r.households.name) || "Our budget",
+    look: (r.households && r.households.appearance && typeof r.households.appearance === "object") ? r.households.appearance : {} }));
   return app.households;
 }
 
@@ -291,7 +296,7 @@ async function openHH(id) {
   // Forget the last household's history views straight away, so nothing from it can show while this one loads
   app.snapshots = null; app.compareId = null; app.pgSel = null; app.snapshotsOffline = false;
   const hh = app.households.find(h => h.id === id) || app.households[0];
-  app.household = { id: hh.id, name: hh.name };
+  app.household = { id: hh.id, name: hh.name, look: hh.look || {} };
   app.role = hh.role;
   app.canWrite = hh.role !== "viewer";
   try { localStorage.setItem(lastHHKey(), hh.id); } catch (_) {}

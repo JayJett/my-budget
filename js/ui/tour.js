@@ -20,6 +20,8 @@
 import { app, TAB_HASH } from "./ctx.js";
 import { $, esc, lockScroll, unlockScroll } from "./dom.js";
 import { TABS } from "./views/labels.js";
+import { isShared } from "../model/schema.js";
+import { calm } from "./motion.js";
 
 /* ---------- the tours ----------
    Each stop names what to point at (the first of these that's on screen) and what to say. A stop
@@ -61,7 +63,7 @@ export const TOURS = {
     stops: [
       { sel: ["#app .gl-sum .sp-head", "#app .gl-sum"], title: "Your goals at a glance", text: "What’s saved so far across your goals, and how much the Budget tab sends to goals each pay." },
       { sel: ["#app .gl-group.ef"], title: "Emergency fund", text: "A safety net for surprises. Set a target, and update Saved as you put money aside." },
-      { sel: ["#app .gl-group.joint"], title: () => (app.state.people.length > 1 ? "Joint goals" : "Your goals"),
+      { sel: ["#app .gl-group.joint"], title: () => (isShared(app.state) ? "Joint goals" : "Your goals"),
         text: () => has("#app .gl-group.joint .gl-none") ? "Create your first goal here: a holiday, a car, a house deposit. Each goal gets a share of the money going to goals." : "Each goal gets a share of the money going to goals, and shows how close it is. Higher in the list is funded first." },
       { sel: ["#app .gl-group:not(.ef):not(.joint)"], title: "Personal goals", text: "Each person’s own goals, funded from their own share of pay." },
       { sel: ["#app .gl-main > .add-row"], title: "Adding a goal", text: "Saved is money you’ve already put aside. Choosing which account it’s in doesn’t move any money, and it’s never counted twice." },
@@ -133,7 +135,6 @@ export const tourDone = (tab = "budget") => tourState()[tab] === "done";
 
 /* ---------- the spotlight tour ---------- */
 let el = null, cur = null, i = 0, stops = [], opener = null, raf = 0;
-const calm = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const val = v => typeof v === "function" ? v() : v;
 const visible = t => { if (!t) return false; const r = t.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(t).visibility !== "hidden"; };
 const find = s => { for (const q of s.sel) { const t = document.querySelector(q); if (visible(t)) return t; } return null; };

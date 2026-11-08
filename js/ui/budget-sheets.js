@@ -8,7 +8,7 @@
 import { app, changed, readOnly } from "./ctx.js";
 import { $, esc } from "./dom.js";
 import { K, attrs, fmtNum, pc } from "./inputs.js";
-import { COLOUR_KEYS, PERSON_COLOURS, ROLES, addPerson, MAX_PEOPLE } from "../model/schema.js";
+import { COLOUR_KEYS, PERSON_COLOURS, roleNote, isShared, addPerson, MAX_PEOPLE } from "../model/schema.js";
 import { WORDS } from "../model/periods.js";
 import { addRow } from "./events.js";
 import { BILL_PERIODS } from "../model/periods.js";
@@ -17,7 +17,9 @@ import { SP_TYPES, typeIcon } from "./views/spending.js";
 import { NW_TYPES, nwIcon, nwType } from "./views/networth.js";
 import { goalSheet, goalGroups } from "./views/goals.js";
 import { investSheet } from "./views/invest.js";
-import { itemIcon, iconPickerHTML, pickerOpen } from "./icons.js";
+import { itemIcon, iconPickerHTML, appearanceHTML, pickerOpen } from "./icons.js";
+import { OBJECT_COLOURS, isObjectColour } from "./palette.js";
+import { accIcon } from "./views/budget.js";
 import { list } from "./render.js";
 import { openPop, closePop } from "./dom.js";
 import { money } from "../model/format.js";
@@ -40,14 +42,24 @@ function show(title, body) {
 }
 const isOurs = () => $("#sheet").open && !!$("#sheet .bsheet");
 
+/** Type: Joint / Personal / Investment. On your own there's nothing to share, so the choice is just
+    everyday money or investing (an older "Joint" allocation still shows as it is). The stored value is
+    the same field as always, so the Budget, Goals and Investments maths are unchanged. */
+function typeField(a, S) {
+  const solo = !isShared(S);
+  const opts = solo ? [["Personal", "Everyday money"], ...(a.type === "Joint" ? [["Joint", "Joint"]] : []), ["Investment", "Investing"]] : TYPES.map(t => [t, t]);
+  if (solo && a.type && !opts.some(([v]) => v === a.type)) opts.push([a.type, a.type]);
+  return `<fieldset class="bs-field"><legend>${solo ? "Kind" : "Type"}</legend><div class="seg seg-radio">${opts.map(([t, l]) => `<label><input type="radio" name="type-${esc(a.id)}" value="${esc(t)}" ${attrs("acc", a.id, "type", "text")}${a.type === t ? " checked" : ""}${dis()}><span>${esc(l)}</span></label>`).join("")}</div></fieldset>`;
+}
+
 function accountSheet(a) {
   const S = app.state, P = S.people, multi = P.length > 1, w = WORDS[S.viewAs];
   const ownerOpts = [["", "Shared"], ...P.map(p => [p.id, p.name || "Unnamed"])];
   const showOwner = multi && a.type === "Personal" && a.role !== "personalGoals";
-  return `<div class="bs-hero"><span class="a-sw big" data-k="acc.${esc(a.id)}.sw"></span><div><div class="bs-amt">${K(`acc.${a.id}.t`)}</div><small>${esc(w.per)}${multi ? ", from everyone" : ""}</small></div></div>
+  return `<div class="bs-hero"><span class="a-ic big" data-k="acc.${esc(a.id)}.ic" aria-hidden="true">${accIcon(a)}</span><div><div class="bs-amt">${K(`acc.${a.id}.t`)}</div><small>${esc(w.per)}${multi ? ", from everyone" : ""}</small></div></div>
     <label class="bs-field"><span>Name</span><input class="bs-in" type="text" ${attrs("acc", a.id, "name", "text")} value="${esc(a.name)}" placeholder="e.g. Groceries account" autocomplete="off"${dis()}></label>
-    ${a.role ? `<p class="bs-note">${esc(ROLES[a.role])}</p>` : ""}
-    <fieldset class="bs-field"><legend>Type</legend><div class="seg seg-radio">${TYPES.map(t => `<label><input type="radio" name="type-${esc(a.id)}" value="${t}" ${attrs("acc", a.id, "type", "text")}${a.type === t ? " checked" : ""}${dis()}><span>${t}</span></label>`).join("")}</div></fieldset>
+    ${a.role ? `<p class="bs-note">${esc(roleNote(a.role, S))}</p>` : ""}
+    ${typeField(a, S)}
     ${showOwner ? `<label class="bs-field"><span>Whose account</span><select class="bs-in" ${attrs("acc", a.id, "owner", "text")}${dis()}>${ownerOpts.map(([v, l]) => `<option value="${esc(v)}"${v === (a.owner || "") ? " selected" : ""}>${esc(l)}</option>`).join("")}</select></label>` : ""}
     <div class="bs-field"><span class="bs-label">${multi ? "Share of each person’s pay" : "Share of your pay"}</span>
       <ul class="bs-shares">${P.map(p => `<li class="${pc(p)}">
@@ -55,6 +67,7 @@ function accountSheet(a) {
         <span class="unit person"><input type="number" step="any" inputmode="decimal" ${attrs("acc", a.id, `split.${p.id}`, "pct")} value="${a.split[p.id] == null ? "" : +(a.split[p.id] * 100).toFixed(4)}" aria-label="${esc(p.name || "Their")} percent of pay to ${esc(a.name || "this account")}"${dis()}><i>%</i></span>
         <span class="bs-val">${K(`acc.${a.id}.v.${p.id}`)}</span>
         <small class="bs-sub">${multi ? esc(p.name || "Unnamed") + ": " : ""}${K(`tot.p.${p.id}`)} of pay allocated in total</small></li>`).join("")}</ul></div>
+    ${appearanceHTML({ l: "acc", id: a.id, icon: a.icon, def: accIcon({ ...a, icon: null }), colour: a.colour, colours: OBJECT_COLOURS, defColour: app.colours[a.id] && !isObjectColour(a.colour) ? app.colours[a.id] : "var(--faint)", disabled: readOnly() })}
     ${!a.role && !readOnly() ? `<button class="btn danger-soft block" type="button" data-del="acc" data-i="${esc(a.id)}">Delete allocation</button>` : ""}`;
 }
 
@@ -74,7 +87,7 @@ function expenseSheet(x) {
         <label class="bs-field"><span>Set aside so far</span><span class="unit wide"><i>$</i><input type="text" inputmode="decimal" ${attrs("sp", x.id, "aside", "num")} value="${fmtNum(x.aside)}" aria-label="Set aside so far"${dis()}></span></label></div>
       <div class="sk-box">${K(`sp.${x.id}.sk`, "chip")}<p>${K(`sp.${x.id}.sk2`)}</p>
         <div class="ex-prog big" aria-hidden="true"><span data-k="sp.${esc(x.id)}.bar"></span></div><small>${K(`sp.${x.id}.saved`)}</small></div>`;
-  return `<div class="bs-hero"><span class="ex-ic big" style="--cat:${cat}" aria-hidden="true">${itemIcon(x.icon) || typeIcon(x.type)}</span><div><div class="bs-amt">${K(`sp.${x.id}.v`)}</div><small>${esc(w.per)}${K(`sp.${x.id}.pb`)}</small></div></div>
+  return `<div class="bs-hero"><span class="ex-ic big" style="--cat:${isObjectColour(x.colour) ? `var(--o-${x.colour})` : cat}" aria-hidden="true">${itemIcon(x.icon) || typeIcon(x.type)}</span><div><div class="bs-amt">${K(`sp.${x.id}.v`)}</div><small>${esc(w.per)}${K(`sp.${x.id}.pb`)}</small></div></div>
     <label class="bs-field"><span>Name</span><input class="bs-in" type="text" ${attrs("sp", x.id, "name", "text")} value="${esc(x.name)}" placeholder="e.g. Groceries" autocomplete="off"${dis()}></label>
     <fieldset class="bs-field"><legend>Type ${tipq(SP_TYPES.map(t => `${t.key}: ${t.help}`).join(" "))}</legend><div class="seg seg-radio">${types.map(t => `<label><input type="radio" name="sptype-${esc(x.id)}" value="${esc(t)}" ${attrs("sp", x.id, "type", "text")}${x.type === t ? " checked" : ""}${dis()}><span>${esc(t)}</span></label>`).join("")}</div></fieldset>
     <div class="bs-field"><span class="bs-label">Cost ${tipq(`Enter it however it’s billed. It’s converted to an amount ${w.per}, so everything adds up.`)}</span>
@@ -83,7 +96,7 @@ function expenseSheet(x) {
       <small class="bs-sub">${K(`sp.${x.id}.about`)}</small></div>
     ${sinking}
     <label class="bs-field"><span>Notes</span><textarea class="bs-in" rows="2" ${attrs("sp", x.id, "notes", "text")} placeholder="Optional"${dis()}>${esc(x.notes || "")}</textarea></label>
-    ${iconPickerHTML("sp", x.id, x.icon, typeIcon(x.type), readOnly())}
+    ${iconPickerHTML("sp", x.id, x.icon, typeIcon(x.type), readOnly(), { colour: x.colour, colours: OBJECT_COLOURS, defColour: cat })}
     ${readOnly() ? "" : `<button class="btn danger-soft block" type="button" data-del="sp" data-i="${esc(x.id)}">Delete expense</button>`}`;
 }
 
@@ -99,7 +112,7 @@ function networthSheet(a) {
         <div class="ex-prog big nw-em" aria-hidden="true"><span data-k="nw.${esc(a.id)}.bar"></span></div>${K(`nw.${a.id}.st`, "chip")}
         ${linked.length ? `<details class="more"><summary>${linked.length === 1 ? "1 goal uses" : `${linked.length} goals use`} this account</summary><ul class="nw-goals">${linked.map(g => `<li><span>${esc(g.name)}</span><b>${money(Number(g.saved) || 0)}</b></li>`).join("")}</ul>
           <p class="bs-note">Change which account a goal uses on the Goals tab.</p></details>` : `<p class="bs-note">No goals use this account yet. Pick it as a goal’s account on the Goals tab.</p>`}</div>`;
-  return `<div class="bs-hero"><span class="ex-ic big" style="--cat:${t.col}" aria-hidden="true">${nwIcon(a.type)}</span><div><div class="bs-amt">${K(`nw.${a.id}.v`)}</div><small>${esc(t.label)}${a.type === "Debt" ? ", owed" : ""}</small></div></div>
+  return `<div class="bs-hero"><span class="ex-ic big" style="--cat:${isObjectColour(a.colour) ? `var(--o-${a.colour})` : t.col}" aria-hidden="true">${itemIcon(a.icon) || nwIcon(a.type)}</span><div><div class="bs-amt">${K(`nw.${a.id}.v`)}</div><small>${esc(t.label)}${a.type === "Debt" ? ", owed" : ""}</small></div></div>
     <label class="bs-field"><span>${a.type === "Debt" ? "Amount owed" : "Balance"}</span><span class="unit wide nw-bal"><i>$</i><input type="text" inputmode="decimal" ${attrs("nw", a.id, "balance", "num")} value="${fmtNum(a.balance)}" aria-label="${a.type === "Debt" ? "Amount owed" : "Balance"}"${dis()}></span>
       <small class="bs-sub">${a.type === "Debt" ? "Enter what you owe as a positive number. It’s taken off your assets." : "What’s in the account right now, from your banking app."}</small></label>
     <label class="bs-field"><span>Name</span><input class="bs-in" type="text" ${attrs("nw", a.id, "name", "text")} value="${esc(a.name)}" placeholder="e.g. Everyday account" autocomplete="off"${dis()}>
@@ -107,6 +120,7 @@ function networthSheet(a) {
     <fieldset class="bs-field"><legend>Type ${tipq(NW_TYPES.map(x => `${x.key}: ${x.help}`).join(" "))}</legend><div class="seg seg-radio wrap">${types.map(k => `<label><input type="radio" name="nwtype-${esc(a.id)}" value="${esc(k)}" ${attrs("nw", a.id, "type", "text")}${a.type === k ? " checked" : ""}${dis()}><span>${esc(nwType(k).label)}</span></label>`).join("")}</div>
       <small class="bs-sub">${esc(t.help)}</small></fieldset>
     ${goalBox}
+    ${appearanceHTML({ l: "nw", id: a.id, icon: a.icon, def: nwIcon(a.type), colour: a.colour, colours: OBJECT_COLOURS, defColour: t.col, disabled: readOnly() })}
     ${readOnly() ? "" : `<button class="btn danger-soft block" type="button" data-del="nw" data-i="${esc(a.id)}">Delete account</button>`}`;
 }
 
@@ -121,7 +135,8 @@ function personSheet(p) {
     <label class="bs-field"><span>A recent payday</span><input class="bs-in" type="date" ${attrs("pp", p.id, "payday", "date")} value="${esc(p.payday)}"${dis()}></label>
     <p class="bs-note">${K(`p27.${p.id}`, "p27")}</p>
     <div class="bs-field"><span class="bs-label">Colour in charts</span>
-      <div class="swatches" role="group" aria-label="Colour">${COLOUR_KEYS.map(k => `<button type="button" class="swatch-btn pc-${k}" data-colour="${k}" data-i="${esc(p.id)}" aria-pressed="${k === p.colour}" aria-label="${PERSON_COLOURS[k].label}"${dis()}></button>`).join("")}</div></div>
+      <div class="swatches" role="group" aria-label="Colour">${COLOUR_KEYS.map(k => `<button type="button" class="swatch-btn pc-${k}" data-colour="${k}" data-i="${esc(p.id)}" aria-pressed="${k === p.colour}" aria-label="${PERSON_COLOURS[k].label}"${dis()}></button>`).join("")}</div>
+      ${(() => { const twin = S.people.find(o => o.id !== p.id && o.colour === p.colour); return twin ? `<small class="bs-sub pc-twin">${esc(twin.name || "Someone else")} uses ${esc(PERSON_COLOURS[p.colour].label.toLowerCase())} too. A different colour makes the charts easier to read, but it’s up to you.</small>` : ""; })()}</div>
     ${multi && !readOnly() ? `<button class="btn danger-soft block" type="button" data-rmperson="${esc(p.id)}">Remove ${esc(p.name || "this person")}</button>` : ""}`;
 }
 
@@ -208,9 +223,19 @@ export function initBudgetSheets() {
     const eg = t.closest("[data-edit-goal]"); if (eg && !eg.disabled) { openGoalSheet(eg.dataset.editGoal, eg.dataset.i); return; }
     const ep = t.closest("[data-edit-person]"); if (ep) { openPersonSheet(ep.dataset.editPerson); return; }
     if (readOnly()) return;
+    const oc = t.closest("[data-oc-pick]");
+    if (oc && !oc.disabled) { // a colour is just how the item looks too
+      const it = (list(oc.dataset.ocl) || []).find(x => x.id === oc.dataset.oci); if (!it) return;
+      const k = oc.dataset.ocPick; if ((it.colour || "") === k) return;
+      if (isObjectColour(k)) it.colour = k; else delete it.colour;
+      changed({ full: true }); return;
+    }
+    const rs = t.closest("[data-look-reset-l]");
+    if (rs) { const it = (list(rs.dataset.lookResetL) || []).find(x => x.id === rs.dataset.lookResetI); if (!it) return; delete it.icon; delete it.colour; changed({ full: true }); return; }
     const ic = t.closest("[data-icon-l]");
     if (ic && !ic.disabled) { // an icon is just how the item looks: saved on the item like any other edit
       const it = (list(ic.dataset.iconL) || []).find(x => x.id === ic.dataset.iconI); if (!it) return;
+      if ((it.icon || "") === ic.dataset.icon) return; // already that one: no save, no Undo step
       if (ic.dataset.icon) it.icon = ic.dataset.icon; else delete it.icon;
       changed({ full: true }); return;
     }

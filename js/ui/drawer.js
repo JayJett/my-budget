@@ -9,9 +9,9 @@
    - Keyboard focus stays inside while it's open and goes back to the button that opened it.
    One drawer element is shared; its content is whatever the caller puts in it. */
 import { $, lockScroll, unlockScroll, setBehind, closePop } from "./dom.js";
+import { calm } from "./motion.js";
 
 let el = null, back = null, side = "left", opener = null, handler = null, timer = null, open = false;
-const calm = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 export const drawerOpen = () => open;
 
 function build() {

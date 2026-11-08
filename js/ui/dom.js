@@ -1,4 +1,5 @@
 /* Page helpers: finding elements, escaping text, tooltips, pop-up menus, toasts and the confirm dialog. */
+import { calm } from "./motion.js";
 
 export const $ = (s, r = document) => r.querySelector(s);
 export const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -46,7 +47,7 @@ export function initTooltips() {
    unchanged; only how the panel opens and closes is new. */
 let popHandler = null, popOpener = null, popSheet = false, popTimer = null;
 const isPhone = () => matchMedia("(max-width:760px)").matches;
-const calmMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+const calmMotion = () => calm();
 const BEHIND = [".top", "#app", ".conn-wrap"];
 
 /* Keeping the page still behind a sheet. Counted, so two things that both need it can't unlock each

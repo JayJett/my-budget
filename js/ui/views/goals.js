@@ -18,7 +18,13 @@ import { n, blank } from "../../model/util.js";
 import { jointGoalsLabel } from "./labels.js";
 import { budgetUI } from "../budget-sheets.js";
 import { itemIcon, iconPickerHTML } from "../icons.js";
+import { OBJECT_COLOURS, isObjectColour } from "../palette.js";
+/** A goal's own colour (Phase 8), for its badge and progress bar; otherwise its group's colour. */
+const gcStyle = g => isObjectColour(g.colour) ? ` style="--gc:var(--o-${g.colour})"` : "";
 import { ART } from "../art.js";
+import { combineCard } from "../household-mode.js";
+import { isShared } from "../../model/schema.js";
+import { feedback } from "../feedback.js";
 
 const CHEV = '<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5L10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const CHECK = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7"/></svg>';
@@ -40,13 +46,13 @@ export const groupOf = (S, key) => goalGroups(S).find(g => g.key === key);
 /** A small round badge: the shield for the emergency fund, otherwise the goal's first letter. */
 const defaultBadge = (g, grp) => grp.kind === "ef" ? SHIELD : blank(g.name) ? TARGET : esc(String(g.name).trim().charAt(0).toUpperCase());
 /** The goal's chosen icon if it has one, otherwise the usual badge. */
-export const badge = (g, grp, big = "") => `<span class="gl-ic${grp.kind === "ef" ? " ef" : ""} ${big}" aria-hidden="true">${itemIcon(g.icon) || defaultBadge(g, grp)}</span>`;
+export const badge = (g, grp, big = "") => `<span class="gl-ic${grp.kind === "ef" ? " ef" : ""} ${big}"${gcStyle(g)} aria-hidden="true">${itemIcon(g.icon) || defaultBadge(g, grp)}</span>`;
 
 function card(g, grp, ui, i) {
   const done = isDone(g), named = !blank(g.name);
   const mv = ui.reorder && grp.kind !== "ef" ? `<span class="mv-row"><button class="mv-btn" type="button" data-move="up" data-l="${esc(grp.key)}" data-i="${esc(g.id)}" aria-label="Move ${esc(g.name || "this goal")} up"${i === 0 ? " disabled" : ""}>↑</button><button class="mv-btn" type="button" data-move="down" data-l="${esc(grp.key)}" data-i="${esc(g.id)}" aria-label="Move ${esc(g.name || "this goal")} down"${i === grp.goals.length - 1 ? " disabled" : ""}>↓</button></span>` : "";
   if (ui.reorder) return `<li class="gl-li"><div class="gl-card compact">${badge(g, grp)}<span class="gl-name">${i + 1}. ${esc(g.name || "Unnamed goal")}</span></div>${mv}</li>`;
-  return `<li class="gl-li"><button class="gl-card${done ? " done" : ""}" type="button" data-edit-goal="${esc(grp.key)}" data-i="${esc(g.id)}" aria-label="${esc(g.name || "Unnamed goal")}: edit">
+  return `<li class="gl-li"><button class="gl-card${done ? " done" : ""}"${gcStyle(g)} type="button" data-edit-goal="${esc(grp.key)}" data-i="${esc(g.id)}" aria-label="${esc(g.name || "Unnamed goal")}: edit">
       <span class="gl-top">${badge(g, grp)}<span class="gl-name">${esc(g.name || "Unnamed goal")}</span>${done ? `<span class="gl-done">${CHECK}Reached</span>` : `<span class="gl-pc">${K(`g.${g.id}.pc`)}</span>`}${CHEV}</span>
       <span class="gl-amt">${K(`g.${g.id}.amt`)}</span>
       <span class="gl-bar" aria-hidden="true"><span data-k="g.${esc(g.id)}.bar"></span></span>
@@ -102,12 +108,12 @@ export function view() {
   const hidden = goalGroups(S).filter(g => !shown(S, g));
   const addAny = ro || ui.reorder || !anyGoals(S) ? "" : `<button class="add-row" type="button" data-goal-new="${groups.length + hidden.length > 2 ? "pick" : "gj"}">+ Add goal</button>`;
   const help = `<details class="help"><summary>How goals are funded</summary><ul>
-    <li>The Budget tab decides how much goes to the emergency fund, ${S.people.length > 1 ? "the joint goals fund and each person’s goals pool" : "and to your goals"}. Each goal gets a % of its fund.</li>
+    <li>The Budget tab decides how much goes to the emergency fund, ${isShared(S) ? "the joint goals fund and each person’s goals pool" : "and to your goals"}. Each goal gets a % of its fund.</li>
     <li>Goals higher in a list are funded first. When a goal is reached, its share moves to the next unfinished goal below it (or above, if it’s last). If every goal is reached, the money shows as spare.</li>
     <li>Saved is money already put aside, in the account you pick. Picking an account doesn’t move any money. The Net worth tab checks the goals in each savings account add up.</li>
     <li>Leave the deadline blank for an estimated finish date, or set one to see whether you’re on track.</li>
   </ul></details>`;
-  return `<div class="gl-page"><div class="gl-side">${summary}</div><div class="gl-main">${head}${sections}${addAny}${help}</div></div>`;
+  return `<div class="gl-page"><div class="gl-side">${summary}</div><div class="gl-main">${head}${ui.reorder ? "" : combineCard()}${sections}${addAny}${help}</div></div>`;
 }
 
 /* ---------- the goal sheet (opened from ui/budget-sheets.js) ---------- */
@@ -144,7 +150,7 @@ export function goalSheet(key, g) {
     ${shares}
     <label class="bs-field"><span>Deadline (optional)</span><input class="bs-in" type="date" ${attrs(key, g.id, "deadline", "date")} value="${esc(g.deadline || "")}"${dis}>
       <small class="bs-sub">Leave it blank to see an estimated finish date.</small></label>
-    ${iconPickerHTML(key, g.id, g.icon, defaultBadge(g, grp), ro)}
+    ${iconPickerHTML(key, g.id, g.icon, defaultBadge(g, grp), ro, { colour: g.colour, colours: OBJECT_COLOURS, defColour: grp.kind === "ef" ? "var(--c-slate)" : grp.kind === "joint" ? "var(--accent)" : `var(--c-${grp.kind.colour})` })}
     ${isEF || ro ? "" : `<button class="btn danger-soft block" type="button" data-del="${esc(key)}" data-i="${esc(g.id)}">Delete goal</button>`}`;
 }
 
@@ -236,7 +242,7 @@ export function initGoals() {
     if (now >= 1 && was < 1) line = `${g.name} reached its target`;
     else { const step = STEPS.find(([s]) => was < s && now >= s); if (step) line = `${g.name} is ${step[1]}`; }
     if (!line) return;
-    toast(line, "ok");
+    toast(line, "ok"); feedback("success");
     document.querySelectorAll(`#sheet .gl-bar.big, [data-edit-goal][data-i="${CSS.escape(g.id)}"]`).forEach(x => { x.classList.remove("cheer"); void x.offsetWidth; x.classList.add("cheer"); });
   }
 }
