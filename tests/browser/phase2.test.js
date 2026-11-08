@@ -121,7 +121,7 @@ test("leaving a household moves you to your other one; creating one starts the s
 test("account settings: name, password, download my data, delete account", { skip }, async () => {
   const { page, errors, ctx } = await open(RICH_V3);
   await settle(page);
-  await page.click("#menuBtn"); await page.click('[data-act="account"]');
+  await page.click("#menuBtn"); await page.click('#drawer [data-act="profile"]'); // account settings are part of My profile
   await page.waitForSelector("#sheet[open] #setName");
   await page.screenshot({ path: join(SHOTS, "account-settings.png"), fullPage: true });
   await page.fill('#setName input', "Jay");

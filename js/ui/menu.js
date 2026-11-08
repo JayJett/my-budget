@@ -48,7 +48,6 @@ export function mainMenu() {
       ${row("reminders", "reminders", "Reminders")}
       ${row("history", "history", "History")}
       ${row("appearance", "appearance", "Appearance")}
-      ${row("account", "account", "Account settings")}
       ${row("tours", "tours", "Guided tours")}
     </nav>
     <div class="dr-sec">${row("data", "data", "Data & backups")}</div>
@@ -85,7 +84,7 @@ export function menuAct(b) {
   if (act === "history") openHistory();
   if (act === "reminders") openReminderSettings();
   if (act === "household") openHouseholdSettings();
-  if (act === "account") openAccount();
+  if (act === "account") openAccount(); // (older links: account settings are part of My profile now)
   if (act === "appearance") openAppearance();
   if (act === "profile") openProfile();
   if (act === "signout") app.signOut();

@@ -31,6 +31,18 @@ Verify: sign up with a spare address, type the code from the email into the app,
 
 **Email limits.** Supabase's built-in email sender only sends a handful of emails per hour, on purpose. That's fine for trying things out, but real sign-ups will need your own email service (**Authentication → Emails → SMTP Settings**). That's the email service you paused earlier. When the limit is hit, the app says "Too many attempts for now…". "Send a new code" always follows Supabase's own wait time.
 
+## For now: Supabase's standard emails (a link, no code)
+
+Codes in emails need the templates to include `{{ .Token }}`, and properly customising emails needs your own email service (custom SMTP). Until you have one, the app uses Supabase's **standard emails, which contain a link only**:
+
+- After sign-up, the app says "Check your email … tap the link in it". There's no code box.
+- "Email me a sign-in link instead" sends a link (existing accounts only).
+- In the code this is one switch, `EMAIL_CODES = false` in `js/ui/auth.js`. The code screens are still there for later.
+
+**What to do in Supabase** (you already did this if your emails have no code in them): go to Authentication → Emails → Templates. For **Confirm signup** and **Magic Link**, either use **Reset to default**, or delete the line you added with `{{ .Token }}`. Keep `{{ .ConfirmationURL }}`; that's the link. Save each one.
+
+To bring codes back later: set up custom SMTP, add the `{{ .Token }}` line to both templates again, and change `EMAIL_CODES` to `true`.
+
 ## 3. Google sign-in
 
 1. Go to **console.cloud.google.com** and create a project (or pick one).
