@@ -8,7 +8,7 @@
 import { app, changed, readOnly } from "./ctx.js";
 import { $, esc } from "./dom.js";
 import { K, attrs, fmtNum, pc } from "./inputs.js";
-import { COLOUR_KEYS, PERSON_COLOURS, ROLES, addPerson, MAX_PEOPLE } from "../model/schema.js";
+import { COLOUR_KEYS, PERSON_COLOURS, roleNote, isShared, addPerson, MAX_PEOPLE } from "../model/schema.js";
 import { WORDS } from "../model/periods.js";
 import { addRow } from "./events.js";
 import { BILL_PERIODS } from "../model/periods.js";
@@ -40,14 +40,24 @@ function show(title, body) {
 }
 const isOurs = () => $("#sheet").open && !!$("#sheet .bsheet");
 
+/** Type: Joint / Personal / Investment. On your own there's nothing to share, so the choice is just
+    everyday money or investing (an older "Joint" allocation still shows as it is). The stored value is
+    the same field as always, so the Budget, Goals and Investments maths are unchanged. */
+function typeField(a, S) {
+  const solo = !isShared(S);
+  const opts = solo ? [["Personal", "Everyday money"], ...(a.type === "Joint" ? [["Joint", "Joint"]] : []), ["Investment", "Investing"]] : TYPES.map(t => [t, t]);
+  if (solo && a.type && !opts.some(([v]) => v === a.type)) opts.push([a.type, a.type]);
+  return `<fieldset class="bs-field"><legend>${solo ? "Kind" : "Type"}</legend><div class="seg seg-radio">${opts.map(([t, l]) => `<label><input type="radio" name="type-${esc(a.id)}" value="${esc(t)}" ${attrs("acc", a.id, "type", "text")}${a.type === t ? " checked" : ""}${dis()}><span>${esc(l)}</span></label>`).join("")}</div></fieldset>`;
+}
+
 function accountSheet(a) {
   const S = app.state, P = S.people, multi = P.length > 1, w = WORDS[S.viewAs];
   const ownerOpts = [["", "Shared"], ...P.map(p => [p.id, p.name || "Unnamed"])];
   const showOwner = multi && a.type === "Personal" && a.role !== "personalGoals";
   return `<div class="bs-hero"><span class="a-sw big" data-k="acc.${esc(a.id)}.sw"></span><div><div class="bs-amt">${K(`acc.${a.id}.t`)}</div><small>${esc(w.per)}${multi ? ", from everyone" : ""}</small></div></div>
     <label class="bs-field"><span>Name</span><input class="bs-in" type="text" ${attrs("acc", a.id, "name", "text")} value="${esc(a.name)}" placeholder="e.g. Groceries account" autocomplete="off"${dis()}></label>
-    ${a.role ? `<p class="bs-note">${esc(ROLES[a.role])}</p>` : ""}
-    <fieldset class="bs-field"><legend>Type</legend><div class="seg seg-radio">${TYPES.map(t => `<label><input type="radio" name="type-${esc(a.id)}" value="${t}" ${attrs("acc", a.id, "type", "text")}${a.type === t ? " checked" : ""}${dis()}><span>${t}</span></label>`).join("")}</div></fieldset>
+    ${a.role ? `<p class="bs-note">${esc(roleNote(a.role, S))}</p>` : ""}
+    ${typeField(a, S)}
     ${showOwner ? `<label class="bs-field"><span>Whose account</span><select class="bs-in" ${attrs("acc", a.id, "owner", "text")}${dis()}>${ownerOpts.map(([v, l]) => `<option value="${esc(v)}"${v === (a.owner || "") ? " selected" : ""}>${esc(l)}</option>`).join("")}</select></label>` : ""}
     <div class="bs-field"><span class="bs-label">${multi ? "Share of each person’s pay" : "Share of your pay"}</span>
       <ul class="bs-shares">${P.map(p => `<li class="${pc(p)}">

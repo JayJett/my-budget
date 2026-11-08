@@ -31,6 +31,7 @@ export const STAGES = ["Make it yours", "Your income", "Your starting plan"];
 const FREQS = [["weekly", "Weekly"], ["fortnightly", "Fortnightly"], ["monthly", "Monthly"]];
 /** Colours for the starter buckets (fixed, so they never follow the personal accent). */
 const BUCKET_COL = { essentials: "var(--c-blue)", fun: "var(--c-coral)", emergency: "var(--c-slate)", goals: "var(--joint)", invest: "var(--invest)", personalGoals: "var(--c-gold)", debt: "var(--bad)" };
+const SOLO_HELP = { fun: "Your own money to spend", goals: "Everything you’re saving for" };
 const SHORT_HELP = { essentials: "Rent, power, groceries, transport", fun: "Each person’s own spending", emergency: "A safety net for surprises", goals: "Things you’re saving for", invest: "Long-term growth", personalGoals: "Each person’s own savings goals", debt: "Extra debt repayments" };
 
 let ans = null, stage = 2, done = 1, split = null, dir = 1, saving = false, saveErr = "";
@@ -52,6 +53,9 @@ export function obHeader(current, doneCount, extra = "") {
 const MODE_KEY = () => `mb-ob-mode-${app.meId}`;
 export function rememberMode(mode) { try { sessionStorage.setItem(MODE_KEY(), mode); } catch (_) {} }
 function savedMode() { try { return sessionStorage.getItem(MODE_KEY()); } catch (_) { return null; } }
+/** Step 1's choice as the plan's mode (Phase 8): "Just me" → a solo plan, "With someone" → a shared one,
+    however many people's pay has been added so far. */
+const planOf = () => ans && ans.mode === "solo" ? { mode: "solo", purpose: "solo" } : { mode: "shared", purpose: "household" };
 
 export function startSetup() {
   const me = app.members.find(m => m.user_id === app.meId);
@@ -70,7 +74,7 @@ function skip() {
   endSetup();
   if (!app.hasData) {
     // the empty budget is saved together with your first edit: that first save is the starting point, not an undo
-    holdUndoForSetup(); const me = app.members.find(m => m.user_id === app.meId); app.state = blankBudget({ name: (me && me.display_name) || (ans && ans.people[0].name) || "" }); }
+    holdUndoForSetup(); const me = app.members.find(m => m.user_id === app.meId); app.state = blankBudget({ name: (me && me.display_name) || (ans && ans.people[0].name) || "", mode: planOf().mode }); }
   app.render();
   window.scrollTo({ top: 0 });
 }
@@ -142,7 +146,7 @@ function body() {
     ${nav("Continue")}`;
 
   if (stage === 3) {
-    split = split || suggestSplit({ purpose: P.length > 1 ? "household" : "solo", people: P, have: {} });
+    split = split || suggestSplit({ ...planOf(), people: P, have: {} });
     const yr = householdIncome(P), t = splitTotal(split.buckets), v = view();
     return `<h2 id="obTitle" tabindex="-1">Here’s your starting plan</h2><p class="lead">A simple way to divide ${P.length > 1 ? "everyone’s" : "your"} pay. Change anything you like.</p>
     <div class="ob-sum">
@@ -153,12 +157,13 @@ function body() {
     ${yr ? "" : `<p class="ob-note">Add your income to see what each part is in dollars. <button class="linkish" type="button" data-obact="back">Add income</button></p>`}
     <ul class="ob-buckets">${split.buckets.map((b, i) => `<li style="--bc:${BUCKET_COL[b.key] || "var(--faint)"}">
       <span class="ob-b-dot" aria-hidden="true"></span>
-      <span class="ob-b-name"><b>${esc(b.name)}</b><small>${esc(SHORT_HELP[b.key] || b.help)}${b.perPerson && P.length > 1 ? " · one each" : ""}</small></span>
+      <span class="ob-b-name"><b>${esc(b.name)}</b><small>${esc((split.mode === "solo" && SOLO_HELP[b.key]) || SHORT_HELP[b.key] || b.help)}${b.perPerson && P.length > 1 ? " · one each" : ""}</small></span>
       <span class="unit ob-pct"><input type="text" inputmode="decimal" data-ob="split.${i}" value="${fmtNum(b.pct)}" aria-label="${esc(b.name)}, percent of pay"><i>%</i></span>
       <span class="ob-b-amt" data-obk="amt.${i}">${bucketAmount(b)}</span></li>`).join("")}</ul>
     ${saveErr ? `<p class="msg err" role="alert">${esc(saveErr)}</p>` : ""}
     <div class="ob-foot"><p class="ob-status" data-obk="status" aria-live="polite">${statusHTML(t)}</p>
     ${nav(saving ? "Saving your budget…" : saveErr ? "Try again" : "Use this plan", { disabled: saving || Math.round(t * 100) !== 10000 })}</div>
+    ${split.mode === "shared" && P.length === 1 ? `<p class="ob-hint ob-shared-hint">The shared parts are ready for whoever joins you. Add their pay later in the Budget tab.</p>` : ""}
     <p class="ob-skip"><button class="linkish" type="button" data-obact="skip">Start with a blank budget instead</button></p>`;
   }
 
@@ -228,7 +233,7 @@ async function finishBudget() {
   saving = true; saveErr = ""; draw();
   holdUndoForSetup(); // the plan becomes the budget's starting point, not something Undo can take back
   ans.people.forEach(p => { p.name = (p.name || "").trim(); });
-  app.state = buildBudget({ purpose: ans.people.length > 1 ? "household" : "solo", people: ans.people, have: {} }, split, app.today);
+  app.state = buildBudget({ ...planOf(), people: ans.people, have: {} }, split, app.today);
   app.hasData = true;
   changed({ full: false });
   try { await app.store.flushNow(); } catch (_) {}
@@ -268,6 +273,7 @@ export function initSetupEvents() {
   });
   document.addEventListener("change", e => {
     if (!app.setup || e.target.name !== "obmode") return;
+    if (ans.mode !== e.target.value) split = null; // a different plan for a different choice
     ans.mode = e.target.value; rememberMode(ans.mode);
   });
   document.addEventListener("click", e => {

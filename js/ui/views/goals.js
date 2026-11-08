@@ -19,6 +19,8 @@ import { jointGoalsLabel } from "./labels.js";
 import { budgetUI } from "../budget-sheets.js";
 import { itemIcon, iconPickerHTML } from "../icons.js";
 import { ART } from "../art.js";
+import { combineCard } from "../household-mode.js";
+import { isShared } from "../../model/schema.js";
 
 const CHEV = '<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5L10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const CHECK = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7"/></svg>';
@@ -102,12 +104,12 @@ export function view() {
   const hidden = goalGroups(S).filter(g => !shown(S, g));
   const addAny = ro || ui.reorder || !anyGoals(S) ? "" : `<button class="add-row" type="button" data-goal-new="${groups.length + hidden.length > 2 ? "pick" : "gj"}">+ Add goal</button>`;
   const help = `<details class="help"><summary>How goals are funded</summary><ul>
-    <li>The Budget tab decides how much goes to the emergency fund, ${S.people.length > 1 ? "the joint goals fund and each person’s goals pool" : "and to your goals"}. Each goal gets a % of its fund.</li>
+    <li>The Budget tab decides how much goes to the emergency fund, ${isShared(S) ? "the joint goals fund and each person’s goals pool" : "and to your goals"}. Each goal gets a % of its fund.</li>
     <li>Goals higher in a list are funded first. When a goal is reached, its share moves to the next unfinished goal below it (or above, if it’s last). If every goal is reached, the money shows as spare.</li>
     <li>Saved is money already put aside, in the account you pick. Picking an account doesn’t move any money. The Net worth tab checks the goals in each savings account add up.</li>
     <li>Leave the deadline blank for an estimated finish date, or set one to see whether you’re on track.</li>
   </ul></details>`;
-  return `<div class="gl-page"><div class="gl-side">${summary}</div><div class="gl-main">${head}${sections}${addAny}${help}</div></div>`;
+  return `<div class="gl-page"><div class="gl-side">${summary}</div><div class="gl-main">${head}${ui.reorder ? "" : combineCard()}${sections}${addAny}${help}</div></div>`;
 }
 
 /* ---------- the goal sheet (opened from ui/budget-sheets.js) ---------- */

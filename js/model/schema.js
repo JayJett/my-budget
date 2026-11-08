@@ -21,7 +21,9 @@ export const PERSON_COLOURS = {
 };
 export const COLOUR_KEYS = Object.keys(PERSON_COLOURS);
 
-/** Account "roles": the built-in accounts other tabs read from. They can be renamed but not deleted. */
+/** Account "roles": the built-in accounts other tabs read from. They can be renamed but not deleted.
+    A role is the allocation's PURPOSE (what the money is for). Who it belongs to is separate: an
+    allocation with an owner is that person's; one without is shared by the household. */
 export const ROLES = {
   spending: "Feeds the Joint spending tab",
   emergency: "Feeds the emergency fund",
@@ -29,6 +31,17 @@ export const ROLES = {
   invest: "Feeds the Investments tab",
   personalGoals: "Feeds this person’s goals",
 };
+/** The same notes, worded for a solo or shared budget. */
+export const roleNote = (role, S) => isShared(S) ? ROLES[role]
+  : ({ spending: "Feeds the Spending tab", emergency: "Feeds the emergency fund", goals: "Feeds your goals", invest: "Feeds the Investments tab", personalGoals: "Feeds your personal goals" })[role];
+
+/* ---------- solo or shared (Phase 8) ----------
+   state.mode is who the budget is FOR: "solo" ("Just me") or "shared" ("With someone"), chosen during
+   setup and changeable in Household settings. Budgets from before Phase 8 have no mode; for those we
+   go by the number of people, as the app always has. Adding a second person always makes it shared
+   in how things are shown, but never moves anyone's money. */
+export const MODES = ["solo", "shared"];
+export const isShared = S => !!S && ((S.people || []).length > 1 || S.mode === "shared");
 
 /* ---------- order within lists ---------- */
 /** The position number for a new item at the end of a list. */
@@ -88,19 +101,23 @@ export function renamePerson(state, pid, name) {
 
 /* ---------- a fresh budget ---------- */
 /** A new, empty budget for one person. (Phase 6: its starting accounts are named plainly, not "Joint …",
-    since there's only one person; existing budgets keep whatever names they have.) */
-export function blankBudget({ name = "" } = {}) {
+    since there's only one person; existing budgets keep whatever names they have.)
+    mode "solo" (Phase 8): every allocation is this person's, with one Goals allocation.
+    mode "shared": the household allocations are shared, plus this person's own personal goals.
+    No mode: the shape budgets have always had (kept for anything that doesn't say). */
+export function blankBudget({ name = "", mode } = {}) {
   const me = makePerson({ name, colour: "blue", pos: 1 });
   const acc = (id, name, type, role, pos, owner = null) => ({ id, name, type, owner, role, split: {}, pos });
+  const solo = mode === "solo", T = solo ? "Personal" : "Joint", O = solo ? me.id : null;
   return {
-    version: VERSION, note: "", viewAs: "fortnight",
+    version: VERSION, note: "", viewAs: "fortnight", ...(MODES.includes(mode) ? { mode } : {}),
     people: [me],
     accounts: [
-      acc("js", "Spending", "Joint", "spending", 1),
-      acc("ef", "Emergency Fund", "Joint", "emergency", 2),
-      acc("jg", "Goals", "Joint", "goals", 3),
+      acc("js", "Spending", T, "spending", 1, O),
+      acc("ef", "Emergency Fund", T, "emergency", 2, O),
+      acc("jg", "Goals", T, "goals", 3, O),
       acc("ji", "Investments", "Investment", "invest", 4),
-      acc(uid(), personalGoalsName(name), "Personal", "personalGoals", 5, me.id),
+      ...(solo ? [] : [acc(uid(), personalGoalsName(name), "Personal", "personalGoals", 5, me.id)]),
     ],
     nw: { reviewed: "", accounts: [] },
     spend: [],
@@ -146,6 +163,7 @@ export function normalise(s) {
   s.version = VERSION;
   if (s.note === undefined) s.note = "";
   if (!["week", "fortnight", "month"].includes(s.viewAs)) s.viewAs = "fortnight";
+  if (s.mode !== undefined && !MODES.includes(s.mode)) delete s.mode; // (never added: old budgets stay as they are)
   s.invest = { rate: 0.07, growth: 0, fee: 0, ...(s.invest || {}) };
   s.people.forEach((p, i) => {
     if (!PERSON_COLOURS[p.colour]) p.colour = COLOUR_KEYS[i % COLOUR_KEYS.length];

@@ -9,6 +9,14 @@
      goal: { name, target, deadline },                       // only for "saving for something"
    }
 
+   answers.mode = "solo" | "shared" (Phase 8): who the budget is FOR, chosen in step 1 ("Just me" or
+   "With someone"). It's not the same as how many people are listed: someone budgeting with a partner
+   may add only their own pay at first, and still gets a shared plan.
+
+   A solo plan is built for one person: every allocation is theirs (no "Joint"), and there's one Goals
+   allocation rather than "Goals" plus "Personal Goals". The money still feeds the same places (the
+   Spending tab, the emergency fund, goals, investments): that's decided by each allocation's role.
+
    The split is the same % of each person's own pay, so bigger earners put in more dollars
    (a split "in proportion to income"). People can change it all later. */
 
@@ -29,9 +37,13 @@ export const householdIncome = people => people.reduce((s, p) => s + n(p.pay) * 
 /** Three months of "bills & essentials" at the suggested 50% (55% for families). */
 export const emergencyTarget = (people, purpose) => Math.round(householdIncome(people) * (purpose === "family" ? 0.55 : 0.5) / 12 * 3);
 
+/** Solo or shared, from the answers: an explicit mode wins; otherwise "solo" purpose means solo. */
+export const planMode = answers => answers.mode === "solo" || answers.mode === "shared" ? answers.mode : (answers.purpose === "solo" ? "solo" : "shared");
+
 /** The suggested split: a list of buckets with a % of each person's pay, always adding to 100%. */
 export function suggestSplit(answers) {
   const purpose = answers.purpose || "household";
+  const solo = planMode(answers) === "solo";
   const have = answers.have || {};
   const debtTotal = (have.debts || []).reduce((s, d) => s + n(d.balance), 0);
   const efCovered = n(have.emergency) > 0 && n(have.emergency) >= emergencyTarget(answers.people || [], purpose);
@@ -48,17 +60,30 @@ export function suggestSplit(answers) {
   } else why.push("10% builds an emergency fund towards three months of essentials.");
   why.push("Everyone puts in the same % of their own pay, so the split is in proportion to income.");
 
-  const multi = (answers.people || []).length > 1;
+  if (solo) {
+    // One person: their own goals and "personal goals" are the same thing, so it's one Goals allocation
+    // with both shares (e.g. 10% + 5% = 15%). Nothing else about the suggestion changes.
+    pct.goals += pct.personalGoals; pct.personalGoals = 0;
+    const buckets = [
+      { key: "essentials", name: "Bills & essentials", type: "Personal", role: "spending", pct: pct.essentials, help: "Rent or mortgage, power, groceries, insurance, transport." },
+      { key: "fun", name: "Spending money", type: "Personal", role: null, pct: pct.fun, perPerson: true, help: "Your own money to spend, no questions asked." },
+      { key: "emergency", name: "Emergency Fund", type: "Personal", role: "emergency", pct: pct.emergency, help: "A safety net for surprises." },
+      { key: "goals", name: "Goals", type: "Personal", role: "goals", pct: pct.goals, help: "Saving for the things you want." },
+      { key: "invest", name: "Investments", type: "Investment", role: "invest", pct: pct.invest, help: "Long-term money that grows." },
+    ];
+    if (pct.debt > 0) buckets.splice(2, 0, { key: "debt", name: "Debt repayments", type: "Personal", role: null, pct: pct.debt, help: "Extra payments on top of the minimums." });
+    return { buckets, why, debtTotal, efCovered, mode: "solo" };
+  }
   const buckets = [
     { key: "essentials", name: "Bills & essentials", type: "Joint", role: "spending", pct: pct.essentials, help: "Rent or mortgage, power, groceries, insurance, transport." },
     { key: "fun", name: "Spending money", type: "Personal", role: null, pct: pct.fun, perPerson: true, help: "Each person’s own money to spend, no questions asked." },
     { key: "emergency", name: "Emergency Fund", type: "Joint", role: "emergency", pct: pct.emergency, help: "A safety net for surprises." },
-    { key: "goals", name: multi ? "Joint Goals" : "Goals", type: "Joint", role: "goals", pct: pct.goals, help: "Saving for the things you want." },
-    { key: "invest", name: multi ? "Joint Investments" : "Investments", type: "Investment", role: "invest", pct: pct.invest, help: "Long-term money that grows." },
+    { key: "goals", name: "Joint Goals", type: "Joint", role: "goals", pct: pct.goals, help: "Saving for the things you want, together." },
+    { key: "invest", name: "Joint Investments", type: "Investment", role: "invest", pct: pct.invest, help: "Long-term money that grows." },
     { key: "personalGoals", name: "Personal Goals", type: "Personal", role: "personalGoals", pct: pct.personalGoals, perPerson: true, help: "Each person’s own savings goals." },
   ];
-  if (pct.debt > 0) buckets.splice(2, 0, { key: "debt", name: "Debt repayments", type: multi ? "Joint" : "Personal", role: null, pct: pct.debt, help: "Extra payments on top of the minimums." });
-  return { buckets, why, debtTotal, efCovered };
+  if (pct.debt > 0) buckets.splice(2, 0, { key: "debt", name: "Debt repayments", type: "Joint", role: null, pct: pct.debt, help: "Extra payments on top of the minimums." });
+  return { buckets, why, debtTotal, efCovered, mode: "shared" };
 }
 
 const total = buckets => buckets.reduce((s, b) => s + n(b.pct), 0);
@@ -67,7 +92,8 @@ export const splitTotal = total;
 /** Build a full version 4 budget from the answers and the (possibly tweaked) split. */
 export function buildBudget(answers, split, today = new Date()) {
   const purpose = answers.purpose || "household";
-  const raw = (answers.people || []).filter(p => !blank(p.name) || n(p.pay) > 0).slice(0, MAX_PEOPLE);
+  const mode = split.mode || planMode(answers), solo = mode === "solo";
+  const raw = (answers.people || []).filter(p => !blank(p.name) || n(p.pay) > 0).slice(0, solo ? 1 : MAX_PEOPLE);
   const list = raw.length ? raw : [{ name: "" }];
   const colours = [];
   const people = list.map((p, i) => {
@@ -82,16 +108,17 @@ export function buildBudget(answers, split, today = new Date()) {
   for (const b of split.buckets) {
     if (b.perPerson) {
       people.forEach(p => {
-        const name = b.role === "personalGoals" ? personalGoalsName(p.name) : `${p.name || "Personal"} — ${b.name}`;
+        const name = b.role === "personalGoals" ? personalGoalsName(p.name) : solo ? b.name : `${p.name || "Personal"} — ${b.name}`;
         put({ id: uid(), name, type: "Personal", owner: p.id, role: b.role, split: n(b.pct) ? { [p.id]: pctOf(b) } : {} });
       });
     } else {
       const sp = {}; if (n(b.pct)) people.forEach(p => { sp[p.id] = pctOf(b); });
-      put({ id: fixedIds[b.key] || uid(), name: b.name, type: b.type, role: b.role, split: sp });
+      // solo: the whole plan is this one person's money, so each allocation is theirs
+      put({ id: fixedIds[b.key] || uid(), name: b.name, type: b.type, owner: solo && b.type === "Personal" ? people[0].id : null, role: b.role, split: sp });
     }
   }
-  // Every person must have a personal-goals account (the app relies on it).
-  people.forEach(p => { if (!accounts.some(a => a.role === "personalGoals" && a.owner === p.id)) put({ id: uid(), name: personalGoalsName(p.name), type: "Personal", owner: p.id, role: "personalGoals" }); });
+  // Shared plans: every person has a personal-goals account. (Solo plans have one Goals allocation instead.)
+  if (!solo) people.forEach(p => { if (!accounts.some(a => a.role === "personalGoals" && a.owner === p.id)) put({ id: uid(), name: personalGoalsName(p.name), type: "Personal", owner: p.id, role: "personalGoals" }); });
 
   // What you already have → Net worth
   const have = answers.have || {}, nw = [];
@@ -115,6 +142,7 @@ export function buildBudget(answers, split, today = new Date()) {
   return {
     version: VERSION,
     note: "",
+    mode,
     viewAs: freqToView(people[0].freq),
     people,
     accounts,

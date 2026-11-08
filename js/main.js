@@ -16,6 +16,7 @@ import { initHistory } from "./ui/history.js";
 import { initReminders } from "./ui/reminders.js";
 import { initAccent } from "./ui/accent.js";
 import { initBudgetSheets } from "./ui/budget-sheets.js";
+import { initHouseholdMode } from "./ui/household-mode.js";
 
 applyUI();
 initTooltips();
@@ -23,6 +24,7 @@ initPop();
 initEvents();
 initImport();
 initSettings();
+initHouseholdMode();
 initSetupEvents();
 initProgress();
 initInvest();

@@ -88,6 +88,10 @@ export function initEvents() {
   document.addEventListener("focusout", e => { const el = e.target; if (el.dataset && el.dataset.t === "num") el.value = fmtNum(readVal(el)); });
   document.addEventListener("change", e => {
     const d = e.target.dataset || {};
+    // (Phase 8 fix) A name typed in an open sheet is committed when the box loses focus, often because
+    // you've just tapped "Done". Redrawing then would replace that button mid-tap and swallow the tap,
+    // so it waits: closing the sheet redraws the tab anyway (ui/budget-sheets.js).
+    if (d.l === "pp" && d.f === "name" && e.target.closest && e.target.closest("dialog[open]")) return;
     if (REDRAW_ON_CHANGE.has(d.f) || (d.l === "pp" && d.f === "name")) render();
   });
 
