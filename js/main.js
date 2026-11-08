@@ -18,6 +18,7 @@ import { initAccent } from "./ui/accent.js";
 import { initBudgetSheets } from "./ui/budget-sheets.js";
 import { initHouseholdMode } from "./ui/household-mode.js";
 import { initHouseholdLook } from "./ui/household-look.js";
+import { initFeedback } from "./ui/feedback.js";
 
 applyUI();
 initTooltips();
@@ -27,6 +28,7 @@ initImport();
 initSettings();
 initHouseholdMode();
 initHouseholdLook();
+initFeedback();
 initSetupEvents();
 initProgress();
 initInvest();

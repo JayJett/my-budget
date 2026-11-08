@@ -320,3 +320,94 @@ test("before the database update: households still load, look the same as before
   assert.notEqual(await page.getAttribute("#hhLookPrev .hh-av", "data-oc"), "teal", "it went back to what was saved");
   assert.deepEqual(errors.filter(e => !/42703|appearance/.test(e)), []); await ctx.close();
 });
+
+/* ---------------- your look: setup step 1, Appearance, motion, touch feedback ---------------- */
+const meta = page => fake(page, () => window.__fake.authCalls.filter(c => c.name === "updateUser").map(c => c.data || (c.attrs && c.attrs.data)).filter(Boolean).reduce((a, d) => ({ ...a, ...d }), {}));
+
+test("setup step 1: 'Make it look like yours' is folded away, opens in place, saves to your login (not the budget), no Undo", { skip }, async () => {
+  const { page, errors, ctx } = await open({}, { waitFor: ".ob", ...phone(375, 667), storage: ALL_DONE });
+  await page.click('[data-obact="back"]');
+  assert.equal(await page.isVisible("#obLook"), false, "folded away to start");
+  const fits = () => page.evaluate(() => document.scrollingElement.scrollHeight <= innerHeight + 1);
+  assert.equal(await fits(), true);
+  await page.click('[data-obact="look"]');
+  assert.equal(await page.isVisible("#obLook"), true);
+  assert.equal(await fits(), true, "still no scrolling once it's open");
+  await page.click('#obLook [data-accent-pick="purple"]');
+  await page.click('#obLook [data-look="theme"][data-v="dark"]');
+  assert.equal(await page.evaluate(() => document.documentElement.dataset.accent), "purple", "shows straight away");
+  await page.waitForFunction(() => window.__fake.authCalls.some(c => c.name === "updateUser"), null, { timeout: 3000 });
+  await page.check('input[name="obmode"][value="solo"]', { force: true });
+  await page.click('[data-obact="next"]'); await page.fill('[data-ob="people.0.pay"]', "1500"); await page.click('[data-obact="next"]');
+  await page.click('[data-obact="next"]'); await page.waitForSelector(".ob-done"); await page.click('[data-obact="finish"]');
+  await page.waitForSelector("#app .b-income"); await settle(page);
+  const m = await meta(page);
+  assert.equal(m.accent, "purple"); assert.equal(m.theme, "dark");
+  assert.equal(JSON.stringify(await budgetOf(page)).includes("purple"), false, "not in the household's budget");
+  assert.equal(await page.isVisible("#undoBtn"), false, "and nothing to undo");
+  assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), "dark");
+  assert.deepEqual(errors, []); await ctx.close();
+});
+
+test("Appearance: a live preview, ten colours plus your own, motion, and a reset to defaults", { skip }, async () => {
+  const noVibrate = () => { try { delete Navigator.prototype.vibrate; } catch (_) {} };
+  const { page, errors, ctx } = await open(null, { ...phone(), storage: ALL_DONE, init: { ...TWO(), meta: { accent: "rose", theme: "dark", motion: "reduce" } }, initScript: noVibrate });
+  await page.click("#menuBtn"); await page.waitForSelector("#drawer:not([hidden])"); await page.click('#drawer [data-act="appearance"]');
+  await page.waitForSelector("#sheet .ap-prev");
+  assert.equal(await page.locator("#sheet [data-accent-pick]").count(), 10);
+  assert.equal(await page.getAttribute('#sheet [data-look="motion"][data-v="reduce"]', "aria-checked"), "true");
+  assert.equal(await page.evaluate(() => document.documentElement.dataset.motion), "reduce", "Reduced motion calms the whole app");
+  const prevColour = () => page.$eval(".ap-prev-sw", e => getComputedStyle(e).backgroundColor);
+  const before = await prevColour();
+  await page.click('#sheet [data-accent-pick="sky"]');
+  assert.notEqual(await prevColour(), before, "the preview follows");
+  // your own colour, made readable (in light mode yellow is far too pale on white, so it's darkened)
+  await page.click('#sheet [data-look="theme"][data-v="light"]');
+  await page.$eval("[data-accent-custom]", el => { el.value = "#ffff00"; el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("change", { bubbles: true })); });
+  assert.equal(await page.evaluate(() => document.documentElement.dataset.accent), "custom");
+  const acc = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--accent").trim());
+  assert.notEqual(acc.toUpperCase(), "#FFFF00", "yellow is adjusted so text stays readable");
+  assert.match(acc, /^#[0-9A-F]{6}$/i);
+  assert.equal(await page.locator('#sheet [data-accent-pick="custom"]').count(), 1, "'Yours' joins the colours");
+  await shot(page, "appearance");
+  // no vibration on this browser: no Touch feedback switch promising one
+  assert.equal(await page.locator('#sheet [data-look="feedback"]').count(), 0);
+  await page.click("#sheet [data-ap-reset]"); await page.click("#dlgYes");
+  await page.waitForSelector("#sheet .ap-prev");
+  assert.equal(await page.evaluate(() => [document.documentElement.dataset.accent, document.documentElement.dataset.theme, document.documentElement.dataset.motion].join("|")), "||");
+  // (quick changes are sent together, so this may be one save or several)
+  await page.waitForFunction(() => { const u = window.__fake.authCalls.filter(c => c.name === "updateUser"); return u.length && (u[u.length - 1].data || {}).accent === "mint"; }, null, { timeout: 3000 });
+  const m = await meta(page);
+  assert.deepEqual([m.accent, m.theme, m.motion], ["mint", "auto", "auto"]);
+  assert.deepEqual(errors, []); await ctx.close();
+});
+
+test("touch feedback: a short buzz for choices on phones that can vibrate, never twice in a blink, and never when switched off", { skip }, async () => {
+  const initScript = () => { window.__buzz = []; navigator.vibrate = p => { window.__buzz.push(p); return true; }; };
+  const { page, errors, ctx } = await open(null, { ...phone(), storage: ALL_DONE, init: TWO(), motion: "no-preference", initScript });
+  await page.click('[data-viewas="week"]');
+  assert.deepEqual(await page.evaluate(() => window.__buzz), [8]);
+  await page.click('[data-viewas="month"]'); // straight after: skipped
+  await page.waitForTimeout(150); await page.click('[data-viewas="fortnight"]');
+  assert.equal(await page.evaluate(() => window.__buzz.length), 2);
+  await page.click('[data-viewas="fortnight"]'); await page.waitForTimeout(150);
+  assert.equal(await page.evaluate(() => window.__buzz.length), 2, "tapping what's already chosen: nothing");
+  await page.click("#menuBtn"); await page.waitForSelector("#drawer:not([hidden])"); await page.click('#drawer [data-act="appearance"]');
+  await page.waitForSelector('#sheet [data-look="feedback"]');
+  await page.click('#sheet [data-look="feedback"][data-v="off"]');
+  const n = await page.evaluate(() => window.__buzz.length);
+  await page.waitForTimeout(150); await page.click('#sheet [data-accent-pick="ocean"]');
+  assert.equal(await page.evaluate(() => window.__buzz.length), n, "off means off");
+  assert.deepEqual(errors, []); await ctx.close();
+});
+
+test("iPhone-like browser (no vibration): everything works, nothing breaks, visual feedback only", { skip }, async () => {
+  const initScript = () => { try { delete Navigator.prototype.vibrate; } catch (_) {} };
+  const { page, errors, ctx } = await open(null, { ...phone(), storage: ALL_DONE, init: TWO(), motion: "no-preference", initScript });
+  assert.equal(await page.evaluate(() => typeof navigator.vibrate), "undefined");
+  await page.click('[data-viewas="week"]'); await page.click('[data-tab="goals"]');
+  await page.click("#menuBtn"); await page.waitForSelector("#drawer:not([hidden])"); await page.click('#drawer [data-act="appearance"]');
+  await page.waitForSelector("#sheet .ap-prev");
+  assert.equal(await page.locator('#sheet [data-look="feedback"]').count(), 0);
+  assert.deepEqual(errors, []); await ctx.close();
+});

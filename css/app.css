@@ -2225,3 +2225,62 @@ body.setting-up::before, body.signed-out::before{ background:transparent; }
 .hh-look-acts small{ flex-basis:100%; color:var(--muted); font-size:var(--fs-xs); }
 .hh-look .oc-row{ margin-top:12px; }
 .hh-icons button b{ font:700 1rem var(--display); }
+
+/* ============ Phase 8: motion — one spring, used everywhere ============
+   Press: things sink in quickly (--m-fast). Release: they spring back with a small, soft overshoot
+   (--ease-spring). Only transform and opacity move. Calm mode (the phone's Reduce Motion, or "Reduced"
+   in Appearance) switches all of it off. */
+:root{ --ease-spring:cubic-bezier(.34,1.36,.64,1); --m-spring:.32s; }
+.btn, .alloc-row, .member-row, .dr-row, .dr-hh, .dr-me, .hm-opt, .acc-sw, .acc-mini-sw, .oc-sw, .ico-pick button, .ico-grid > button.def, .ex-row, .gl-card, .ob-opt, .tab .ti, .seg button, .seg-radio label{
+  transition-property:transform, background-color, border-color, color, box-shadow, opacity;
+  transition-duration:var(--m-spring), var(--dur), var(--dur), var(--dur), var(--m-sel), var(--dur);
+  transition-timing-function:var(--ease-spring), var(--ease), var(--ease), var(--ease), var(--ease), var(--ease); }
+:is(.btn, .hm-opt, .acc-sw, .oc-sw, .ico-pick button, .ico-grid > button.def, .seg button, .seg-radio label):active:not(:disabled){ transform:scale(.95); transition-duration:var(--m-fast); }
+:is(.alloc-row, .member-row, .ex-row, .ob-opt, .gl-card:not(.compact)):active:not(:disabled){ transform:scale(.985); transition-duration:var(--m-fast); }
+:is(.dr-row, .dr-hh, .dr-me):active{ transform:scale(.98); transition-duration:var(--m-fast); }
+.tab:active .ti{ transform:scale(.88); transition-duration:var(--m-fast); }
+/* choosing something: its tick or ring springs in */
+.oc-sw[aria-checked="true"], .acc-mini-sw[aria-checked="true"]{ animation:choose-pop var(--m-spring) var(--ease-spring); }
+@keyframes choose-pop{ 0%{ transform:scale(.86); } 100%{ transform:scale(1); } }
+/* sheets rise with the same spring; their backdrop fades */
+dialog.sheet[open]{ animation:sheet-in .34s var(--ease-spring); }
+dialog.sheet::backdrop{ animation:fade-in .24s var(--ease); }
+@keyframes fade-in{ from{ opacity:0; } }
+/* progress glides to its new value (only when a value really changes; nothing replays on opening) */
+.st-bar span, .gl-bar span, .ex-prog span, .ob-prog span{ transition:width .5s var(--ease-out, var(--ease)); }
+/* your "Reduced" motion choice, the same as the phone's setting */
+:root[data-motion="reduce"] *, :root[data-motion="reduce"] *::before, :root[data-motion="reduce"] *::after, :root[data-motion="reduce"] dialog::backdrop{ transition:none !important; animation:none !important; scroll-behavior:auto !important; }
+@media (prefers-reduced-motion: reduce){ dialog.sheet::backdrop{ animation:none !important; } }
+/* Phase 8: Appearance preview (uses the live tokens, so it changes as you pick) */
+.ap-prev{ position:sticky; top:-1px; z-index:2; margin:-4px -4px 8px; padding:4px; background:var(--surface); }
+.ap-prev-card{ display:grid; grid-template-columns:1fr auto; gap:10px; align-items:center; padding:12px 14px; border-radius:16px; background:var(--bg); border:1px solid var(--line); }
+.ap-prev-t{ font:650 .95rem var(--display); color:var(--ink); }
+.ap-prev-bar{ grid-column:1/-1; height:6px; border-radius:99px; background:var(--accent-soft); overflow:hidden; }
+.ap-prev-bar i{ display:block; width:62%; height:100%; border-radius:99px; background:var(--accent); }
+.ap-prev-row{ grid-column:1/-1; display:flex; align-items:center; gap:12px; }
+.ap-prev-row .btn{ pointer-events:none; }
+.ap-prev-row .linkish{ color:var(--accent); font-weight:600; font-size:var(--fs-sm); }
+.ap-prev-sw{ margin-left:auto; width:22px; height:22px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+.ap-links{ display:grid; gap:4px; }
+.ap-links .dr-row{ border:1px solid var(--line); background:var(--surface-2); }
+.ap-links .dr-row small{ display:block; color:var(--muted); font-size:var(--fs-xs); font-weight:500; }
+
+/* Phase 8: setup step 1, "Make it look like yours" (the setup screens are always dark, so dark swatches) */
+.acc-mini-sw[data-accent-pick="mint"]{ --sw:#7FD4A8; } .acc-mini-sw[data-accent-pick="emerald"]{ --sw:#52B883; } .acc-mini-sw[data-accent-pick="teal"]{ --sw:#43B5B0; } .acc-mini-sw[data-accent-pick="ocean"]{ --sw:#7FB9F2; } .acc-mini-sw[data-accent-pick="sky"]{ --sw:#51B1DF; } .acc-mini-sw[data-accent-pick="lavender"]{ --sw:#B9A6F5; } .acc-mini-sw[data-accent-pick="purple"]{ --sw:#C594E4; } .acc-mini-sw[data-accent-pick="rose"]{ --sw:#F29CC3; } .acc-mini-sw[data-accent-pick="coral"]{ --sw:#F4A285; } .acc-mini-sw[data-accent-pick="amber"]{ --sw:#F2C46B; }
+.ob-look{ margin-top:10px; }
+.ob-look-btn{ display:inline-flex; align-items:center; gap:8px; min-height:var(--tap); font-weight:600; }
+.ob-look-btn .ob-look-dots{ display:inline-flex; } .ob-look-btn .ob-look-dots i{ width:12px; height:12px; border-radius:50%; margin-left:-4px; box-shadow:0 0 0 2px var(--surface); }
+.ob-look-btn .ob-look-dots i:first-child{ margin-left:0; }
+.ob-look-body{ display:grid; gap:10px; padding:4px 0 2px; animation:ob-reveal .22s var(--ease-spring); }
+.acc-mini{ display:flex; gap:8px; overflow-x:auto; padding:4px 2px 6px; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+.acc-mini::-webkit-scrollbar{ display:none; }
+.acc-mini-sw{ flex:none; width:34px; height:34px; border-radius:50%; border:0; padding:0; background:var(--sw); color:transparent; display:grid; place-items:center; cursor:pointer; }
+.acc-mini-sw svg{ width:16px; height:16px; }
+.acc-mini-sw[aria-checked="true"]{ color:#0E1412; box-shadow:0 0 0 3px var(--hero, #2D3C3F), 0 0 0 5px var(--sw); }
+.acc-mini-sw:focus-visible{ outline:2px solid var(--ink); outline-offset:3px; }
+.ob-look .seg-look{ max-width:320px; }
+/* opening it on a short screen: the picture steps aside so nothing needs scrolling */
+.ob-card.look-open .ob-art{ display:none; }
+/* Phase 8: the colour you pick on setup step 1 shows on the setup screens straight away (each accent's
+   light version, checked against these dark screens in tests/accent.test.js) */
+:root[data-accent] .im{ --accent:var(--acc-d); --accent-hover:var(--acc-d); --accent-soft:color-mix(in srgb, var(--acc-d) 22%, #0B2621); --on-accent:var(--on-acc-d); }

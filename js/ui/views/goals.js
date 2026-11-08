@@ -24,6 +24,7 @@ const gcStyle = g => isObjectColour(g.colour) ? ` style="--gc:var(--o-${g.colour
 import { ART } from "../art.js";
 import { combineCard } from "../household-mode.js";
 import { isShared } from "../../model/schema.js";
+import { feedback } from "../feedback.js";
 
 const CHEV = '<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5L10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const CHECK = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7"/></svg>';
@@ -241,7 +242,7 @@ export function initGoals() {
     if (now >= 1 && was < 1) line = `${g.name} reached its target`;
     else { const step = STEPS.find(([s]) => was < s && now >= s); if (step) line = `${g.name} is ${step[1]}`; }
     if (!line) return;
-    toast(line, "ok");
+    toast(line, "ok"); feedback("success");
     document.querySelectorAll(`#sheet .gl-bar.big, [data-edit-goal][data-i="${CSS.escape(g.id)}"]`).forEach(x => { x.classList.remove("cheer"); void x.offsetWidth; x.classList.add("cheer"); });
   }
 }

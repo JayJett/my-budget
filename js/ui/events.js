@@ -10,6 +10,7 @@ import { pct, possessive } from "../model/format.js";
 import { openMenu } from "./menu.js";
 import { closeDrawer } from "./drawer.js";
 import { startSetup } from "./onboarding.js";
+import { calm } from "./motion.js";
 
 /* Phase 7D: each tab remembers how far down you were, so coming back puts you where you left off.
    Switching tab also closes anything left open over the old one (an editing sheet, the menu, a
@@ -103,7 +104,7 @@ export function initEvents() {
     if (tb) {
       const h = TAB_HASH[tb.dataset.tab];
       // tapping the tab you're already on goes back to its top (like a phone app); otherwise switch
-      if (tb.dataset.tab === app.tab) { tabScroll[app.tab] = 0; window.scrollTo({ top: 0, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }); return; }
+      if (tb.dataset.tab === app.tab) { tabScroll[app.tab] = 0; window.scrollTo({ top: 0, behavior: calm() ? "auto" : "smooth" }); return; }
       if (location.hash !== "#" + h) location.hash = h; else switchTab(tb.dataset.tab);
       return;
     }

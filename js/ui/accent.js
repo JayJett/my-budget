@@ -17,6 +17,7 @@ import { esc } from "./dom.js";
 import { ACCENTS, DEFAULT_ACCENT, CUSTOM_ACCENT } from "./accent-list.js";
 import { accentTokens, isHex } from "./palette.js";
 import { applyUI } from "./render.js";
+import { calm } from "./motion.js";
 
 const KEY = id => `mb-accent-${id}`;
 export const THEMES = [["auto", "Auto"], ["light", "Light"], ["dark", "Dark"]];
@@ -118,7 +119,7 @@ async function save(uid) {
 export function chooseLook(field, value) {
   if (!VALID[field] || !VALID[field](value)) return;
   const root = document.documentElement;
-  if (!matchMedia("(prefers-reduced-motion: reduce)").matches) { root.classList.add("theme-anim"); clearTimeout(chooseLook._t); chooseLook._t = setTimeout(() => root.classList.remove("theme-anim"), 450); }
+  if (!calm()) { root.classList.add("theme-anim"); clearTimeout(chooseLook._t); chooseLook._t = setTimeout(() => root.classList.remove("theme-anim"), 450); }
   const u = app.session && app.session.user;
   const look = u ? lookFor(u) : { ...shown, theme: app.ui.theme, density: app.ui.density };
   look[field] = value; applyLook(look);
@@ -157,7 +158,7 @@ export function accentPickerHTML({ custom = true } = {}) {
 /** Small swatches only (setup step 1): the curated colours, nothing else. */
 export const accentSwatchesHTML = () => { const cur = currentAccent(); return `<div class="acc-mini" role="radiogroup" aria-label="Accent colour">${ACCENTS.map(a => `<button type="button" class="acc-mini-sw" role="radio" data-accent-pick="${a.key}" aria-checked="${a.key === cur}" aria-label="${esc(a.label)}">${TICK}</button>`).join("")}</div>`; };
 /** A two- or three-way choice (light/dark, spacing) as a segmented control. */
-export const lookSeg = (field, opts, label) => `<div class="seg seg-look" role="radiogroup" aria-label="${esc(label)}">${opts.map(([v, l]) => `<button type="button" role="radio" data-look="${field}" data-v="${v}" aria-checked="${app.ui[field] === v}">${esc(l)}</button>`).join("")}</div>`;
+export const lookSeg = (field, opts, label) => { const cur = field in app.ui ? app.ui[field] : shown[field]; return `<div class="seg seg-look" role="radiogroup" aria-label="${esc(label)}">${opts.map(([v, l]) => `<button type="button" role="radio" data-look="${field}" data-v="${v}" aria-checked="${cur === v}">${esc(l)}</button>`).join("")}</div>`; };
 
 export function initAccent() {
   document.addEventListener("click", e => {

@@ -43,9 +43,10 @@ export function accentTokens(hex) {
   accent = fit(accent, [L.bg, L.surface, soft], 4.6, "#000000");
   const hover = mix(accent, "#000000", 0.14);
   // dark mode: light enough on the dark page, cards, its soft fill and the hero cards
-  let dAccent = fit(hex, [D.bg, D.surface, D.hero, L.hero], 4.6, "#FFFFFF");
+  const IM = ["#0B2621", "#19413A"]; // the dark setup screens (css .im)
+  let dAccent = fit(hex, [D.bg, D.surface, D.hero, L.hero, ...IM], 4.6, "#FFFFFF");
   const dSoft = mix(dAccent, D.surface, 0.84);
-  dAccent = fit(dAccent, [D.bg, D.surface, D.hero, L.hero, dSoft], 4.6, "#FFFFFF");
+  dAccent = fit(dAccent, [D.bg, D.surface, D.hero, L.hero, ...IM, dSoft], 4.6, "#FFFFFF");
   const dHover = mix(dAccent, "#FFFFFF", 0.18);
   const dOn = fit(mix(dAccent, "#000000", 0.88), [dAccent, dHover], 4.6, "#000000");
   return {

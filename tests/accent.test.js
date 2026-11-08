@@ -60,6 +60,11 @@ test("the dark hero cards and the dark setup screens are readable (Phase 7C rede
   const im = block(".im{");
   for (const k of ["ink", "muted", "accent", "bad", "ok"]) assert.ok(ratio(im[k], im.bg) >= 4.5 && ratio(im[k], im["surface-2"]) >= 4.5, `setup screens: ${k}`);
   assert.ok(ratio(im["on-accent"], im.accent) >= 4.5);
+  // Phase 8: a colour picked on setup step 1 shows on these screens too
+  for (const [a, on] of accD) {
+    assert.ok(ratio(a, im.bg) >= 4.5 && ratio(a, im["surface-2"]) >= 4.5, `accent ${a} on the setup screens`);
+    assert.ok(ratio(on, a) >= 4.5);
+  }
 });
 
 test("status and people's colours are readable too (phase 6 audit: warning chips and the gold person colour)", () => {

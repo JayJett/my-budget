@@ -12,6 +12,7 @@ import { loadReminders, resetReminders, openFromHash } from "./reminders.js";
 import { disablePush } from "./push.js";
 import { useAccentOf, resetAccent } from "./accent.js";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "../config.js";
+import { calm } from "./motion.js";
 
 const here = () => location.origin + location.pathname;
 /* Emails with a code to type in (Phase 7A) need Supabase's email templates to include the code, and
@@ -241,7 +242,7 @@ function initWelcome(el) {
   const track = el.querySelector("#wlTrack"), dots = [...el.querySelectorAll("[data-wl]")];
   if (!track) return;
   const at = () => Math.round(track.scrollLeft / Math.max(1, track.clientWidth));
-  const show = i => { const k = Math.max(0, Math.min(dots.length - 1, i)); track.scrollTo({ left: k * track.clientWidth, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }); };
+  const show = i => { const k = Math.max(0, Math.min(dots.length - 1, i)); track.scrollTo({ left: k * track.clientWidth, behavior: calm() ? "auto" : "smooth" }); };
   let raf = 0;
   track.addEventListener("scroll", () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => { const i = at(); dots.forEach((d, k) => d.setAttribute("aria-current", String(k === i))); }); }, { passive: true });
   dots.forEach((d, k) => d.addEventListener("click", () => show(k)));

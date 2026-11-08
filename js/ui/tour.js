@@ -21,6 +21,7 @@ import { app, TAB_HASH } from "./ctx.js";
 import { $, esc, lockScroll, unlockScroll } from "./dom.js";
 import { TABS } from "./views/labels.js";
 import { isShared } from "../model/schema.js";
+import { calm } from "./motion.js";
 
 /* ---------- the tours ----------
    Each stop names what to point at (the first of these that's on screen) and what to say. A stop
@@ -134,7 +135,6 @@ export const tourDone = (tab = "budget") => tourState()[tab] === "done";
 
 /* ---------- the spotlight tour ---------- */
 let el = null, cur = null, i = 0, stops = [], opener = null, raf = 0;
-const calm = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const val = v => typeof v === "function" ? v() : v;
 const visible = t => { if (!t) return false; const r = t.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(t).visibility !== "hidden"; };
 const find = s => { for (const q of s.sel) { const t = document.querySelector(q); if (visible(t)) return t; } return null; };

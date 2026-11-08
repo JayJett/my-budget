@@ -26,6 +26,9 @@ import { HERO } from "./hero-art.js";
 import { setThemeColour } from "./auth.js";
 import { markTour } from "./tour.js";
 import { holdUndoForSetup } from "./history.js";
+import { calm } from "./motion.js";
+import { feedback } from "./feedback.js";
+import { accentSwatchesHTML, lookSeg, THEMES } from "./accent.js";
 
 export const STAGES = ["Make it yours", "Your income", "Your starting plan"];
 const FREQS = [["weekly", "Weekly"], ["fortnightly", "Fortnightly"], ["monthly", "Monthly"]];
@@ -86,7 +89,6 @@ function skip() {
    Transitions where it has them; elsewhere the new card simply eases in). With "reduce motion" on,
    the step changes straight away. Nothing waits on an animation: the new step is drawn at once. */
 let shownStage = 0;
-const calm = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 function header(shell) {
   const tmp = document.createElement("div");
   tmp.innerHTML = obHeader(stage, done, stage <= 3 ? `<button class="linkish ob-later" type="button" data-obact="skip">Set up later</button>` : "");
@@ -104,7 +106,7 @@ function draw() {
     if (!shell) { el.innerHTML = `<div class="ob im"><div class="ob-in-wrap">${obHeader(stage, done, "")}<div class="ob-card" role="group" aria-labelledby="obTitle"></div></div></div>`; shell = el.firstElementChild; }
     header(shell);
     const card = shell.querySelector(".ob-card");
-    card.className = `ob-card st-${stage}`; card.innerHTML = html;
+    card.className = `ob-card st-${stage}${stage === 1 && lookOpen ? " look-open" : ""}`; card.innerHTML = html;
     // Tell screen readers where they are, without popping up the keyboard
     const h = $("#obTitle"); if (h && moved) h.focus({ preventScroll: true });
     if (moved) { window.scrollTo({ top: 0 }); shell.scrollTop = 0; }
@@ -131,10 +133,20 @@ export const modeChoices = (cur, withJoin) => `<fieldset class="ob-opts"><legend
   ${choice("with", "With someone", "Shared with a partner or family", ICONS.with, cur === "with")}
   ${withJoin ? choice("join", "Joining a household", "Someone has invited you", ICONS.join, cur === "join") : ""}</fieldset>`;
 
+/* Phase 8: "Make it look like yours": optional, folded into one link until wanted. Your colour and
+   light/dark are personal (saved to your login, never to the budget), so choosing them here adds
+   nothing to the household's history or Undo. These setup screens stay dark; your choice of light or
+   dark shows once you're in. */
+let lookOpen = false;
+const LOOK_DOTS = ["#7FD4A8", "#7FB9F2", "#B9A6F5", "#F4A285"];
+const lookPart = () => `<div class="ob-look"><button class="linkish ob-look-btn" type="button" data-obact="look" aria-expanded="${lookOpen}" aria-controls="obLook"><span class="ob-look-dots" aria-hidden="true">${LOOK_DOTS.map(c => `<i style="background:${c}"></i>`).join("")}</span>Make it look like yours <small class="dim">optional</small></button>
+  <div class="ob-look-body" id="obLook"${lookOpen ? "" : " hidden"}>${accentSwatchesHTML()}${lookSeg("theme", THEMES, "Light, dark or auto")}</div></div>`;
+
 function body() {
   const P = ans.people;
   if (stage === 1) return `<div class="ob-art" aria-hidden="true">${HERO.together()}</div><h2 id="obTitle" tabindex="-1">Let’s make this yours</h2><p class="lead">Are you budgeting on your own or with someone else?</p>
     ${modeChoices(ans.mode, false)}
+    ${lookPart()}
     <p class="ob-hint">${app.household ? `Your household: <b>${esc(app.household.name)}</b>. You can rename it or invite people in Household settings.` : ""}</p>
     ${nav("Continue", { back: false })}`;
 
@@ -238,7 +250,7 @@ async function finishBudget() {
   changed({ full: false });
   try { await app.store.flushNow(); } catch (_) {}
   saving = false;
-  if (app.saveStatus === "saved") { done = 3; stage = 4; dir = 1; draw(); return; }
+  if (app.saveStatus === "saved") { done = 3; stage = 4; dir = 1; draw(); feedback("success"); return; }
   if (app.saveStatus === "offline") { done = 3; stage = 4; draw(); toast("Saved on this device. It’ll sync when you’re back online."); return; }
   saveErr = "We couldn’t save your budget yet. Check your connection and try again.";
   draw();
@@ -281,6 +293,12 @@ export function initSetupEvents() {
     const b = e.target.closest("[data-obact]"); if (!b || b.disabled) return;
     const act = b.dataset.obact, i = Number(b.dataset.i);
     if (act === "skip") return skip();
+    if (act === "look") {
+      lookOpen = !lookOpen; b.setAttribute("aria-expanded", String(lookOpen));
+      const body = document.getElementById("obLook"); if (body) body.hidden = !lookOpen;
+      const card = b.closest(".ob-card"); if (card) card.classList.toggle("look-open", lookOpen);
+      return;
+    }
     if (act === "back") return go(Math.max(1, stage - 1));
     if (act === "next") {
       if (stage === 1) { if (ans.mode === "solo") { ans.people = ans.people.slice(0, 1); split = null; } return go(2); }
