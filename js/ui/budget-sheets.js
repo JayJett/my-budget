@@ -231,9 +231,12 @@ export function initBudgetSheets() {
     const gn = t.closest("[data-goal-new]");
     if (gn) {
       if (gn.dataset.goalNew !== "pick") { newGoal(gn.dataset.goalNew); return; }
-      // Which list? (joint, or one person's own goals)
+      // Which pot pays for it? (Phase 7D.2: the question in plain words, with what each pot gets per period.
+      // Nothing is moved between pots: the goal just joins the list it's funded from.)
+      const C = app.C, w = WORDS[app.state.viewAs];
       const opts = goalGroups(app.state).filter(g => g.kind !== "ef");
-      openPop(gn, `<div class="pop-h">Add a goal to</div>${opts.map(g => `<button class="item" type="button" data-pick-goal="${esc(g.key)}">${esc(g.title)}</button>`).join("")}`, b => { closePop(); newGoal(b.dataset.pickGoal); });
+      const per = g => C ? money(C.v(g.kind === "joint" ? C.pool.goals.t : C.pool.personalGoals[g.kind.id] || 0)) + w.short : "";
+      openPop(gn, `<div class="pop-h">Where should the money come from?</div>${opts.map(g => `<button class="item gl-pot" type="button" data-pick-goal="${esc(g.key)}"><span>${esc(g.title)}</span><small>${per(g)} going to it</small></button>`).join("")}`, b => { closePop(); newGoal(b.dataset.pickGoal); }, { label: "Choose where the money comes from" });
       return;
     }
     if (t.closest("[data-person-new]")) {

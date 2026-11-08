@@ -34,7 +34,7 @@ const fakePushManager = () => {
 
 async function openSettings(page) {
   await page.click("#bellBtn");
-  await page.click('#sheet [data-rem="settings"]');
+  await page.click('#drawer [data-rem="settings"]');
   await page.waitForSelector("#sheet .push-set");
 }
 async function openWithPush({ init: extra, ...opts } = {}) {
@@ -143,7 +143,7 @@ test("the service worker shows a pushed reminder, and tapping it opens the right
   await page.waitForSelector('[data-tab="spending"][aria-selected="true"]');
   // Several reminders open the inbox
   await page.evaluate(() => navigator.serviceWorker.dispatchEvent(new MessageEvent("message", { data: { type: "open", hash: "#reminders" } })));
-  await page.waitForSelector("#sheet .rem");
+  await page.waitForSelector("#drawer .rem");
   assert.deepEqual(errors, []);
   await ctx.close();
 });
@@ -152,7 +152,7 @@ test("a link to #reminders (from a notification) opens the inbox when the app st
   const { page, errors, ctx } = await open(null, { init: init() });
   await settle(page);
   await page.evaluate(() => { location.hash = "reminders"; });
-  await page.waitForSelector("#sheet .rem");
+  await page.waitForSelector("#drawer .rem");
   assert.notEqual(await page.evaluate(() => location.hash), "#reminders", "the address goes back to the tab");
   assert.deepEqual(errors, []);
   await ctx.close();

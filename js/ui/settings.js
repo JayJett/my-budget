@@ -4,6 +4,7 @@ import { app } from "./ctx.js";
 import { $, esc, toast, confirmDel, offerFile } from "./dom.js";
 import { ymd } from "../model/util.js";
 import { accentPickerHTML, lookSeg, THEMES, DENSITIES } from "./accent.js";
+import { avatarHTML, myName, checkFile, loadImage, cropper, savePhoto, removePhoto, refreshAvatars } from "./profile.js";
 
 const ROLE_LABEL = { owner: "Owner", editor: "Editor", viewer: "Viewer" };
 const ROLE_HELP = { owner: "Can do everything, including managing people", editor: "Can change the budget and invite people", viewer: "Can look, but not change anything" };
@@ -25,6 +26,54 @@ export function openAppearance() {
     <section class="set"><h4>Light or dark</h4>${lookSeg("theme", THEMES, "Light or dark")}<p class="set-note">Auto follows your phone or computer.</p></section>
     <section class="set"><h4>Spacing</h4>${lookSeg("density", DENSITIES, "Spacing")}<p class="set-note">Compact fits a little more on screen.</p></section>
     ${app.session ? `<p class="set-note">Saved to your login, so it follows you to your other devices.</p>` : ""}`);
+}
+
+/* ---------- my profile (Phase 7D.2): your picture and your name; security stays in Account settings ---------- */
+let crop = null;
+export function openProfile() {
+  const u = app.session.user, name = myName() || (u.user_metadata && u.user_metadata.name) || "", has = !!(u.user_metadata && u.user_metadata.avatar);
+  crop = null;
+  open("My profile", `
+    <section class="prof">
+      <div class="prof-av" data-my-avatar="xl">${avatarHTML("xl")}</div>
+      <div class="prof-acts"><button class="btn small soft" type="button" data-prof="pick">${has ? "Change photo" : "Add a photo"}</button>${has ? `<button class="btn small ghost" type="button" data-prof="remove">Remove photo</button>` : ""}</div>
+      <input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" data-prof-file hidden>
+      <div class="msg" id="mProf" role="status" aria-live="polite"></div>
+      <div class="prof-crop" id="cropBox" hidden>
+        <canvas class="prof-canvas" tabindex="0" aria-label="Your photo. Drag, or use the arrow keys, to move it inside the circle."></canvas>
+        <label class="prof-zoom"><span>Zoom</span><input type="range" min="1" max="3" step="0.01" value="1" data-crop-zoom></label>
+        <div class="prof-crop-acts"><button class="btn" type="button" data-prof="cancel">Cancel</button><button class="btn primary" type="button" data-prof="save">Save photo</button></div>
+      </div>
+    </section>
+    <section class="set"><h4>Your name</h4><form id="setName" class="set-row"><input type="text" name="name" value="${esc(name)}" autocomplete="given-name" required aria-label="Your name" maxlength="60"><button class="btn primary" type="submit">Save</button></form><div class="msg" id="mName"></div>
+      <p class="set-note">How you appear to other people in your households.</p></section>
+    <section class="set"><h4>Email</h4><p class="prof-email">${esc(u.email || "")}</p><button class="btn small soft" type="button" data-sheet="account">Email, password and security</button></section>`);
+}
+async function profileAction(act, btn) {
+  const box = $("#cropBox");
+  if (act === "pick") { $("[data-prof-file]").click(); return; }
+  if (act === "cancel") { crop = null; box.hidden = true; return; }
+  if (act === "save") {
+    if (!crop) return;
+    btn.disabled = true; btn.textContent = "Saving…"; msg("mProf", "", "info");
+    try { await savePhoto(await crop.blob()); toast("Photo saved", "ok"); openProfile(); app.render(); }
+    catch (e) { msg("mProf", `${e.message} Your previous picture hasn’t changed.`); btn.disabled = false; btn.textContent = "Try again"; }
+    return;
+  }
+  if (act === "remove") {
+    if (!(await confirmDel("Remove your photo?", "Your initial shows instead. You can add a photo again any time.", "Remove"))) return;
+    try { await removePhoto(); toast("Photo removed"); openProfile(); app.render(); }
+    catch (e) { msg("mProf", e.message); }
+  }
+}
+async function photoChosen(input) {
+  const f = input.files && input.files[0]; input.value = "";
+  const bad = checkFile(f); if (bad) { msg("mProf", bad); return; }
+  try {
+    const img = await loadImage(f), box = $("#cropBox");
+    crop = cropper(img).mount(box); box.hidden = false; msg("mProf", "Drag to position, zoom if you like, then save.", "info");
+    box.querySelector("canvas").focus({ preventScroll: true });
+  } catch (e) { msg("mProf", e.message); }
 }
 
 /* ---------- account ---------- */
@@ -118,6 +167,8 @@ export function initSettings() {
     if (b.dataset.sheet === "close") return close();
     if (b.dataset.sheet === "download") return downloadAll();
     if (b.dataset.sheet === "appearance") return openAppearance();
+    if (b.dataset.sheet === "account") return openAccount();
+    if (b.dataset.prof) return profileAction(b.dataset.prof, b);
     if (b.dataset.sheet === "leave") {
       if (!(await confirmDel(`Leave ${app.household.name}?`, leaveText().replace(/<[^>]+>/g, ""), "Leave"))) return;
       const { data, error } = await app.sb.rpc("leave_household", { p_household: app.household.id });
@@ -134,6 +185,7 @@ export function initSettings() {
     if (b.dataset.uninvite) { await app.sb.from("household_invites").delete().eq("id", b.dataset.uninvite); return openHouseholdSettings(); }
   });
   d.addEventListener("change", async e => {
+    if (e.target.matches && e.target.matches("[data-prof-file]")) return photoChosen(e.target);
     const s = e.target.closest("[data-role-for]"); if (!s) return;
     const { error } = await app.sb.rpc("set_member_role", { p_household: app.household.id, p_user: s.dataset.roleFor, p_role: s.value });
     if (error) { msg("mPeople", friendly(error)); return openHouseholdSettings(); }
@@ -149,6 +201,8 @@ export function initSettings() {
         if (error) return msg("mName", friendly(error));
         await app.sb.rpc("sync_my_profile");
         app.rememberMe();
+        const me = (app.members || []).find(m => m.user_id === app.meId); if (me) me.display_name = v.name.trim();
+        refreshAvatars(); app.render();
         msg("mName", "Saved.", "ok");
       }
       if (f.id === "setEmail") {

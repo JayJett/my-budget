@@ -90,75 +90,7 @@ test("sign-in: the tagline wraps instead of being cut off", { skip }, async () =
 });
 
 /* ---------------- the menu as a bottom sheet ---------------- */
-test("menu on a phone: a sheet; the page behind stays exactly where it was; backdrop, Escape and drag close it", { skip }, async () => {
-  const { page, errors, ctx } = await open(RICH, { ...PHONE, storage: { "mb-tours-u-me": JSON.stringify({ tabs: { budget: "done", networth: "done", spending: "done", goals: "done", invest: "done", progress: "done" } }) } });
-  // a classic (space-taking) scrollbar, like a desktop browser's: hiding it must not reflow or move the page
-  await page.addStyleTag({ content: "::-webkit-scrollbar{ width:15px; } ::-webkit-scrollbar-thumb{ background:#999; }" });
-  // let the tab finish loading first (anything that arrives late above the fold would move the page by itself)
-  await page.waitForLoadState("networkidle"); await page.waitForTimeout(800);
-  await page.evaluate(() => scrollTo(0, 500)); await page.waitForTimeout(300);
-  const y0 = await page.evaluate(() => scrollY);
-  // record anything that changes size while the menu is open, so a failure says what moved
-  await page.evaluate(() => { window.__moved = []; let first = true; const ro = new ResizeObserver(es => { if (first) { first = false; return; } es.forEach(e => window.__moved.push(`${e.target.tagName}.${e.target.className} ${Math.round(e.contentRect.height)}`)); }); document.querySelectorAll("#app, #app > *, #app > * > *, #app section").forEach(el => ro.observe(el)); window.addEventListener("scroll", () => window.__moved.push("scroll " + scrollY)); });
-  assert.ok(y0 > 300, "scrolled down the Budget tab");
-  await page.click("#menuBtn");
-  await page.waitForSelector("#pop.as-sheet:not([hidden])");
-  assert.equal(await page.getAttribute("#pop", "role"), "dialog");
-  assert.equal(await page.getAttribute("#pop", "aria-modal"), "true");
-  assert.equal(await page.getAttribute("#menuBtn", "aria-expanded"), "true");
-  assert.equal(await page.evaluate(() => document.documentElement.classList.contains("scroll-locked")), true);
-  assert.equal(await page.evaluate(() => document.querySelector("#app").inert), true, "the page behind can't be tapped or focused");
-  await shot(page, "menu-sheet");
-  // trying to scroll the page behind does nothing
-  await page.mouse.move(195, 120); await page.mouse.wheel(0, 600);
-  await page.waitForTimeout(150);
-  assert.equal(await page.evaluate(() => scrollY), y0, `background didn't move (${await page.evaluate(() => window.__moved.join(", "))})`);
-  // the sheet's own list still scrolls (when it's taller than the sheet)
-  await page.$eval("#pop .pop-body", el => el.scrollTop = 40);
-  // backdrop closes it, and the page is where it was
-  await page.mouse.click(195, 20);
-  await page.waitForSelector("#pop", { state: "hidden" });
-  assert.equal(await page.evaluate(() => scrollY), y0, "same place afterwards");
-  assert.equal(await page.evaluate(() => document.documentElement.classList.contains("scroll-locked")), false);
-  assert.equal(await page.evaluate(() => document.querySelector("#app").inert), false);
-  // Escape
-  await page.click("#menuBtn"); await page.waitForSelector("#pop:not([hidden])");
-  await page.keyboard.press("Escape");
-  await page.waitForSelector("#pop", { state: "hidden" });
-  assert.equal(await page.evaluate(() => document.activeElement && document.activeElement.id), "menuBtn", "focus goes back to the ⋯ button");
-  // a small drag on the handle springs back; a long one closes it
-  const drag = async dy => {
-    const b = await page.$eval("#pop .pop-grab", el => { const r = el.getBoundingClientRect(); return { x: r.left + 60, y: r.top + r.height / 2 }; });
-    await page.mouse.move(b.x, b.y); await page.mouse.down();
-    for (let k = 1; k <= 6; k++) await page.mouse.move(b.x, b.y + (dy * k) / 6);
-    await page.mouse.up();
-  };
-  await page.click("#menuBtn"); await page.waitForSelector("#pop:not([hidden])");
-  await drag(30);
-  await page.waitForTimeout(100);
-  assert.equal(await page.isVisible("#pop"), true, "a little drag: still open");
-  await drag(320);
-  await page.waitForSelector("#pop", { state: "hidden" });
-  // open and close several times: never left locked
-  for (let k = 0; k < 4; k++) { await page.click("#menuBtn"); await page.waitForSelector("#pop:not([hidden])"); await page.click("#pop [data-pop-close]"); await page.waitForSelector("#pop", { state: "hidden" }); }
-  assert.equal(await page.evaluate(() => document.documentElement.classList.contains("scroll-locked")), false);
-  assert.equal(await page.evaluate(() => scrollY), y0);
-  // menu actions still work
-  await page.click("#menuBtn"); await page.click('#pop [data-act="appearance"]');
-  await page.waitForSelector("#sheet[open]");
-  assert.deepEqual(errors, []); await ctx.close();
-});
-
-test("menu on a wide screen: still a small menu beside the button, nothing locked", { skip }, async () => {
-  const { page, ctx } = await open(RICH, { width: 1280, storage: fresh });
-  await page.click("#menuBtn");
-  await page.waitForSelector("#pop:not([hidden])");
-  assert.equal(await page.evaluate(() => document.querySelector("#pop").classList.contains("as-sheet")), false);
-  assert.equal(await page.getAttribute("#pop", "role"), null);
-  assert.equal(await page.evaluate(() => document.documentElement.classList.contains("scroll-locked")), false);
-  await page.keyboard.press("Escape");
-  await ctx.close();
-});
+/* (the 7C menu-sheet tests moved to phase7d2.test.js: the menu is a drawer now) */
 
 /* ---------------- tours ---------------- */
 test("first visits: each tab offers its own tour once; 'Not now' sticks; your progress is saved to your login", { skip }, async () => {
@@ -225,10 +157,10 @@ test("tours on empty tabs make sense, skip what isn't there, and replay from the
   await page.click(".ob-later");
   await page.waitForSelector("#app .viewas, #app .b-income");
   // replay Net worth from the menu while on Budget
-  await page.click("#menuBtn"); await page.click('#pop [data-act="tours"]');
-  assert.equal(await page.locator("#pop [data-tour-replay]").count(), 6, "all six tabs");
+  await page.click("#menuBtn"); await page.click('#drawer [data-act="tours"]');
+  assert.equal(await page.locator("#drawer [data-tour-replay]").count(), 6, "all six tabs");
   await shot(page, "menu-tours");
-  await page.click('#pop [data-tour-replay="networth"]');
+  await page.click('#drawer [data-tour-replay="networth"]');
   await page.waitForSelector(".tour:not([hidden])");
   assert.equal(await page.getAttribute('[data-tab="networth"]', "aria-selected"), "true", "went to Net worth first");
   assert.match(await page.textContent(".tour-n"), /1 of 2/, "no review card without accounts, so that stop is skipped");
@@ -237,8 +169,8 @@ test("tours on empty tabs make sense, skip what isn't there, and replay from the
   await page.click('[data-tour="end"]');
   // Goals with no goals: the first-goal card, and the tour points at it
   await goTab(page, "goals");
-  assert.match(await page.textContent(".gl-first"), /Create your first goal/);
-  await page.click("#menuBtn"); await page.click('#pop [data-act="tours"]'); await page.click('#pop [data-tour-replay="goals"]');
+  assert.match(await page.textContent(".gl-first"), /Start saving for something/);
+  await page.click("#menuBtn"); await page.click('#drawer [data-act="tours"]'); await page.click('#drawer [data-tour-replay="goals"]');
   await page.waitForSelector(".tour:not([hidden])");
   let titles = [await page.textContent("#tourT")];
   while (await page.textContent('[data-tour="next"]') === "Next") { await page.click('[data-tour="next"]'); titles.push(await page.textContent("#tourT")); }
@@ -248,7 +180,7 @@ test("tours on empty tabs make sense, skip what isn't there, and replay from the
   // Progress before any snapshot
   await goTab(page, "progress");
   await page.waitForSelector(".pg-start");
-  await page.click("#menuBtn"); await page.click('#pop [data-act="tours"]'); await page.click('#pop [data-tour-replay="progress"]');
+  await page.click("#menuBtn"); await page.click('#drawer [data-act="tours"]'); await page.click('#drawer [data-tour-replay="progress"]');
   await page.waitForSelector(".tour:not([hidden])");
   assert.equal(await page.textContent("#tourT"), "Your journey starts here");
   assert.doesNotMatch(await page.textContent(".tour-card"), /\$/, "no made-up figures");
@@ -280,7 +212,7 @@ test("progress saved on your login counts on this device too, and invitations wa
   assert.equal(await page.locator(".tinv").count(), 0, "Spending said 'Not now' on another device");
   // open the menu before Invest's invitation would appear: it waits until the menu closes
   await goTab(page, "invest");
-  await page.click("#menuBtn"); await page.waitForSelector("#pop:not([hidden])");
+  await page.click("#menuBtn"); await page.waitForSelector("#drawer:not([hidden])");
   await page.waitForTimeout(1800);
   assert.equal(await page.locator(".tinv").count(), 0, "not while the menu is open");
   await page.keyboard.press("Escape");

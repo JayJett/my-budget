@@ -57,7 +57,7 @@ for (const partner of [false, true]) test(`Undo after setup (${partner ? "shared
   assert.equal(Object.keys(b.people).length, partner ? 2 : 1);
   await page.waitForFunction(() => document.querySelector("#undoBtn").hidden);
   // History: the setup entry is labelled and can't be undone from there either
-  await page.click("#menuBtn"); await page.click('#pop [data-act="history"]');
+  await page.click("#menuBtn"); await page.click('#drawer [data-act="history"]');
   await page.waitForSelector("#sheet .hist-item");
   const items = await page.$$eval("#sheet .hist-item", L => L.map(li => ({ t: li.textContent, undo: !!li.querySelector('[data-hist="undo"]') })));
   const set = items.find(x => /Budget set up/.test(x.t));
@@ -103,7 +103,7 @@ test("a save that fails adds nothing to Undo; switching household or signing out
   await page.waitForFunction(() => document.querySelector("#saveText")?.textContent === "Saved", null, { timeout: 20000 });
   assert.equal(await undoShown(page), true, "once it really saves, it can be undone");
   // another household: its Undo starts empty (never reaches back into the first)
-  await page.click("#menuBtn"); await page.click('#pop [data-switch="hh-2"]');
+  await page.click("#menuBtn"); await page.click('#drawer [data-switch="hh-2"]');
   await page.waitForFunction(() => document.querySelector(".brand-t")?.textContent === "Holiday house");
   assert.equal(await undoShown(page), false);
   assert.deepEqual(errors.filter(e => !/Failed to fetch/.test(e)), []); await ctx.close();
@@ -118,20 +118,20 @@ test("header: your avatar opens the account menu (the ⋯ button is gone); long 
     const btn = page.locator("#menuBtn");
     assert.equal(await btn.evaluate(el => el.tagName), "BUTTON");
     assert.match(await btn.getAttribute("aria-label"), /^Open account menu \(Jarden\)$/);
-    assert.equal(await page.textContent("#meAv"), "J");
+    assert.equal(await page.textContent("#meSlot .av"), "J");
     const box = await btn.boundingBox(); assert.ok(box.width >= 44 && box.height >= 44, "44px to tap");
     // nothing in the header overlaps: avatar | name | status and buttons
     const r = await page.evaluate(() => { const g = s => document.querySelector(s).getBoundingClientRect(); return { av: g("#menuBtn"), name: g("#brandNames"), right: g(".save-area") }; });
     assert.ok(r.av.right <= r.name.left + 1 && r.name.right <= r.right.left + 1, `w=${w}: header pieces overlap`);
     await btn.click();
-    await page.waitForSelector("#pop:not([hidden])");
-    for (const a of ["reminders", "history", "household", "appearance", "account", "tours", "csv", "backup", "import", "signout"])
-      assert.equal(await page.locator(`#pop [data-act="${a}"]`).count(), 1, `menu still has ${a}`);
-    assert.equal(await page.locator('#pop [data-switch="hh-2"]').count(), 1, "switching household is still there");
+    await page.waitForSelector("#drawer:not([hidden])");
+    for (const a of ["profile", "reminders", "history", "household", "appearance", "account", "tours", "data", "signout"])
+      assert.equal(await page.locator(`#drawer [data-act="${a}"]`).count(), 1, `menu still has ${a}`);
+    assert.equal(await page.locator('#drawer [data-switch="hh-2"]').count(), 1, "switching household is still there");
     if (w === 390) await page.screenshot({ path: join(SHOTS, "p7d1-header-menu.png") });
     await page.keyboard.press("Escape");
-    await page.waitForSelector("#pop", { state: "hidden" });
-    if (w <= 760) assert.equal(await page.evaluate(() => document.activeElement.id), "menuBtn", "focus back on the avatar");
+    await page.waitForSelector("#drawer", { state: "hidden" });
+    assert.equal(await page.evaluate(() => document.activeElement.id), "menuBtn", "focus back on the avatar");
     assert.deepEqual(errors, []); await ctx.close();
   }
 });

@@ -7,7 +7,8 @@ import { list, render } from "./render.js";
 import { addPerson, removePerson, renamePerson, nextPos, moveItem, MAX_PEOPLE } from "../model/schema.js";
 import { uid, ymd, n, blank } from "../model/util.js";
 import { pct, possessive } from "../model/format.js";
-import { mainMenu, menuAct } from "./menu.js";
+import { openMenu } from "./menu.js";
+import { closeDrawer } from "./drawer.js";
 import { startSetup } from "./onboarding.js";
 
 /* Phase 7D: each tab remembers how far down you were, so coming back puts you where you left off.
@@ -20,7 +21,7 @@ export function switchTab(t) {
   tabScroll[app.tab] = window.scrollY;
   const sheet = $("#sheet"); if (sheet && sheet.open) sheet.close();
   const dlg = $("#dlg"); if (dlg && dlg.open) $("#dlgNo").click();
-  closePop();
+  closePop(); closeDrawer({ focus: false });
   app.tab = t;
   if (app.household) render();
   window.scrollTo({ top: tabScroll[t] || 0 });
@@ -104,7 +105,7 @@ export function initEvents() {
     }
     if (e.target.closest('[data-act="import"]')) { $("#importFile").click(); return; }
     if (e.target.closest('[data-act="setup"]') && !readOnly()) { startSetup(); render(); window.scrollTo({ top: 0 }); return; }
-    if (e.target.closest("#menuBtn")) { if (!pop.hidden) { closePop(); return; } openPop(e.target.closest("#menuBtn"), mainMenu(), menuAct, { label: "Menu" }); return; }
+    if (e.target.closest("#menuBtn")) { openMenu(e.target.closest("#menuBtn")); return; }
     if (readOnly()) return;
 
     const va = e.target.closest("[data-viewas]");
