@@ -2284,3 +2284,8 @@ dialog.sheet::backdrop{ animation:fade-in .24s var(--ease); }
 /* Phase 8: the colour you pick on setup step 1 shows on the setup screens straight away (each accent's
    light version, checked against these dark screens in tests/accent.test.js) */
 :root[data-accent] .im{ --accent:var(--acc-d); --accent-hover:var(--acc-d); --accent-soft:color-mix(in srgb, var(--acc-d) 22%, #0B2621); --on-accent:var(--on-acc-d); }
+/* Phase 8: with the icon tile, narrow phones let an allocation's name wrap to two lines instead of cutting it off */
+@media (max-width:380px){
+  .alloc-row .a-name{ white-space:normal; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; overflow-wrap:anywhere; }
+  .a-ic{ width:32px; height:32px; border-radius:10px; } .a-ic svg{ width:17px; height:17px; }
+}

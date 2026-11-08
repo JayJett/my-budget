@@ -260,6 +260,39 @@ The closing audit's findings, fixes and remaining items are in `docs/phase6-audi
 - **Header save dot:** its words ("Saved", "Saving…", "Offline") are still read out on phones.
 - Tests: `tests/browser/phase7d2.test.js`, `tests/sql/avatars.test.js`.
 
+### Solo or shared, and making it yours (Phase 8)
+
+- **Who the budget is for** is saved with the budget (`state.mode`: `"solo"` or `"shared"`, `js/model/schema.js`). This is separate from how many people are in it.
+  - "Just me" builds a **solo plan**. Every allocation is the person's own (none labelled Joint), and there's **one Goals allocation**: the usual goals and personal-goals shares are combined, e.g. 10% + 5% = 15%.
+  - "With someone" builds a **shared plan**, even before the other person joins.
+  - Money still flows by each allocation's role (what it's for), exactly as before. No formula changed.
+  - Older budgets get no mode and look as they did. Household settings → "Who's this budget for?" changes the wording only, never money.
+  - Adding a second person moves nothing. A note explains how to make an allocation shared.
+- **Older solo budgets with two goal pots** are *offered* a combine on the Goals tab: review, then confirm, and it's undoable. Every goal keeps its saved amount and its money a fortnight (`js/model/household.js`, `tests/phase8.test.js`).
+- **Colours, four kinds kept apart** (`js/ui/palette.js`):
+  - your accent: personal, ten choices plus your own colour, adjusted automatically to stay readable
+  - the household's colour
+  - each person's colour (three new: teal, purple, green)
+  - each allocation, account, goal and expense's colour
+  - Status colours (over budget, debt, warnings) are never pickable.
+- **Appearance box** in every item's sheet: an icon chosen by category, plus a colour, plus "Back to the default look" (`js/ui/icons.js`).
+  - It's saved on the item. It never changes its type, owner or amounts.
+  - Allocations show their icon and colour in the list, the charts and the legend.
+- **Household look** (Household settings → How it looks): a colour, an icon or a photo.
+  - Shown in the header (beside your own avatar, which still opens the menu), the household switcher and settings.
+  - Owners and editors can change it; viewers see it.
+  - Photos are kept in a **private** bucket, `household-photos`, that only the household can see (`supabase/migrations/20261115001000_household_identity.sql`, tested in `tests/sql/household-identity.test.js`).
+  - **This migration must be applied on the live project before household looks can be saved.** Until then the app works as before and explains why a change didn't save.
+- **Appearance** (menu → Appearance): a live preview; colour; light, dark or auto; spacing; motion (Auto or Reduced); touch feedback; and "Reset my appearance to the defaults". It's all saved to your login, so it follows you to every household and device.
+- **Setup step 1** has an optional "Make it look like yours" (swatches plus Light / Dark / Auto). It's folded into one link and opens without scrolling. It's saved to your login, never to the budget, and it doesn't create an Undo step.
+- **Motion:** one gentle spring for presses and sheets, and progress glides to new values (`css/app.css`, Phase 8 sections). Your phone's Reduce Motion setting, or "Reduced" in Appearance, turns it all off (`js/ui/motion.js`).
+- **Touch feedback** (`js/ui/feedback.js`):
+  - A tiny vibration when you choose something, finish setup or reach a goal milestone.
+  - It only works where the Vibration API exists, which is Android Chrome-type browsers.
+  - **iPhone Safari has no vibration API**, so there the app relies on visual feedback. A native app would be needed for iPhone haptics.
+  - The switch only appears on devices that can vibrate.
+- Tests: `tests/phase8.test.js`, `tests/palette.test.js`, `tests/browser/phase8.test.js`, `tests/sql/household-identity.test.js`.
+
 ## How saving works
 
 The whole budget lives in one row (`budgets.state`), but the app never overwrites it. Each edit is

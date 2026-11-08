@@ -72,6 +72,15 @@ describe("a shared plan ('With someone')", () => {
     });
     assert.ok(C.fairShared > 0);
   });
+  test("three or four people: everyone gets their own spending money and goals pot, and every pay adds to 100%", () => {
+    for (const k of [3, 4]) {
+      const people = Array.from({ length: k }, (_, i) => ({ name: `P${i + 1}`, pay: 1000 + i * 500, freq: ["weekly", "fortnightly", "monthly"][i % 3] }));
+      const a = { mode: "shared", purpose: "family", people, have: {} }, S = buildBudget(a, suggestSplit(a), TODAY), C = compute(S, TODAY);
+      assert.equal(S.people.length, k);
+      S.people.forEach(p => { close(C.tot.pct[p.id], 1); assert.equal(S.accounts.filter(x => x.owner === p.id).length, 2); });
+      assert.equal(new Set(S.people.map(p => p.colour)).size, k, "everyone starts with a different colour");
+    }
+  });
   test("no mode given: the old behaviour, decided by purpose", () => {
     assert.equal(suggestSplit({ purpose: "household", people: me() }).mode, "shared");
     assert.equal(suggestSplit({ purpose: "solo", people: me() }).mode, "solo");
