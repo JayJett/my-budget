@@ -1,6 +1,7 @@
 /* Charts, drawn as SVG by hand: donuts, the money-flow picture, split bars and the 30-year curve.
    Amounts passed in are already in the household's chosen period. */
 import { PERSON_COLOURS } from "../model/schema.js";
+import { OBJECT_COLOURS, isObjectColour } from "./palette.js";
 import { money, m0, pct } from "../model/format.js";
 import { n } from "../model/util.js";
 import { $, esc, trunc } from "./dom.js";
@@ -11,9 +12,17 @@ const FAM = {
   invest: ["#7A5AB0", "#9A7DC9", "#5C4287", "#C0AEE0"],
   other: ["#8A6D55", "#A88B72", "#6B5240", "#C9B19C"],
 };
+/** A chosen colour as a real colour value for this light/dark mode (charts draw with plain colours). */
+export function objectHex(key) {
+  const c = OBJECT_COLOURS.find(x => x.key === key); if (!c) return null;
+  try { const v = getComputedStyle(document.documentElement).getPropertyValue(`--o-${key}`).trim(); if (v) return v; } catch (_) {}
+  return c.light;
+}
 export function accountColours(state) {
   const used = {}, out = {}, people = Object.fromEntries(state.people.map(p => [p.id, p]));
   state.accounts.forEach(a => {
+    // Phase 8: an allocation's own colour (picked in its sheet) wins, everywhere it's drawn
+    if (isObjectColour(a.colour)) { out[a.id] = objectHex(a.colour); return; }
     const owner = people[a.owner];
     const key = a.type === "Joint" ? "joint" : a.type === "Investment" ? "invest" : owner ? "p:" + owner.colour : "other";
     const fam = key.startsWith("p:") ? PERSON_COLOURS[owner.colour].fam : FAM[key];

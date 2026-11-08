@@ -93,6 +93,7 @@ export function refresh() {
     const v = D[el.dataset.k]; if (v === undefined) return;
     if (typeof v === "object") {
       if ("bg" in v) { el.style.background = v.bg; return; }
+      if ("oc" in v) { el.style.setProperty("--oc", v.oc); return; }
       if ("w" in v) { el.style.width = (v.w * 100) + "%"; return; }
       if ("pw" in v) { el.style.width = `calc((100% - 20px) * ${Math.max(0, Math.min(1, v.pw))})`; return; }
       el.textContent = v.t; el.className = (el.dataset.base || "") + " " + (v.c || "");

@@ -8,6 +8,12 @@ import { esc } from "../dom.js";
 import { K, attrs, pc } from "../inputs.js";
 import { MAX_PEOPLE, isShared } from "../../model/schema.js";
 import { transitionNote } from "../household-mode.js";
+import { itemIcon } from "../icons.js";
+/** An allocation's icon: the one picked for it, or one that fits what it's for (Phase 8). */
+export const accIconKey = a => a.icon && itemIcon(a.icon) ? a.icon
+  : { spending: "home", emergency: "shield", goals: "target", personalGoals: "star", invest: "trend" }[a.role]
+  || (a.type === "Investment" ? "trend" : /debt|loan|card/i.test(a.name || "") ? "card" : /spend|fun/i.test(a.name || "") ? "wallet" : "coins");
+export const accIcon = a => itemIcon(accIconKey(a));
 import { WORDS, VIEWS, perYear, freqToView } from "../../model/periods.js";
 import { money, m0, pct, listNames } from "../../model/format.js";
 import { drawDonuts, drawFlow, drawSplit, personVar } from "../charts.js";
@@ -19,8 +25,8 @@ const TYPE_WORD = { Joint: "Joint", Personal: "Personal", Investment: "Investmen
 const initial = p => (p.name || "?").trim().charAt(0).toUpperCase() || "?";
 
 /** On your own, an allocation is described by what it's for, not whose it is (it's all yours). */
-const PURPOSE = { spending: "Bills & spending", emergency: "Safety net", goals: "Goals", personalGoals: "Personal goals", invest: "Investing" };
-export const purposeWord = a => PURPOSE[a.role] || (a.type === "Investment" ? "Investing" : "Your money");
+const PURPOSE = { spending: "Bills", emergency: "Safety net", goals: "Goals", personalGoals: "Goals", invest: "Investing" };
+export const purposeWord = a => PURPOSE[a.role] || (a.type === "Investment" ? "Investing" : "Yours");
 /** "Joint", "Personal · Madi", "Investment"; on your own: "Bills & spending", "Goals", "Investing"… */
 function typeLine(a, P, S) {
   if (!isShared(S)) return purposeWord(a);
@@ -56,7 +62,7 @@ export function view() {
     <div class="b-row sec"><h2>Your allocations</h2>${ro ? "" : `<button class="btn small ghost" type="button" data-reorder aria-pressed="${ui.reorder}">${ui.reorder ? "Done" : "Reorder"}</button>`}</div>
     <ul class="card alloc-list${ui.reorder ? " reordering" : ""}">${S.accounts.map((a, i) => `<li class="alloc">
       <button class="alloc-row" type="button" data-edit-acc="${esc(a.id)}"${ui.reorder ? " disabled" : ""} aria-label="${esc(a.name || "Unnamed")}: edit">
-        <span class="a-sw" data-k="acc.${esc(a.id)}.sw" aria-hidden="true"></span>
+        <span class="a-ic" data-k="acc.${esc(a.id)}.ic" aria-hidden="true">${accIcon(a)}</span>
         <span class="a-main"><span class="a-name">${esc(a.name || "Unnamed")}</span>
           <span class="a-meta">${esc(typeLine(a, P, S))}${multi ? "" : ` · ${K(`acc.${a.id}.pct.${P[0].id}`)}`}</span>
           ${multi ? `<span class="a-parts">${P.map(p => `<span data-k="acc.${esc(a.id)}.part.${esc(p.id)}" data-base="a-part ${pc(p)}" class="a-part ${pc(p)}"></span>`).join("")}</span>` : ""}</span>
@@ -134,7 +140,7 @@ export function fill(D, C) {
       D[`acc.${r.id}.pct.${p.id}`] = `${pct(Number(r.split[p.id]) || 0, 1)} of pay`;
     });
     D[`acc.${r.id}.t`] = money(v(r.t)); D[`acc.${r.id}.tb`] = { pw: C.incTotal ? r.t / C.incTotal : 0 };
-    D[`acc.${r.id}.sw`] = { bg: app.colours[r.id] };
+    D[`acc.${r.id}.sw`] = { bg: app.colours[r.id] }; D[`acc.${r.id}.ic`] = { oc: app.colours[r.id] };
   });
   const check100 = x => Math.round(x * 1e4) === 1e4 ? { t: "100%", c: "ok" } : { t: pct(x, 1), c: "bad" };
   C.people.forEach(p => { D[`tot.p.${p.id}`] = pct(C.tot.pct[p.id], 1); D[`tot.a.${p.id}`] = money(v(C.tot.amt[p.id])); D[`tot.c.${p.id}`] = check100(C.tot.pct[p.id]); });

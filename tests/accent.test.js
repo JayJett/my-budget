@@ -27,8 +27,8 @@ for (const { key, label } of ACCENTS) {
   });
 }
 
-test("six accents, each with a name, and Mint is the default", () => {
-  assert.deepEqual(ACCENTS.map(a => a.key), ["mint", "ocean", "lavender", "coral", "rose", "amber"]);
+test("ten accents (Phase 8: Emerald, Teal, Sky and Purple added), each with a name, and Mint is the default", () => {
+  assert.deepEqual(ACCENTS.map(a => a.key), ["mint", "emerald", "teal", "ocean", "sky", "lavender", "purple", "rose", "coral", "amber"]);
   assert.equal(ACCENTS[0].key, "mint");
 });
 
@@ -46,7 +46,7 @@ test("the dark hero cards and the dark setup screens are readable (Phase 7C rede
   const block = sel => { const i = css.indexOf(sel); assert.ok(i >= 0, `missing ${sel}`); return vars(css.slice(i, css.indexOf("}", css.indexOf("{", i)))); };
   for (const mode of ["light", "dark"]) {
     const hero = base[mode].hero, h = block(":is(.b-income, .nw-hero, .sp-sum, .gl-sum, .iv-hero, .pg-hero).card{");
-    for (const k of ["ink", "muted", "ok", "warn", "bad", "c-blue", "c-gold", "c-coral", "c-rose", "c-slate", "joint", "invest"])
+    for (const k of ["ink", "muted", "ok", "warn", "bad", "c-blue", "c-gold", "c-coral", "c-rose", "c-slate", "c-teal", "c-purple", "c-green", "joint", "invest"])
       assert.ok(ratio(h[k], hero) >= 4.5, `${mode}: ${k} on the hero card is ${ratio(h[k], hero).toFixed(2)}:1`);
     assert.ok(ratio(h.muted, h["surface-2"]) >= 4.5, `${mode}: muted text on a hero tile`);
   }

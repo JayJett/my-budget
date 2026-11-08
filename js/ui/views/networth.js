@@ -16,6 +16,8 @@ import { nwStatus as nwStatusOf } from "../../model/calc.js"; // the status word
 import { money, MONTHS } from "../../model/format.js";
 import { n, blank, parseDate, daysBetween } from "../../model/util.js";
 import { ART } from "../art.js";
+import { itemIcon } from "../icons.js";
+import { isObjectColour } from "../palette.js";
 
 /** The account types (exactly the stored ones), their fixed colours and short help. Never the accent. */
 export const NW_TYPES = [
@@ -50,7 +52,7 @@ function row(a, ui, i, L) {
   const over = em > n(a.balance);
   return `<li class="ex">
     <button class="ex-row" type="button" data-edit-nw="${esc(a.id)}"${ui.reorder ? " disabled" : ""} aria-label="${esc(a.name || "Unnamed account")}: edit">
-      <span class="ex-ic" style="--cat:${t.col}" aria-hidden="true">${nwIcon(a.type)}</span>
+      <span class="ex-ic" style="--cat:${isObjectColour(a.colour) ? `var(--o-${a.colour})` : t.col}" aria-hidden="true">${itemIcon(a.icon) || nwIcon(a.type)}</span>
       <span class="ex-main"><span class="ex-name">${esc(a.name || "Unnamed account")}</span>
         <span class="ex-sub">${ui.reorder ? esc(t.label) : K(`nw.${a.id}.sub`)}${ui.reorder ? "" : ` ${K(`nw.${a.id}.flag`, "chip")}`}</span>
         ${showBar ? `<span class="ex-prog nw-em${over ? " over" : ""}" aria-hidden="true"><span data-k="nw.${esc(a.id)}.bar"></span></span>` : ""}</span>

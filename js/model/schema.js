@@ -18,6 +18,10 @@ export const PERSON_COLOURS = {
   coral: { label: "Coral", hex: "#C0603C", fam: ["#C0603C", "#D88A6B", "#8E452B", "#E6B39B"] },
   rose:  { label: "Rose",  hex: "#B04A7C", fam: ["#B04A7C", "#CD79A3", "#86345C", "#E3AECA"] },
   slate: { label: "Slate", hex: "#4F6B7A", fam: ["#4F6B7A", "#7894A3", "#36505D", "#A9C0CC"] },
+  // Phase 8: three more, so bigger households stay easy to tell apart
+  teal:   { label: "Teal",   hex: "#1E7A72", fam: ["#1E7A72", "#4EA39A", "#14574F", "#8CCBC3"] },
+  purple: { label: "Purple", hex: "#7A4AAE", fam: ["#7A4AAE", "#9C77CA", "#5A3484", "#C6AEE5"] },
+  green:  { label: "Green",  hex: "#4A7A24", fam: ["#4A7A24", "#73A24A", "#365A19", "#A8CB86"] },
 };
 export const COLOUR_KEYS = Object.keys(PERSON_COLOURS);
 

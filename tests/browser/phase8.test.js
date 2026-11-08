@@ -48,7 +48,7 @@ test("Just me: a solo plan with one Goals allocation, nothing labelled Joint, an
   assert.deepEqual(acc.map(a => a.role), ["spending", null, "emergency", "goals", "invest"]);
   const meta = await page.$$eval(".alloc .a-meta", e => e.map(x => x.textContent));
   meta.forEach(m => assert.doesNotMatch(m, /Joint|Personal/));
-  assert.match(meta[0], /^Bills & spending · 50% of pay$/);
+  assert.match(meta[0], /^Bills · 50% of pay$/);
   assert.doesNotMatch(await page.textContent("#app"), /Joint/);
   assert.equal(await page.isVisible("#undoBtn"), false, "the plan isn't something to undo");
   // the edit sheet says "Kind: Everyday money / Investing", and changing a % still works
@@ -162,5 +162,78 @@ test("solo → shared: adding a person keeps every allocation as it was, and exp
   assert.match(await page.textContent(".hm-note"), /started as just you/);
   await page.click('[data-hh-note="ok"]');
   assert.equal(await page.locator(".hm-note").count(), 0);
+  assert.deepEqual(errors, []); await ctx.close();
+});
+
+/* ---------------- appearance of allocations, accounts, goals ---------------- */
+test("allocations: pick an icon and a colour; it shows in the list, the sheet and the chart legend; no money changes", { skip }, async () => {
+  const { page, errors, ctx } = await open({}, { waitFor: ".ob", ...phone(), storage: ALL_DONE });
+  await setUp(page, "solo");
+  await page.click('[data-obact="next"]'); await page.waitForSelector(".ob-done"); await page.click('[data-obact="finish"]');
+  await page.waitForSelector("#app .b-income"); await settle(page);
+  await shot(page, "alloc-list");
+  const before = await budgetOf(page);
+  await page.click('[data-edit-acc="jg"]'); await page.waitForSelector("#sheet .bsheet");
+  await page.click("#sheet .ico-box summary");
+  assert.equal(await page.locator("#sheet .ico-cat").count() >= 10, true, "icons come in categories");
+  await page.click('#sheet [data-oc-pick="lavender"]'); await settle(page);
+  await page.click('#sheet [data-icon="plane"]'); await settle(page);
+  await shot(page, "alloc-appearance");
+  assert.equal(await page.getAttribute('#sheet [data-oc-pick="lavender"]', "aria-checked"), "true");
+  const b = await budgetOf(page);
+  assert.equal(b.accounts.jg.colour, "lavender"); assert.equal(b.accounts.jg.icon, "plane");
+  // nothing else about it changed: type, owner, role, percentages
+  const strip = a => { const { colour, icon, ...rest } = a; return rest; };
+  assert.deepEqual(strip(b.accounts.jg), strip(before.accounts.jg));
+  assert.deepEqual(Object.keys(b.accounts).filter(k => k !== "jg").map(k => b.accounts[k]), Object.keys(before.accounts).filter(k => k !== "jg").map(k => before.accounts[k]));
+  await page.click('#sheet .sheet-head [data-sheet="close"]');
+  const tile = await page.$eval('[data-k="acc.jg.ic"]', e => [getComputedStyle(e).color, e.innerHTML.includes("M6.8 9.2")]);
+  const lav = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--o-lavender").trim());
+  assert.equal(tile[1], true, "the plane shows in the list");
+  const hex = c => "#" + c.match(/\d+/g).slice(0, 3).map(x => (+x).toString(16).padStart(2, "0")).join("").toUpperCase();
+  assert.equal(hex(tile[0]), lav, "in lavender");
+  await page.click('details[data-ins="charts"] summary');
+  assert.equal(await page.$$eval("#legend i", (els, lav) => els.some(e => e.style.background && getComputedStyle(e).backgroundColor && e.getAttribute("style").toUpperCase().includes(lav)), lav), true, "the chart legend uses it too");
+  // Back to the default look
+  await page.click('[data-edit-acc="jg"]'); await page.waitForSelector("#sheet .bsheet"); await page.$eval("#sheet .ico-box", d => { d.open = true; }); // (it stays open from last time)
+  await page.click("#sheet .ico-reset"); await settle(page);
+  const c = await budgetOf(page);
+  assert.equal(c.accounts.jg.colour, undefined); assert.equal(c.accounts.jg.icon, undefined);
+  assert.deepEqual(errors, []); await ctx.close();
+});
+
+test("net worth accounts: a house icon on a savings account keeps it a savings account", { skip }, async () => {
+  const s = blankBudget({ name: "Sam" }); s.people[0].pay = 2000;
+  s.nw.accounts.push({ id: "n1", name: "House fund", type: "Savings", balance: 5000, pos: 1 });
+  const { page, errors, ctx } = await open(toStored(s), { ...phone(), storage: ALL_DONE });
+  await goTab(page, "networth");
+  await page.click('[data-edit-nw="n1"]'); await page.waitForSelector("#sheet .bsheet");
+  await page.click("#sheet .ico-box summary");
+  await page.click('#sheet [data-icon="home"]'); await settle(page);
+  await page.click('#sheet [data-oc-pick="coral"]'); await settle(page);
+  const b = await budgetOf(page);
+  assert.deepEqual([b.nw.accounts.n1.type, b.nw.accounts.n1.icon, b.nw.accounts.n1.colour, b.nw.accounts.n1.balance], ["Savings", "home", "coral", 5000]);
+  await page.click('#sheet .sheet-head [data-sheet="close"]');
+  assert.match(await page.textContent('[data-edit-nw="n1"]'), /House fund/);
+  assert.equal(await page.$eval('[data-edit-nw="n1"] .ex-ic', e => e.getAttribute("style")), "--cat:var(--o-coral)");
+  assert.deepEqual(errors, []); await ctx.close();
+});
+
+test("goals: a goal's colour shows on its badge and bar; choosing the same icon twice saves once", { skip }, async () => {
+  const s = blankBudget({ name: "Sam", mode: "solo" }); s.people[0].pay = 2000; const pid = s.people[0].id;
+  s.accounts.find(a => a.role === "goals").split[pid] = 0.2;
+  s.goals.joint.push({ id: "g1", name: "Trip", target: 3000, saved: 400, account: "", split: { [pid]: 1 }, deadline: "", pos: 1 });
+  const { page, errors, ctx } = await open(toStored(s), { ...phone(), storage: ALL_DONE });
+  await goTab(page, "goals");
+  await page.click('[data-edit-goal="gj"][data-i="g1"]'); await page.waitForSelector("#sheet .bsheet");
+  await page.click("#sheet .ico-box summary");
+  await page.click('#sheet [data-oc-pick="teal"]'); await settle(page);
+  await page.click('#sheet [data-icon="plane"]'); await settle(page);
+  const seq = await fake(page, () => window.__fake.seq);
+  await page.click('#sheet [data-icon="plane"]'); await page.waitForTimeout(400);
+  assert.equal(await fake(page, () => window.__fake.seq), seq, "no extra save for the same choice");
+  await page.click('#sheet .sheet-head [data-sheet="close"]');
+  assert.equal(await page.$eval('[data-edit-goal="gj"][data-i="g1"]', e => e.getAttribute("style")), "--gc:var(--o-teal)");
+  await shot(page, "goal-colour");
   assert.deepEqual(errors, []); await ctx.close();
 });
