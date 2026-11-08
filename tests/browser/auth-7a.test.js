@@ -101,47 +101,33 @@ test("if loading households fails, it says so with Try again (not a sign-in erro
   await ctx.close();
 });
 
-/* ---------- email codes ---------- */
-test("sign up → code screen showing the address → wrong code explained → right code signs in → create household", { skip }, async () => {
+/* ---------- email links ----------
+   Emails are Supabase's standard ones for now (a link, no code to type: EMAIL_CODES = false in
+   js/ui/auth.js), until a custom email service lets the templates include a code again. */
+test("sign up → 'check your email' with the address and a link to open (no code box) → the link comes back to the app", { skip }, async () => {
   const { page, errors, ctx } = await signedOut();
   await page.click('[data-auth="signup"]');
   await page.fill('#fSignup [name="name"]', "Sam"); await page.fill('#fSignup [name="email"]', "sam@example.com"); await page.fill('#fSignup [name="password"]', "longenough1");
   await page.click('#fSignup button[type="submit"]');
-  await page.waitForSelector("#fVerify");
+  await page.waitForSelector("#vWait");
   assert.match(await page.textContent(".auth-card"), /sam@example\.com/);
+  assert.match(await page.textContent(".auth-card"), /Tap the link in it/);
+  assert.equal(await page.locator("#fVerify, .otp").count(), 0, "no code to type");
   assert.equal((await auth(page, "signUp"))[0].redirect.endsWith("/"), true, "the confirmation link comes back to the app");
-  assert.equal(await page.getAttribute("#fVerify .otp", "autocomplete"), "one-time-code");
-  assert.equal(await page.getAttribute("#fVerify .otp", "inputmode"), "numeric");
   await page.screenshot({ path: join(SHOTS, "auth-verify-390.png") });
-  await page.fill("#fVerify .otp", "111111"); await page.click('#fVerify button[type="submit"]');
-  await page.waitForFunction(() => /didn’t work/.test(document.querySelector("#authMsg").textContent));
-  assert.match(await msg(page), /already opened the link.*sign in instead/);
-  await page.fill("#fVerify .otp", "123456"); await page.click('#fVerify button[type="submit"]');
-  await page.waitForSelector("#fHousehold");
-  assert.deepEqual((await auth(page, "verifyOtp")).map(c => c.type), ["signup", "signup"]);
-  assert.equal(await page.evaluate(() => localStorage.getItem("mb-verify")), null, "the waiting step is cleared once signed in");
   assert.deepEqual(errors, []); await ctx.close();
 });
 
-test("pasting or auto-filling the whole code verifies straight away; letters and spaces are ignored", { skip }, async () => {
-  const { page, ctx } = await signedOut({}, "#fVerify").catch(() => null) || {};
-  if (page) await ctx.close();
-  const o = await open(null, { init: { signedOut: true, households: [] }, storage: { "mb-verify": JSON.stringify({ email: "sam@example.com", kind: "signup", at: Date.now() }) }, waitFor: "#fVerify" });
-  await o.page.$eval("#fVerify .otp", el => { el.value = " 12 34-56 "; el.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertFromPaste" })); });
-  await o.page.waitForSelector("#fHousehold");
-  await o.ctx.close();
-});
-
-test("refreshing while waiting keeps the code screen; 'send a new code' follows Supabase's own wait, even after a refresh", { skip }, async () => {
+test("refreshing while waiting keeps the 'check your email' screen; 'send a new link' follows Supabase's own wait, even after a refresh", { skip }, async () => {
   const { page, errors, ctx } = await signedOut({ resendWait: 42 });
   await page.click('[data-auth="signup"]');
   await page.fill('#fSignup [name="name"]', "Sam"); await page.fill('#fSignup [name="email"]', "sam@example.com"); await page.fill('#fSignup [name="password"]', "longenough1");
-  await page.click('#fSignup button[type="submit"]'); await page.waitForSelector("#fVerify");
+  await page.click('#fSignup button[type="submit"]'); await page.waitForSelector("#vWait");
   await page.click('[data-auth="resend"]');
-  await page.waitForFunction(() => /Send a new code \(4\ds\)/.test(document.querySelector('[data-auth="resend"]').textContent));
+  await page.waitForFunction(() => /Send a new link \(4\ds\)/.test(document.querySelector('[data-auth="resend"]').textContent));
   assert.equal(await page.isDisabled('[data-auth="resend"]'), true);
   assert.deepEqual((await auth(page, "resend")).map(c => c.type), ["signup"]);
-  await page.reload(); await page.waitForSelector("#fVerify");
+  await page.reload(); await page.waitForSelector("#vWait");
   assert.match(await page.textContent(".auth-card"), /sam@example\.com/);
   assert.match(await page.textContent('[data-auth="resend"]'), /\(\d+s\)/, "the wait carries on after a refresh");
   assert.equal((await auth(page, "resend")).length, 0, "refreshing never sends another email by itself");
@@ -151,51 +137,27 @@ test("refreshing while waiting keeps the code screen; 'send a new code' follows 
   await ctx.close();
 });
 
-test("sign in with a code: the same message whether or not the email has an account; never creates an account", { skip }, async () => {
+test("sign in with an email link: the same message whether or not the email has an account; never creates an account", { skip }, async () => {
   const { page, errors, ctx } = await signedOut();
+  assert.match(await page.textContent('[data-auth="codein"]'), /Email me a sign-in link instead/);
   await page.click('[data-auth="codein"]');
   await page.fill('#fCodeIn [name="email"]', "nobody@example.com"); await page.click('#fCodeIn button[type="submit"]');
-  await page.waitForSelector("#fVerify");
+  await page.waitForSelector("#vWait");
   const unknown = await msg(page);
+  assert.match(unknown, /a link is on its way/);
   await page.click('[data-auth="codein"][data-forget]');
   await page.fill('#fCodeIn [name="email"]', "jarden@example.com"); await page.click('#fCodeIn button[type="submit"]');
-  await page.waitForSelector("#fVerify");
+  await page.waitForSelector("#vWait");
   assert.equal(await msg(page), unknown.replace("nobody@example.com", "jarden@example.com"), "no hint about which emails have accounts");
   assert.deepEqual((await auth(page, "signInWithOtp")).map(c => c.shouldCreateUser), [false, false]);
-  await page.fill("#fVerify .otp", "123456"); await page.click('#fVerify button[type="submit"]');
-  await page.waitForSelector("#fHousehold");
-  assert.deepEqual((await auth(page, "verifyOtp")).map(c => c.type), ["email"]);
+  assert.equal(await page.locator("#fVerify").count(), 0);
   await ctx.close();
 });
 
-test("coming back from an expired link or a cancelled Google/Apple sign-in explains it and tidies the address", { skip }, async () => {
-  const { page, ctx } = await signedOut();
-  await page.goto(page.url().split("#")[0] + "#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired");
-  await page.reload(); await page.waitForSelector("#fSignin");
-  assert.match(await msg(page), /expired or was already used/);
-  assert.equal(new URL(page.url()).hash, "", "nothing left in the address bar");
-  await ctx.close();
-});
-
-/* ---------- Google and Apple: only when switched on ---------- */
-test("Google/Apple buttons only appear when the project has them switched on; they start the provider's sign-in", { skip }, async () => {
-  let o = await signedOut();
-  await o.page.waitForTimeout(300);
-  assert.equal(await o.page.locator("[data-oauth]").count(), 0, "not switched on: no buttons that would fail");
-  await o.ctx.close();
-  o = await signedOut({ providers: { google: true, apple: true } });
-  await o.page.waitForSelector('[data-oauth="google"]');
-  assert.deepEqual(await o.page.$$eval("[data-oauth]", els => els.map(e => e.textContent.trim())), ["Continue with Apple", "Continue with Google"]);
-  await o.page.screenshot({ path: join(SHOTS, "auth-signin-providers-390.png") });
-  await o.page.click('[data-oauth="google"]');
-  const calls = await auth(o.page, "oauth");
-  assert.equal(calls[0].provider, "google"); assert.ok(calls[0].redirectTo.endsWith("/"));
-  await o.ctx.close();
-});
 
 for (const width of [320, 375, 390, 430]) {
-  test(`${width}px: sign-in, sign-up, code and household screens fit, with big enough taps and no zoom`, { skip }, async () => {
-    const o = await open(null, { init: { signedOut: true, households: [], providers: { google: true, apple: true } }, storage: { "mb-verify": JSON.stringify({ email: "a.very.long.email.address@example.com", kind: "signup", at: Date.now() }) }, waitFor: "#fVerify", width });
+  test(`${width}px: sign-in, sign-up, email and household screens fit, with big enough taps and no zoom`, { skip }, async () => {
+    const o = await open(null, { init: { signedOut: true, households: [], providers: { google: true, apple: true } }, storage: { "mb-verify": JSON.stringify({ email: "a.very.long.email.address@example.com", kind: "signup", at: Date.now() }) }, waitFor: "#vWait", width });
     for (const mode of ["verify", "signin", "signup", "codein"]) {
       if (mode !== "verify") await o.page.evaluate(m => document.querySelector(`[data-auth="${m}"]`) ? document.querySelector(`[data-auth="${m}"]`).click() : null, mode);
       await o.page.waitForTimeout(150);

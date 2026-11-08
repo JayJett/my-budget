@@ -14,6 +14,13 @@ import { useAccentOf, resetAccent } from "./accent.js";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "../config.js";
 
 const here = () => location.origin + location.pathname;
+/* Emails with a code to type in (Phase 7A) need Supabase's email templates to include the code, and
+   customising those needs your own email service (custom SMTP). Until then the emails are Supabase's
+   standard ones, which contain a link only, so the app asks people to open the link. Set this to true
+   once the templates include {{ .Token }} again (see docs/auth-setup.md): the code screens come back. */
+export const EMAIL_CODES = false;
+const what = () => EMAIL_CODES ? "code" : "link";
+
 const brand = `<div class="auth-brand"><div class="logo" aria-hidden="true">$</div><div class="brand">Moni Money<small>Give every dollar a purpose, on your own or together</small></div></div>`;
 /* The welcome (Phase 7C redesign): three slides you can swipe through, with the two buttons always
    underneath. Shown to someone new on this device; after they tap either button it isn't shown again
@@ -155,29 +162,32 @@ export function showAuth(mode, msg, kind) {
     <label class="field"><span>Password</span><input type="password" name="password" autocomplete="current-password" required></label>
     <input type="text" name="username" value="${esc(me.email)}" autocomplete="username" hidden>
     <button class="btn primary block" type="submit">Sign in</button></form>${oauthButtons()}
-    <div class="auth-foot"><button class="linkish" type="button" data-auth="forgot">Forgot your password?</button><button class="linkish" type="button" data-auth="codein">Email me a sign-in code instead</button></div>`;
+    <div class="auth-foot"><button class="linkish" type="button" data-auth="forgot">Forgot your password?</button><button class="linkish" type="button" data-auth="codein">Email me a sign-in ${what()} instead</button></div>`;
   else if (mode === "signin") body = `<h2>Welcome to Moni Money</h2><p class="lead">Sign in to see your budget.</p>${tabs}${m}
     <form id="fSignin"><label class="field"><span>Email</span><input type="email" name="email" autocomplete="email" required></label>
     <label class="field"><span>Password</span><input type="password" name="password" autocomplete="current-password" required></label>
     <button class="btn primary block" type="submit">Sign in</button></form>${oauthButtons()}
-    <div class="auth-foot"><button class="linkish" type="button" data-auth="forgot">Forgot your password?</button><button class="linkish" type="button" data-auth="codein">Email me a sign-in code instead</button></div>`;
+    <div class="auth-foot"><button class="linkish" type="button" data-auth="forgot">Forgot your password?</button><button class="linkish" type="button" data-auth="codein">Email me a sign-in ${what()} instead</button></div>`;
   else if (mode === "signup") body = `<h2>Create your account</h2><p class="lead">One account each. You can share a budget once you’re in the same household.</p>${tabs}${m}
     <form id="fSignup"><label class="field"><span>Your first name</span><input type="text" name="name" autocomplete="given-name" required></label>
     <label class="field"><span>Email</span><input type="email" name="email" autocomplete="email" required></label>
     <label class="field"><span>Password</span><input type="password" name="password" autocomplete="new-password" minlength="8" required><small>At least 8 characters.</small></label>
     <button class="btn primary block" type="submit">Create account</button></form>${oauthButtons()}`;
-  else if (mode === "codein") body = `<h2>Sign in with a code</h2><p class="lead">We’ll email you a code. No password needed.</p>${m}
+  else if (mode === "codein") body = `<h2>Sign in with ${EMAIL_CODES ? "a code" : "an email link"}</h2><p class="lead">We’ll email you a ${what()}. No password needed.</p>${m}
     <form id="fCodeIn"><label class="field"><span>Email</span><input type="email" name="email" autocomplete="email" inputmode="email" value="${esc((pending() && pending().email) || (me && me.email) || "")}" required></label>
-    <button class="btn primary block" type="submit">Email me a code</button></form>
+    <button class="btn primary block" type="submit">Email me a ${what()}</button></form>
     <div class="auth-foot"><button class="linkish" type="button" data-auth="signin">Sign in with a password</button></div>`;
   else if (mode === "verify") {
     const p = pending() || {}, wait = Math.max(0, Math.ceil(((p.until || 0) - Date.now()) / 1000));
-    body = `<h2>Check your email</h2><p class="lead">We sent an email to <b>${esc(p.email || "")}</b>. Enter the code from it here, or open the link in it. It can take a minute to arrive.</p>${m}
+    body = EMAIL_CODES ? `<h2>Check your email</h2><p class="lead">We sent an email to <b>${esc(p.email || "")}</b>. Enter the code from it here, or open the link in it. It can take a minute to arrive.</p>${m}
     <form id="fVerify" novalidate><label class="field"><span>Code from the email</span>
       <input class="otp" type="text" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="10" required aria-describedby="otpHelp" spellcheck="false"></label>
       <small class="field-help" id="otpHelp">Numbers only. You can paste the whole code.</small>
-      <button class="btn primary block" type="submit">Verify</button></form>
-    <div class="auth-foot"><button class="linkish" type="button" data-auth="resend"${wait ? " disabled" : ""}>${wait ? `Send a new code (${wait}s)` : "Send a new code"}</button>
+      <button class="btn primary block" type="submit">Verify</button></form>`
+    : `<h2>Check your email</h2><p class="lead">We sent an email to <b>${esc(p.email || "")}</b>. Tap the link in it to ${p.kind === "signup" ? "confirm your email and carry on" : "sign in"}. It can take a minute to arrive, so check your spam folder too.</p>${m}
+    <div id="vWait" class="v-wait"><span class="v-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M3.8 6.2 12 12.5l8.2-6.3"/></svg></span><p>Open it on this device for the quickest way back in.</p></div>`;
+    body += `
+    <div class="auth-foot"><button class="linkish" type="button" data-auth="resend"${wait ? " disabled" : ""}>${wait ? `Send a new ${what()} (${wait}s)` : `Send a new ${what()}`}</button>
       <button class="linkish" type="button" data-auth="${p.kind === "email" ? "codein" : "signup"}" data-forget="1">Use a different email</button>
       <button class="linkish" type="button" data-auth="signin" data-forget="1">${p.kind === "signup" ? "Already confirmed? Sign in" : "Back to sign in"}</button></div>`;
   }
@@ -247,7 +257,7 @@ export function friendly(err) {
   if (/failed to fetch|network/i.test(t)) return "Can’t reach the server. Check your connection and try again.";
   if (/should be different from the old/i.test(t)) return "That’s your current password. Choose a different one.";
   if (/token has expired|otp_expired|invalid.*(otp|token)|token.*invalid/i.test(t)) return "That code didn’t work, or it has expired. Check it, or request a new one.";
-  if (/after \d+ seconds?/i.test(t)) return "Please wait a moment before asking for another code.";
+  if (/after \d+ seconds?/i.test(t)) return `Please wait a moment before asking for another ${what()}.`;
   if (isAuthError(err)) return "Your session has expired. Please sign in again.";
   if (/provider is not enabled|unsupported provider/i.test(t)) return "That way of signing in isn’t available right now. Use your email instead.";
   return t;
@@ -476,7 +486,7 @@ async function resendCode(btn) {
     : await app.sb.auth.resend({ type: "signup", email: p.email, options: opts });
   const wait = error && /after (\d+) seconds?/i.exec(error.message || "");
   if (wait) setPending({ until: Date.now() + Number(wait[1]) * 1000 });
-  showAuth("verify", error && !(p.kind === "email" && /signups? not allowed|not found/i.test(error.message || "")) ? friendly(error) : "A new code is on its way. It can take a minute to arrive.", error && !/signups? not allowed|not found/i.test(error.message || "") ? "err" : "info");
+  showAuth("verify", error && !(p.kind === "email" && /signups? not allowed|not found/i.test(error.message || "")) ? friendly(error) : `A new ${what()} is on its way. It can take a minute to arrive.`, error && !/signups? not allowed|not found/i.test(error.message || "") ? "err" : "info");
   if (wait) tickResend();
 }
 let tick = null;
@@ -486,7 +496,7 @@ function tickResend() {
     const p = pending(), b = document.querySelector('[data-auth="resend"]');
     if (!p || !b) { clearInterval(tick); return; }
     const left = Math.max(0, Math.ceil(((p.until || 0) - Date.now()) / 1000));
-    b.disabled = left > 0; b.textContent = left ? `Send a new code (${left}s)` : "Send a new code";
+    b.disabled = left > 0; b.textContent = left ? `Send a new ${what()} (${left}s)` : `Send a new ${what()}`;
     if (!left) clearInterval(tick);
   }, 1000);
 }
@@ -526,7 +536,7 @@ export function initAuth(sb) {
       const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: false, emailRedirectTo: here() } });
       // Never say whether an account exists: "no such user" looks the same as success. Rate limits and connection problems are real, so say those.
       if (error && (/rate limit|too many|after \d+ seconds|failed to fetch|network/i.test(error.message || ""))) return authMsg(friendly(error));
-      startPending(email, "email"); showAuth("verify", `If there’s an account for ${email}, a code is on its way.`, "info");
+      startPending(email, "email"); showAuth("verify", `If there’s an account for ${email}, a ${what()} is on its way.`, "info");
     });
   });
   document.addEventListener("click", e => {

@@ -47,7 +47,13 @@ export function openProfile() {
     </section>
     <section class="set"><h4>Your name</h4><form id="setName" class="set-row"><input type="text" name="name" value="${esc(name)}" autocomplete="given-name" required aria-label="Your name" maxlength="60"><button class="btn primary" type="submit">Save</button></form><div class="msg" id="mName"></div>
       <p class="set-note">How you appear to other people in your households.</p></section>
-    <section class="set"><h4>Email</h4><p class="prof-email">${esc(u.email || "")}</p><button class="btn small soft" type="button" data-sheet="account">Email, password and security</button></section>`);
+    <section class="set"><h4>Email</h4><form id="setEmail" class="set-row"><input type="email" name="email" value="${esc(u.email || "")}" autocomplete="email" required aria-label="Email"><button class="btn primary" type="submit">Change</button></form><div class="msg" id="mEmail"></div>
+      <p class="set-note">We’ll email a confirmation link. The change happens once you open it.</p></section>
+    <section class="set"><h4>Password</h4><form id="setPass" class="set-row"><input type="password" name="password" minlength="8" autocomplete="new-password" required placeholder="New password (8+ characters)" aria-label="New password"><button class="btn primary" type="submit">Change</button></form><div class="msg" id="mPass"></div></section>
+    <section class="set"><h4>Your data</h4><p class="set-note">Download everything we store about you: your account details, every household you’re in, their budgets, backups and change history.</p><button class="btn" type="button" data-sheet="download">Download all my data</button><div class="msg" id="mDl"></div></section>
+    <section class="set danger-zone"><h4>Delete my account</h4><div id="delPlan" class="set-note">Working out what would happen…</div>
+      <form id="setDelete" class="set-row"><input type="text" name="confirm" autocomplete="off" placeholder="Type DELETE to confirm" aria-label="Type DELETE to confirm"><button class="btn danger" type="submit">Delete my account</button></form><div class="msg" id="mDel"></div></section>`);
+  explainDelete();
 }
 async function profileAction(act, btn) {
   const box = $("#cropBox");
@@ -77,20 +83,8 @@ async function photoChosen(input) {
 }
 
 /* ---------- account ---------- */
-export function openAccount() {
-  const u = app.session.user, name = (u.user_metadata && u.user_metadata.name) || "";
-  open("Your account", `
-    <section class="set"><h4>Appearance</h4><button class="btn block soft" type="button" data-sheet="appearance">Colour, light or dark, and spacing</button></section>
-    <section class="set"><h4>Your name</h4><form id="setName" class="set-row"><input type="text" name="name" value="${esc(name)}" autocomplete="given-name" required aria-label="Your name"><button class="btn primary" type="submit">Save</button></form><div class="msg" id="mName"></div>
-      <p class="set-note">This is how you appear to other people in your households. Names inside a budget are changed on its Budget tab.</p></section>
-    <section class="set"><h4>Email</h4><form id="setEmail" class="set-row"><input type="email" name="email" value="${esc(u.email || "")}" autocomplete="email" required aria-label="Email"><button class="btn primary" type="submit">Change</button></form><div class="msg" id="mEmail"></div>
-      <p class="set-note">We’ll email a confirmation link. The change happens once you open it.</p></section>
-    <section class="set"><h4>Password</h4><form id="setPass" class="set-row"><input type="password" name="password" minlength="8" autocomplete="new-password" required placeholder="New password (8+ characters)" aria-label="New password"><button class="btn primary" type="submit">Change</button></form><div class="msg" id="mPass"></div></section>
-    <section class="set"><h4>Your data</h4><p class="set-note">Download everything we store about you: your account details, every household you’re in, their budgets, backups and change history.</p><button class="btn" type="button" data-sheet="download">Download all my data</button><div class="msg" id="mDl"></div></section>
-    <section class="set danger-zone"><h4>Delete my account</h4><div id="delPlan" class="set-note">Working out what would happen…</div>
-      <form id="setDelete" class="set-row"><input type="text" name="confirm" autocomplete="off" placeholder="Type DELETE to confirm" aria-label="Type DELETE to confirm"><button class="btn danger" type="submit">Delete my account</button></form><div class="msg" id="mDel"></div></section>`);
-  explainDelete();
-}
+/** Account settings now live in My profile (Phase 7D.2 follow-up): one page for you. */
+export function openAccount() { openProfile(); }
 
 async function myHouseholds() {
   const { data } = await app.sb.from("household_members").select("household_id, role, joined_at, households(name)").eq("user_id", app.meId).order("joined_at");

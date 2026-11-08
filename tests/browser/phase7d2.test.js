@@ -78,7 +78,7 @@ test("every menu destination still works: profile, household, reminders, history
   assert.equal(await page.locator('#drawer [data-switch]').count(), 2, "both households to switch between");
   await shot(page, "drawer-320-long");
   await page.keyboard.press("Escape"); await page.waitForSelector("#drawer", { state: "hidden" });
-  for (const [act, sel] of [["profile", "#sheet .prof"], ["household", "#sheet[open]"], ["reminders", "#sheet .rem-switches"], ["history", "#sheet .hist-intro, #sheet .hist-empty"], ["appearance", "#sheet .acc-picker"], ["account", "#setPass"]]) {
+  for (const [act, sel] of [["profile", "#sheet .prof"], ["household", "#sheet[open]"], ["reminders", "#sheet .rem-switches"], ["history", "#sheet .hist-intro, #sheet .hist-empty"], ["appearance", "#sheet .acc-picker"]]) {
     await go(act, sel);
     await page.click('#sheet [data-sheet="close"]'); await page.waitForSelector("#sheet", { state: "hidden" });
   }
@@ -145,7 +145,11 @@ test("My profile: add a photo (crop, save), it shows everywhere, survives a reop
   assert.equal(await page.textContent("#meSlot .av"), "J", "your initial to start with");
   await page.click("#menuBtn"); await page.click('#drawer [data-act="profile"]');
   await page.waitForSelector("#sheet .prof");
-  assert.match(await page.textContent("#sheet .prof-email"), /jarden@example\.com/);
+  assert.equal(await page.inputValue('#sheet #setEmail [name="email"]'), "jarden@example.com", "account settings are on the same page");
+  for (const f of ["#setName", "#setEmail", "#setPass", "#setDelete"]) assert.equal(await page.locator(`#sheet ${f}`).count(), 1, f);
+  assert.equal(await page.locator('#drawer [data-act="account"]').count(), 0);
+  const x = await page.$eval('#sheet [data-sheet="close"]', b => { const c = getComputedStyle(b); return c.borderTopWidth + " " + c.backgroundColor; });
+  assert.match(x, /^0px rgba\(0, 0, 0, 0\)/, "the close ✕ has no box");
   await page.setInputFiles("[data-prof-file]", { name: "me.png", mimeType: "image/png", buffer: await pngBuffer(page) });
   await page.waitForSelector("#cropBox:not([hidden])");
   await page.fill("[data-crop-zoom]", "1.6");
