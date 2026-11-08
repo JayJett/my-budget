@@ -63,6 +63,7 @@ function saveOfflineProfile() {
   if (app.household) members[app.household.id] = app.members;
   try { localStorage.setItem(OFFLINE, JSON.stringify({ user: { id: u.id, email: u.email, user_metadata: u.user_metadata || {} }, households: app.households, members })); } catch (_) {}
 }
+app.saveOfflineProfile = saveOfflineProfile;
 const lastHHKey = () => `mb-household-${app.meId}`;
 
 /* ---------- small helpers (Phase 7A) ---------- */
@@ -274,13 +275,16 @@ async function loadMembers() {
   app.members = error && prof && prof.members ? (prof.members[app.household.id] || []) : (data || []);
 }
 async function loadHouseholds() {
-  const { data, error } = await app.sb.from("household_members").select("household_id, role, households(name)").eq("user_id", app.meId).order("joined_at");
+  // Phase 8: each household's look comes too. Until the database has it, ask for the name alone.
+  let { data, error } = await app.sb.from("household_members").select("household_id, role, households(name, appearance)").eq("user_id", app.meId).order("joined_at");
+  if (error && /appearance|42703|column/i.test(`${error.code} ${error.message}`)) ({ data, error } = await app.sb.from("household_members").select("household_id, role, households(name)").eq("user_id", app.meId).order("joined_at"));
   if (error) {
     const prof = offlineProfile();
     if (isNetworkError(error) && prof && prof.user.id === app.meId && prof.households) { app.households = prof.households; return app.households; }
     throw error;
   }
-  app.households = (data || []).map(r => ({ id: r.household_id, role: r.role, name: (r.households && r.households.name) || "Our budget" }));
+  app.households = (data || []).map(r => ({ id: r.household_id, role: r.role, name: (r.households && r.households.name) || "Our budget",
+    look: (r.households && r.households.appearance && typeof r.households.appearance === "object") ? r.households.appearance : {} }));
   return app.households;
 }
 
@@ -291,7 +295,7 @@ async function openHH(id) {
   // Forget the last household's history views straight away, so nothing from it can show while this one loads
   app.snapshots = null; app.compareId = null; app.pgSel = null; app.snapshotsOffline = false;
   const hh = app.households.find(h => h.id === id) || app.households[0];
-  app.household = { id: hh.id, name: hh.name };
+  app.household = { id: hh.id, name: hh.name, look: hh.look || {} };
   app.role = hh.role;
   app.canWrite = hh.role !== "viewer";
   try { localStorage.setItem(lastHHKey(), hh.id); } catch (_) {}

@@ -15,6 +15,7 @@ import * as spending from "./views/spending.js";
 import * as goals from "./views/goals.js";
 import * as invest from "./views/invest.js";
 import * as progress from "./views/progress.js";
+import { hhAvatarHTML } from "./household-look.js";
 
 const VIEWS_BY_TAB = { budget, networth, spending, goals, invest, progress };
 
@@ -55,7 +56,7 @@ export function renderBrand() {
     if (btn) btn.setAttribute("aria-label", nm ? `Open account menu (${nm})` : "Open account menu");
   }
   const brand = $("#brandNames");
-  if (brand) brand.innerHTML = `<span class="brand-t">${esc(title)}</span>${P.length > 1 && names.length ? `<small>${esc(listNames(names))}</small>` : ""}`;
+  if (brand) brand.innerHTML = `${app.household ? hhAvatarHTML(app.household, "sm") : ""}<span class="brand-tx"><span class="brand-t">${esc(title)}</span>${P.length > 1 && names.length ? `<small>${esc(listNames(names))}</small>` : ""}</span>`;
   document.title = `${title} · Budget`;
 }
 

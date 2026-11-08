@@ -5,6 +5,7 @@ import { $, esc, toast, confirmDel, offerFile } from "./dom.js";
 import { ymd } from "../model/util.js";
 import { accentPickerHTML, lookSeg, THEMES, DENSITIES } from "./accent.js";
 import { modeSection, combineLink } from "./household-mode.js";
+import { lookSection } from "./household-look.js";
 import { avatarHTML, myName, checkFile, loadImage, cropper, savePhoto, removePhoto, refreshAvatars } from "./profile.js";
 
 const ROLE_LABEL = { owner: "Owner", editor: "Editor", viewer: "Viewer" };
@@ -134,6 +135,7 @@ export async function openHouseholdSettings() {
   open("Household settings", `
     <section class="set"><h4>Name</h4>${isOwner ? `<form id="setHHName" class="set-row"><input type="text" name="name" value="${esc(hh.name)}" required aria-label="Household name"><button class="btn primary" type="submit">Rename</button></form><div class="msg" id="mHH"></div>` : `<p>${esc(hh.name)}</p>`}
       <p class="set-note">You’re ${role === "owner" ? "an owner" : role === "editor" ? "an editor" : "a viewer"} here: ${esc(ROLE_HELP[role].toLowerCase())}.</p></section>
+    ${lookSection()}
     ${app.hasData ? modeSection() + combineLink() : ""}
     <section class="set"><h4>People</h4><ul class="hh-list">${app.members.map(m => `<li><span>${esc(m.display_name || m.email)}${m.user_id === app.meId ? " (you)" : ""}<small>${esc(m.email)}</small></span>
       <span class="hh-acts">${isOwner && m.user_id !== app.meId ? `${roleSel(m)}<button class="btn small" type="button" data-remove="${esc(m.user_id)}" data-name="${esc(m.display_name || m.email)}">Remove</button>` : `<span class="chip ${m.role === "owner" ? "ok" : ""}" title="${esc(ROLE_HELP[m.role] || "")}">${ROLE_LABEL[m.role] || m.role}</span>`}</span></li>`).join("")}</ul>

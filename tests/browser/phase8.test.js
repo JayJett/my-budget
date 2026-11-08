@@ -187,6 +187,8 @@ test("allocations: pick an icon and a colour; it shows in the list, the sheet an
   assert.deepEqual(strip(b.accounts.jg), strip(before.accounts.jg));
   assert.deepEqual(Object.keys(b.accounts).filter(k => k !== "jg").map(k => b.accounts[k]), Object.keys(before.accounts).filter(k => k !== "jg").map(k => before.accounts[k]));
   await page.click('#sheet .sheet-head [data-sheet="close"]');
+  await page.waitForSelector("#sheet", { state: "hidden" });
+  await page.waitForFunction(() => /^rgb/.test(getComputedStyle(document.querySelector('[data-k="acc.jg.ic"]')).color));
   const tile = await page.$eval('[data-k="acc.jg.ic"]', e => [getComputedStyle(e).color, e.innerHTML.includes("M6.8 9.2")]);
   const lav = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--o-lavender").trim());
   assert.equal(tile[1], true, "the plane shows in the list");
@@ -236,4 +238,85 @@ test("goals: a goal's colour shows on its badge and bar; choosing the same icon 
   assert.equal(await page.$eval('[data-edit-goal="gj"][data-i="g1"]', e => e.getAttribute("style")), "--gc:var(--o-teal)");
   await shot(page, "goal-colour");
   assert.deepEqual(errors, []); await ctx.close();
+});
+
+/* ---------------- household identity ---------------- */
+async function pngBuffer(page, w = 600, h = 400) {
+  const data = await page.evaluate(([w, h]) => { const c = document.createElement("canvas"); c.width = w; c.height = h; const x = c.getContext("2d"); x.fillStyle = "#6a8caf"; x.fillRect(0, 0, w, h); x.fillStyle = "#f2c14e"; x.fillRect(w / 3, 0, w / 3, h); return c.toDataURL("image/png"); }, [w, h]);
+  return Buffer.from(data.split(",")[1], "base64");
+}
+const TWO = (role = "owner", extra = {}) => ({ households: [
+  { id: "hh-1", name: "Ana & Ben", role, budget: toStored(blankBudget({ name: "Ana" })), ...extra },
+  { id: "hh-2", name: "Mum’s budget", role: "editor", budget: toStored(blankBudget({ name: "Mum" })), appearance: { colour: "rose", icon: "heart" } },
+] });
+
+test("household look: colour and icon show in the header, the switcher and settings; saved on the household; the last quick tap wins", { skip }, async () => {
+  const { page, errors, ctx } = await open(null, { ...phone(), storage: ALL_DONE, init: TWO() });
+  assert.equal(await page.textContent("#brandNames .hh-av"), "A", "no look yet: the initial");
+  await openHousehold(page);
+  await page.waitForSelector("#hhLookSec");
+  for (const k of ["blue", "teal", "purple"]) await page.click(`[data-hh-oc="${k}"]`);
+  await page.click('[data-hh-icon="home"]');
+  await page.waitForFunction(() => { const h = window.__fake.hh("hh-1"); return h.appearance && h.appearance.colour === "purple" && h.appearance.icon === "home"; });
+  assert.equal(await page.getAttribute("#hhLookPrev .hh-av", "data-oc"), "purple");
+  await shot(page, "household-look");
+  await page.click('#sheet [data-sheet="close"]');
+  assert.equal(await page.getAttribute("#brandNames .hh-av", "data-oc"), "purple");
+  assert.equal(await page.locator("#brandNames .hh-av svg").count(), 1, "the icon, in the header");
+  assert.equal(await page.locator("#meSlot .av").count(), 1, "your own avatar still opens the menu");
+  await page.click("#menuBtn"); await page.waitForSelector("#drawer:not([hidden])");
+  assert.equal(await page.getAttribute('#drawer [data-switch="hh-1"] .hh-av', "data-oc"), "purple");
+  assert.equal(await page.getAttribute('#drawer [data-switch="hh-2"] .hh-av', "data-oc"), "rose", "other households show their own look");
+  await shot(page, "household-switcher");
+  // the household's look isn't in the budget, and didn't change any money
+  assert.equal(JSON.stringify(await fake(page, () => window.__fake.hh("hh-1").budget)).includes("purple"), false);
+  assert.deepEqual(errors, []); await ctx.close();
+});
+
+test("household photo: crop and save into the household's own folder, shown everywhere, replaced and removed", { skip }, async () => {
+  const { page, errors, ctx } = await open(null, { ...phone(), storage: ALL_DONE, init: TWO() });
+  await openHousehold(page);
+  await page.setInputFiles("[data-hh-file]", { name: "us.png", mimeType: "image/png", buffer: await pngBuffer(page) });
+  await page.waitForSelector("#hhCropBox:not([hidden])");
+  await page.click('[data-hh-photo="save"]');
+  await page.waitForFunction(() => !!(window.__fake.hh("hh-1").appearance || {}).photo);
+  const p1 = await fake(page, () => window.__fake.hh("hh-1").appearance.photo);
+  assert.match(p1, /^hh-1\/\d+\.jpg$/);
+  const up = await fake(page, () => window.__fake.storageCalls.find(c => c.op === "upload"));
+  assert.equal(up.bucket, "household-photos"); assert.ok(up.size < 512 * 1024);
+  await page.waitForSelector("#hhLookPrev .hh-av img");
+  await page.click('#sheet [data-sheet="close"]');
+  assert.equal(await page.locator("#brandNames .hh-av img").count(), 1, "the header shows the photo");
+  // replace: the old file is tidied away
+  await openHousehold(page);
+  await page.setInputFiles("[data-hh-file]", { name: "new.png", mimeType: "image/png", buffer: await pngBuffer(page, 300, 900) });
+  await page.waitForSelector("#hhCropBox:not([hidden])"); await page.click('[data-hh-photo="save"]');
+  await page.waitForFunction(p1 => window.__fake.hh("hh-1").appearance.photo !== p1, p1);
+  await page.waitForFunction(p1 => window.__fake.storageCalls.some(c => c.op === "remove" && c.bucket === "household-photos" && c.paths.includes(p1)), p1);
+  // remove: back to the initial
+  await page.click('[data-hh-photo="remove"]'); await page.click("#dlgYes");
+  await page.waitForFunction(() => !window.__fake.hh("hh-1").appearance.photo);
+  await page.waitForFunction(() => !document.querySelector("#hhLookPrev .hh-av img"));
+  assert.deepEqual(errors, []); await ctx.close();
+});
+
+test("household look: viewers see it but can't change it", { skip }, async () => {
+  const { page, errors, ctx } = await open(null, { ...phone(), storage: ALL_DONE, init: TWO("viewer", { appearance: { colour: "amber" } }) });
+  assert.equal(await page.getAttribute("#brandNames .hh-av", "data-oc"), "amber");
+  await openHousehold(page);
+  assert.equal(await page.locator("[data-hh-oc]:not([disabled])").count(), 0);
+  assert.equal(await page.locator("[data-hh-photo]").count(), 0);
+  assert.match(await page.textContent("#hhLookSec"), /Owners and editors can change this/);
+  assert.deepEqual(errors, []); await ctx.close();
+});
+
+test("before the database update: households still load, look the same as before, and a change explains itself", { skip }, async () => {
+  const init = { ...TWO(), noLook: true };
+  const { page, errors, ctx } = await open(null, { ...phone(), storage: ALL_DONE, init });
+  assert.equal(await page.textContent("#brandNames .hh-av"), "A");
+  await openHousehold(page);
+  await page.click('[data-hh-oc="teal"]');
+  await page.waitForFunction(() => /quick database update/.test(document.querySelector("#mHHLook").textContent));
+  assert.notEqual(await page.getAttribute("#hhLookPrev .hh-av", "data-oc"), "teal", "it went back to what was saved");
+  assert.deepEqual(errors.filter(e => !/42703|appearance/.test(e)), []); await ctx.close();
 });

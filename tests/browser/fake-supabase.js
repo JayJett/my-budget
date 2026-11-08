@@ -82,7 +82,7 @@
 
   const fake = window.__fake = {
     households, rpcCalls: [], authCalls: [], backups: [], remUpdates: [], prefSaves: [], devices: copy(init.devices || []), fnCalls: [],
-    pushKey: init.pushKey === undefined ? "BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4" : init.pushKey, listeners: [], failNext: 0, files: copy(init.files || {}), storageCalls: [], failUpload: 0, storageOn: init.storageOn !== false, deleted: false, createMode: init.createMode || null, invite: init.invite || null, failMembers: init.failMembers || 0, createDelay: init.createDelay || 0, resendWait: init.resendWait || 0,
+    pushKey: init.pushKey === undefined ? "BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4" : init.pushKey, listeners: [], failNext: 0, files: copy(init.files || {}), storageCalls: [], failUpload: 0, storageOn: init.storageOn !== false, noLook: !!init.noLook, deleted: false, createMode: init.createMode || null, invite: init.invite || null, failMembers: init.failMembers || 0, createDelay: init.createDelay || 0, resendWait: init.resendWait || 0,
     get budget() { return households[0].budget; },
     get seq() { return households[0].seq; },
     hh: id => households.find(h => h.id === id),
@@ -112,7 +112,11 @@
       const hid = q.eq.household_id || q.eq.id;
       if (table === "household_members" && fake.failMembers > 0) { fake.failMembers--; return { data: null, error: { message: "Failed to fetch" } }; }
       if (table === "household_members") {
-        if (q.eq.user_id === ME) return { data: mine().map(h => ({ household_id: h.id, role: roleIn(h.id), joined_at: "2026-01-01", households: { name: h.name } })), error: null };
+        if (q.eq.user_id === ME) {
+          // Phase 8: a household's look comes along with its name, once the database has the column
+          if (/appearance/.test(q.cols) && fake.noLook) return { data: null, error: { code: "42703", message: "column households_1.appearance does not exist" } };
+          return { data: mine().map(h => ({ household_id: h.id, role: roleIn(h.id), joined_at: "2026-01-01", households: /appearance/.test(q.cols) ? { name: h.name, appearance: copy(h.appearance || {}) } : { name: h.name } })), error: null };
+        }
         return { data: copy((fake.hh(hid) || { members: [] }).members), error: null };
       }
       if (table === "households" && q.update) {
@@ -157,6 +161,9 @@
     return b;
   }
 
+  const folder = path => String(path).split("/")[0];
+  const mayRead = (bucket, path) => bucket === "household-photos" ? !!roleIn(folder(path)) : path.startsWith(ME + "/");
+  const mayWrite = (bucket, path) => bucket === "household-photos" ? ["owner", "editor"].includes(roleIn(folder(path))) : path.startsWith(ME + "/");
   async function rpc(name, a) {
     await new Promise(r => setTimeout(r, 30));
     if (offline()) return NET;
@@ -164,6 +171,18 @@
     const id = a && a.p_household;
     switch (name) {
       case "sync_my_profile": return { data: 0, error: null };
+      case "set_household_appearance": { // like the database function: owners and editors, known keys only
+        if (fake.noLook) return { data: null, error: { code: "PGRST202", message: "Could not find the function public.set_household_appearance(p_appearance, p_household) in the schema cache" } };
+        const h = fake.hh(a.p_household), r = roleIn(a.p_household);
+        if (!h || !r) return { data: null, error: { message: "Not a member of this household" } };
+        if (r === "viewer") return { data: null, error: { message: "Only owners and editors can change how the household looks" } };
+        const v = a.p_appearance || {}, clean = {};
+        if (/^[a-z]{2,12}$/.test(v.colour || "")) clean.colour = v.colour;
+        if (/^[a-z]{2,16}$/.test(v.icon || "")) clean.icon = v.icon;
+        if (new RegExp(`^${h.id}/\\d{10,16}\\.jpg$`).test(v.photo || "")) clean.photo = v.photo;
+        h.appearance = clean; fake.lookSaves = (fake.lookSaves || 0) + 1;
+        return { data: copy(clean), error: null };
+      }
       case "accept_invites": { // an invitation waiting for this email (init.invite) becomes a membership, with the role it was given
         if (!fake.invite) return { data: 0, error: null };
         const v = fake.invite; fake.invite = null;
@@ -308,18 +327,19 @@
           },
         },
         from: query,
-        // Storage (profile pictures): like the avatars bucket's rules, you can only use your own folder
+        // Storage, like the real buckets' rules: profile pictures only in your own folder; household photos
+        // (Phase 8) seen by the household, changed by its owners and editors
         storage: { from(bucket) { return {
           async upload(path, blob, opts) {
             fake.storageCalls.push({ op: "upload", bucket, path, type: opts && opts.contentType, size: blob.size });
             if (fake.failUpload) { fake.failUpload--; return { data: null, error: { message: "Upload failed" } }; }
             if (!fake.storageOn) return { data: null, error: { message: "Bucket not found" } };
-            if (!path.startsWith(user.id + "/")) return { data: null, error: { message: "new row violates row-level security policy" } };
+            if (!mayWrite(bucket, path)) return { data: null, error: { message: "new row violates row-level security policy" } };
             fake.files[path] = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(blob); });
             return { data: { path }, error: null };
           },
-          async remove(paths) { fake.storageCalls.push({ op: "remove", bucket, paths }); paths.forEach(p => { if (p.startsWith(user.id + "/")) delete fake.files[p]; }); return { data: [], error: null }; },
-          async createSignedUrl(path) { fake.storageCalls.push({ op: "sign", bucket, path }); const u = path.startsWith(user.id + "/") && fake.files[path]; return u ? { data: { signedUrl: u }, error: null } : { data: null, error: { message: "Object not found" } }; },
+          async remove(paths) { fake.storageCalls.push({ op: "remove", bucket, paths }); paths.forEach(p => { if (mayWrite(bucket, p)) delete fake.files[p]; }); return { data: [], error: null }; },
+          async createSignedUrl(path) { fake.storageCalls.push({ op: "sign", bucket, path }); const u = mayRead(bucket, path) && fake.files[path]; return u ? { data: { signedUrl: u }, error: null } : { data: null, error: { message: "Object not found" } }; },
         }; } },
         rpc,
         // Edge Functions: the reminders function's "public key" and "send a test" jobs
