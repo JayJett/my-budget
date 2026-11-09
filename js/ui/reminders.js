@@ -50,7 +50,7 @@ const ago = iso => {
   const d = new Date(iso), days = Math.round((app.today - new Date(d.getFullYear(), d.getMonth(), d.getDate())) / 864e5);
   return days <= 0 ? "Today" : days === 1 ? "Yesterday" : days < 7 ? `${days} days ago` : d.toLocaleDateString("en-NZ", { day: "numeric", month: "short" });
 };
-const TAB_NAME = { budget: "Budget", networth: "Net worth", spending: "Joint spending", goals: "Goals", invest: "Investments", progress: "Progress" };
+const TAB_NAME = { budget: "Budget", networth: "Net worth", spending: "Joint spending", goals: "Goals", invest: "Investments", progress: "Progress", payday: "your payday plan" };
 
 /* Phase 7D.2: the bell opens a notification centre, a drawer from the right with the same look as the
    menu. It shows your real reminders for this household (nothing made up): unread ones stand out, each
@@ -73,6 +73,7 @@ function remAct(b) {
     const r = (app.reminders || []).find(x => x.id === id); if (!r) return;
     if (!r.read_at) markRead([id]);
     inboxOpen = false; closeDrawer({ focus: false });
+    if (r.tab === "payday") { location.hash = "home"; import("./payday.js").then(m => m.openPayday()); return; }
     if (TAB_HASH[r.tab]) location.hash = TAB_HASH[r.tab];
   }
 }
@@ -165,7 +166,7 @@ function drawSettings() {
     sink_due: `<label class="rem-opt">Warn me <select class="cell" data-pref-n="due_weeks" aria-label="How many weeks ahead">${DUE_WEEKS.map(w => `<option value="${w}"${P.due_weeks === w ? " selected" : ""}>${w} weeks</option>`).join("")}</select> before</label>`,
   };
   sheet("Reminder settings", `<p class="set-note">Choose the reminders you’d like for <b>${esc(app.household.name)}</b>. They’re just for you: everyone in the household chooses their own. Each morning at about 8:30, new ones appear under the bell 🔔.</p>
-    <ul class="rem-switches">${REMINDER_TYPES.map(t => `<li><label class="switch-row"><span><b>${esc(t.title)}</b><small>${esc(t.help)}</small></span>
+    <ul class="rem-switches">${REMINDER_TYPES.filter(t => !t.needsPerson || paydayOK()).map(t => `<li><label class="switch-row"><span><b>${esc(t.title)}</b><small>${esc(t.help)}</small></span>
       <input type="checkbox" role="switch" data-pref="${t.pref}"${P[t.pref] ? " checked" : ""}></label>${P[t.pref] && extra[t.pref] ? extra[t.pref] : ""}</li>`).join("")}</ul>
     <div class="msg" id="mRem"></div>
     <section class="set rem-preview"><h4>With your budget today, you’d get</h4>${previewHTML()}</section>
@@ -178,17 +179,20 @@ function drawSettings() {
 function previewHTML() {
   const any = REMINDER_TYPES.some(t => R.prefs[t.pref]);
   if (!any) return `<p class="set-note">Nothing: every reminder is off.</p>`;
-  const list = remindersFor(app.state, R.prefs, app.today);
+  const list = remindersFor(app.state, R.prefs, app.today, { personId: paydayOK() ? myPersonId() : null });
   return list.length ? `<ul class="rem-lines">${list.map(r => `<li><b>${esc(r.title)}</b> <span class="dim">${esc(r.body)}</span></li>`).join("")}</ul>`
     : `<p class="set-note">Nothing right now: all good. You’ll hear when something comes up.</p>`;
 }
 
+/** Phase 10: the payday reminder needs the database part and you to have said which person you are. */
+const myPersonId = () => { const m = (app.members || []).find(x => x.user_id === app.meId), id = m && m.person_id; return id && app.state.people.some(p => p.id === id) ? id : null; };
+const paydayOK = () => !!app.personLinks && !!myPersonId();
 let saving = Promise.resolve();
 async function savePref(key, value) {
   R.prefs[key] = value;
   drawSettings();
   const row = { user_id: app.meId, household_id: app.household.id, updated_at: new Date().toISOString() };
-  for (const k of Object.keys(DEFAULT_PREFS)) row[k] = R.prefs[k];
+  for (const k of Object.keys(DEFAULT_PREFS)) if (k !== "payday" || app.personLinks) row[k] = R.prefs[k]; // (payday: once the database has it)
   saving = saving.then(async () => {
     const { error } = await app.sb.from("reminder_prefs").upsert(row);
     const m = $("#mRem");
@@ -211,6 +215,7 @@ export function initReminders() {
       const r = (app.reminders || []).find(x => x.id === id); if (!r) return;
       if (!r.read_at) markRead([id]);
       d.close();
+      if (r.tab === "payday") { location.hash = "home"; import("./payday.js").then(m => m.openPayday()); return; }
       if (TAB_HASH[r.tab]) location.hash = TAB_HASH[r.tab];
     }
   });

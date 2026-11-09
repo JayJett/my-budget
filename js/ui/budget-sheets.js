@@ -24,6 +24,7 @@ import { list } from "./render.js";
 import { openPop, closePop } from "./dom.js";
 import { money } from "../model/format.js";
 import { blank } from "../model/util.js";
+import { destFieldHTML, srcFieldHTML } from "./payday-dest.js";
 
 // sheet: { kind: "acc" | "person" | "sp" | "nw" | "goal", id, tab, l (goal list key) }; fresh: a row just added (removed again if left blank)
 const UI = { reorder: false, reorderTab: null, open: new Set(), sheet: null, fresh: null };
@@ -68,6 +69,7 @@ function accountSheet(a) {
         <span class="unit person"><input type="number" step="any" inputmode="decimal" ${attrs("acc", a.id, `split.${p.id}`, "pct")} value="${a.split[p.id] == null ? "" : +(a.split[p.id] * 100).toFixed(4)}" aria-label="${esc(p.name || "Their")} percent of pay to ${esc(a.name || "this account")}"${dis()}><i>%</i></span>
         <span class="bs-val">${K(`acc.${a.id}.v.${p.id}`)}</span>
         <small class="bs-sub">${multi ? esc(p.name || "Unnamed") + ": " : ""}${K(`tot.p.${p.id}`)} of pay allocated in total</small></li>`).join("")}</ul></div>
+    ${destFieldHTML(a)}
     ${appearanceHTML({ l: "acc", id: a.id, icon: a.icon, def: accIcon({ ...a, icon: null }), colour: a.colour, colours: OBJECT_COLOURS, defColour: app.colours[a.id] && !isObjectColour(a.colour) ? app.colours[a.id] : "var(--faint)", disabled: readOnly() })}
     ${!a.role && !readOnly() ? `<button class="btn danger-soft block" type="button" data-del="acc" data-i="${esc(a.id)}">Delete allocation</button>` : ""}`;
 }
@@ -137,6 +139,7 @@ function personSheet(p) {
       <small class="bs-sub">${K(`inc.${p.id}.sub`)}</small></div>
     <label class="bs-field"><span>A recent payday</span><input class="bs-in" type="date" ${attrs("pp", p.id, "payday", "date")} value="${esc(p.payday)}"${dis()}></label>
     <p class="bs-note">${K(`p27.${p.id}`, "p27")}</p>
+    ${srcFieldHTML(p)}
     <div class="bs-field"><span class="bs-label">Colour in charts</span>
       <div class="swatches" role="group" aria-label="Colour">${COLOUR_KEYS.map(k => `<button type="button" class="swatch-btn pc-${k}" data-colour="${k}" data-i="${esc(p.id)}" aria-pressed="${k === p.colour}" aria-label="${PERSON_COLOURS[k].label}"${dis()}></button>`).join("")}</div>
       ${(() => { const twin = S.people.find(o => o.id !== p.id && o.colour === p.colour); return twin ? `<small class="bs-sub pc-twin">${esc(twin.name || "Someone else")} uses ${esc(PERSON_COLOURS[p.colour].label.toLowerCase())} too. A different colour makes the charts easier to read, but it’s up to you.</small>` : ""; })()}</div>

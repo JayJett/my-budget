@@ -18,6 +18,8 @@ import { initAccent } from "./ui/accent.js";
 import { initBudgetSheets } from "./ui/budget-sheets.js";
 import { initRebalance } from "./ui/rebalance.js";
 import { initExpensePicker } from "./ui/expense-picker.js";
+import { initPaydayDest } from "./ui/payday-dest.js";
+import { initPayday } from "./ui/payday.js";
 import { initHouseholdMode } from "./ui/household-mode.js";
 import { initHouseholdLook } from "./ui/household-look.js";
 import { initFeedback } from "./ui/feedback.js";
@@ -45,6 +47,8 @@ initAccent();
 initBudgetSheets();
 initRebalance(); // after the budget sheets: it chains their redraw hook
 initExpensePicker();
+initPaydayDest();
+initPayday(); // after the budget sheets and rebalance: it chains their redraw hook
 
 // Ctrl/Cmd+S saves straight away; leaving the page saves anything pending.
 document.addEventListener("keydown", e => {

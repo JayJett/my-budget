@@ -54,8 +54,12 @@ function payCard(S, C, w) {
     ${readOnly() ? "" : `<button class="btn soft small" type="button" data-home-go="budget" data-home-person="${esc(first.id)}">Set a payday</button>`}</section>`;
   return `<section class="card ho-pay ho-hero" aria-labelledby="hoPayT"><span class="eyebrow" id="hoPayT">Next payday</span>
     <p class="ho-big">${esc(dateLine(day))}</p><p class="ho-when">${when(first.inDays)}</p>
-    <ul class="ho-pays">${same.map(p => row(p)).join("")}${rest.map(p => row(p, p.date ? short(p.date) : "No payday yet")).join("")}</ul></section>`;
+    <ul class="ho-pays">${same.map(p => row(p)).join("")}${rest.map(p => row(p, p.date ? short(p.date) : "No payday yet")).join("")}</ul>
+    <button class="ho-pb" type="button" data-pb-open>${paySetUp(S) ? "See your payday plan" : "Set up your payday plan"}<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5L10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button></section>`;
 }
+
+/** Phase 10: has anyone said where any money goes yet? (Just changes the words on the payday card.) */
+const paySetUp = S => S.accounts.some(a => a.dest || (a.destBy && Object.keys(a.destBy).length));
 
 function planCard(S, C, w) {
   const st = planStatus(C);

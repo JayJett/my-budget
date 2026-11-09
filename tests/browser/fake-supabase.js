@@ -82,7 +82,7 @@
 
   const fake = window.__fake = {
     households, rpcCalls: [], authCalls: [], backups: [], remUpdates: [], prefSaves: [], devices: copy(init.devices || []), fnCalls: [],
-    pushKey: init.pushKey === undefined ? "BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4" : init.pushKey, listeners: [], failNext: 0, liveCb: null, liveDown: false, live(st) { if (this.liveCb) this.liveCb(st); }, files: copy(init.files || {}), storageCalls: [], failUpload: 0, storageOn: init.storageOn !== false, noLook: !!init.noLook, deleted: false, createMode: init.createMode || null, invite: init.invite || null, failMembers: init.failMembers || 0, createDelay: init.createDelay || 0, resendWait: init.resendWait || 0,
+    pushKey: init.pushKey === undefined ? "BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4" : init.pushKey, listeners: [], failNext: 0, checks: {}, noPersonLinks: !!init.noPersonLinks, liveCb: null, liveDown: false, live(st) { if (this.liveCb) this.liveCb(st); }, files: copy(init.files || {}), storageCalls: [], failUpload: 0, storageOn: init.storageOn !== false, noLook: !!init.noLook, deleted: false, createMode: init.createMode || null, invite: init.invite || null, failMembers: init.failMembers || 0, createDelay: init.createDelay || 0, resendWait: init.resendWait || 0,
     get budget() { return households[0].budget; },
     get seq() { return households[0].seq; },
     hh: id => households.find(h => h.id === id),
@@ -117,7 +117,9 @@
           if (/appearance/.test(q.cols) && fake.noLook) return { data: null, error: { code: "42703", message: "column households_1.appearance does not exist" } };
           return { data: mine().map(h => ({ household_id: h.id, role: roleIn(h.id), joined_at: "2026-01-01", households: /appearance/.test(q.cols) ? { name: h.name, appearance: copy(h.appearance || {}) } : { name: h.name } })), error: null };
         }
-        return { data: copy((fake.hh(hid) || { members: [] }).members), error: null };
+        // Phase 10: who's who (person_id), once the database has the column
+        if (/person_id/.test(q.cols) && fake.noPersonLinks) return { data: null, error: { code: "42703", message: "column household_members.person_id does not exist" } };
+        return { data: copy((fake.hh(hid) || { members: [] }).members).map(m => /person_id/.test(q.cols) ? { person_id: null, ...m } : (({ person_id, ...r }) => r)(m)), error: null };
       }
       if (table === "households" && q.update) {
         const h = fake.hh(hid); if (!h || roleIn(hid) !== "owner") return { data: [], error: null };
@@ -171,6 +173,33 @@
     const id = a && a.p_household;
     switch (name) {
       case "sync_my_profile": return { data: 0, error: null };
+      // Phase 10: the same rules as the database functions (supabase/migrations/..._payday_playbook.sql)
+      case "link_budget_person": {
+        if (fake.failNext > 0) { fake.failNext--; return err("Failed to fetch"); }
+        const hh = fake.hh(id); if (!roleIn(id)) return err("Not a member of this household");
+        const mem = hh.members.find(m => m.user_id === ME);
+        if (a.p_person === null) { mem.person_id = null; return { data: null, error: null }; }
+        if (!hh.budget.people || !hh.budget.people[a.p_person]) return err("That person isn't in this budget");
+        if (hh.members.some(m => m.person_id === a.p_person && m.user_id !== ME)) return err("Someone else in this household has already said that's them");
+        mem.person_id = a.p_person; return { data: a.p_person, error: null };
+      }
+      case "payday_check_get": case "payday_check_mark": case "payday_check_replan": {
+        if (fake.failNext > 0) { fake.failNext--; return err("Failed to fetch"); }
+        const hh = fake.hh(id); if (!roleIn(id)) return err("Not a member of this household");
+        if (!hh.members.some(m => m.user_id === ME && m.person_id === a.p_person)) return err("This checklist is for someone else");
+        const k = `${id}|${ME}|${a.p_person}|${a.p_payday}`, row = fake.checks[k];
+        const out = r => r ? { payday: a.p_payday, plan: copy(r.plan), done: copy(r.done), updated_at: new Date().toISOString() } : null;
+        if (name === "payday_check_get") return { data: out(row), error: null };
+        if (name === "payday_check_mark") {
+          const r = row || (fake.checks[k] = { plan: copy(a.p_plan || {}), done: {} });
+          if (a.p_on) r.done[a.p_key] = true; else delete r.done[a.p_key];
+          return { data: out(r), error: null };
+        }
+        if (!row) return { data: null, error: null };
+        const keys = (a.p_plan.groups || []).map(g => g.key);
+        row.plan = copy(a.p_plan); row.done = Object.fromEntries(Object.entries(row.done).filter(([kk]) => keys.includes(kk)));
+        return { data: out(row), error: null };
+      }
       case "set_household_appearance": { // like the database function: owners and editors, known keys only
         if (fake.noLook) return { data: null, error: { code: "PGRST202", message: "Could not find the function public.set_household_appearance(p_appearance, p_household) in the schema cache" } };
         const h = fake.hh(a.p_household), r = roleIn(a.p_household);

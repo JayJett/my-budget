@@ -273,7 +273,10 @@ async function busy(form, fn) {
 
 /* ---------- households ---------- */
 async function loadMembers() {
-  const { data, error } = await app.sb.from("household_members").select("user_id, display_name, email, role").eq("household_id", app.household.id).order("joined_at");
+  // Phase 10: who's who in the budget (person_id). Until the database has it, ask without it.
+  let { data, error } = await app.sb.from("household_members").select("user_id, display_name, email, role, person_id").eq("household_id", app.household.id).order("joined_at");
+  app.personLinks = !error;
+  if (error && /person_id|42703|column/i.test(`${error.code} ${error.message}`)) ({ data, error } = await app.sb.from("household_members").select("user_id, display_name, email, role").eq("household_id", app.household.id).order("joined_at"));
   const prof = offlineProfile();
   app.members = error && prof && prof.members ? (prof.members[app.household.id] || []) : (data || []);
 }
@@ -349,6 +352,7 @@ async function openHH(id) {
   loadSnapshots();
   loadReminders();
   openFromHash();
+  if (app.openPaydayFromHash) app.openPaydayFromHash();
   if (app.offline) return; // live updates start when the app reconnects
   ensureMonthly();
   liveSubscribe();

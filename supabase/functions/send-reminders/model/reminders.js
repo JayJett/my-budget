@@ -13,14 +13,16 @@
      sink-behind:s4:2026-W45    at most once a week, while it's behind
      goal-done:g1:3000          once per goal (again only if its target changes)
      goal-risk:g2:2026-W45      at most once a week, while it's at risk
-     alloc:m:2026-W45           at most once a week, while it isn't 100%  */
+     alloc:m:2026-W45           at most once a week, while it isn't 100%
+     payday:pa:2026-11-18       once per person per payday (Phase 10; only to the member who is that person)  */
 import { compute, goalStatus } from "./calc.js";
 import { n, blank, is100, parseDate, daysBetween, ymd } from "./util.js";
 import { WORDS } from "./periods.js";
 import { money, m0, monthYear, possessive } from "./format.js";
+import { nextPayday } from "./paydate.js";
 
 /** Every reminder starts switched off. */
-export const DEFAULT_PREFS = { review: false, review_day: 1, sink_due: false, due_weeks: 6, sink_behind: false, goal_done: false, goal_risk: false, allocation: false };
+export const DEFAULT_PREFS = { review: false, review_day: 1, sink_due: false, due_weeks: 6, sink_behind: false, goal_done: false, goal_risk: false, allocation: false, payday: false };
 export const DUE_WEEKS = [2, 4, 6, 8];
 
 /** The switches, with plain-language explanations (used by the settings screen). */
@@ -31,6 +33,7 @@ export const REMINDER_TYPES = [
   { pref: "goal_done", title: "Goal reached", help: "A small celebration when a goal is fully funded." },
   { pref: "goal_risk", title: "Goal deadline at risk", help: "When a goal with a deadline won’t get there at the current rate, and how much more it needs." },
   { pref: "allocation", title: "Allocation not at 100%", help: "When someone’s pay isn’t fully allocated on the Budget tab (or adds up to more than 100%), so every dollar has a job." },
+  { pref: "payday", title: "It’s payday", help: "On your payday, a nudge that your payday plan is ready. No amounts are shown in the notification.", needsPerson: true },
 ];
 
 /** "2026-W45": the ISO week a date falls in (Monday to Sunday). */
@@ -46,7 +49,7 @@ const pctText = v => (Math.round(v * 1000) / 10).toString().replace(/\.0$/, "") 
 
 /** The reminders one person should have today, for one household's budget (in-memory shape).
     `today` is a Date at midnight, NZ date. Returns [{ kind, key, title, body, tab }]. */
-export function remindersFor(S, prefs, today) {
+export function remindersFor(S, prefs, today, { personId = null } = {}) {
   const P = { ...DEFAULT_PREFS, ...(prefs || {}) }, out = [];
   if (!S || !S.people || !S.people.length) return out;
   const C = compute(S, today), w = WORDS[C.view], week = isoWeek(today);
@@ -108,6 +111,14 @@ export function remindersFor(S, prefs, today) {
       : `That’s ${pctText(t - 1)} more than the pay itself. Adjust the Allocation plan on the Budget tab so it adds up to 100%.`;
     add("allocation", `alloc:${p.id}:${week}`, `${who} pay is ${pctText(t)} allocated`, body, "budget");
   });
+
+  // Phase 10: it's payday. Only for the person this member said they are; no amounts (lock screens).
+  if (P.payday && personId) {
+    const p = S.people.find(x => x.id === personId);
+    const next = p && n(p.pay) > 0 ? nextPayday(p.payday, p.freq, today) : null;
+    if (next && ymd(next) === ymd(today))
+      add("payday", `payday:${p.id}:${ymd(today)}`, "It’s payday!", "Your payday plan is ready in Moni Money.", "payday");
+  }
   return out;
 }
 
