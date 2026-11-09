@@ -55,7 +55,7 @@ test("one person: income, then the plan, then 'ready' only once it's saved; the 
   assert.deepEqual(people.map(p => [p.name, p.pay, p.freq]), [["Jarden", 2000, "fortnightly"]]);
   const total = Object.values(b.accounts).reduce((s, a) => s + (a.split[people[0].id] || 0), 0);
   assert.ok(Math.abs(total - 1) < 1e-9, "the plan adds to 100% of pay");
-  assert.deepEqual(Object.values(b.nw.accounts).map(a => a.balance), [null], "no balances made up (only the empty Emergency Fund account, as before)");
+  assert.deepEqual(Object.values(b.nw.accounts), [], "no accounts or balances made up (Phase 9A: not even an empty Emergency Fund account)");
   assert.deepEqual(Object.keys(b.goals.joint || {}), [], "no goals made up");
   assert.equal(b.goals.ef.target, emergencyTarget([{ pay: 2000, freq: "fortnightly" }], "solo"));
   await page.click('[data-obact="finish"]');

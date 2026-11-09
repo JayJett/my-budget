@@ -91,7 +91,7 @@ test("Household settings: switching between Just me and With others changes word
   assert.equal((await budgetOf(page)).mode, "shared");
   assert.equal(JSON.stringify((await budgetOf(page)).accounts), before, "no allocation changed");
   await page.click('#sheet [data-sheet="close"]');
-  assert.match(await page.textContent('[data-tab="spending"]'), /Spending/);
+  assert.match(await page.textContent('[data-tab="spending"]'), /Expenses/);
   assert.match((await page.$$eval(".alloc .a-meta", e => e.map(x => x.textContent)))[0], /^Joint/);
   await openHousehold(page);
   await page.click('[data-hh-mode="solo"]'); await settle(page);

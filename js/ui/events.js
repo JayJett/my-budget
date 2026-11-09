@@ -1,6 +1,6 @@
 /* Everything the user can do on the page: typing, clicking, dragging. Each change edits app.state
    and then calls changed(), which redraws and queues a save. */
-import { app, changed, readOnly, TAB_HASH } from "./ctx.js";
+import { app, changed, readOnly, TAB_HASH, WEALTH, tabFromHash } from "./ctx.js";
 import { $, esc, toast, openPop, closePop, confirmDel } from "./dom.js";
 import { fmtNum } from "./inputs.js";
 import { list, render } from "./render.js";
@@ -23,6 +23,7 @@ export function switchTab(t) {
   const sheet = $("#sheet"); if (sheet && sheet.open) sheet.close();
   const dlg = $("#dlg"); if (dlg && dlg.open) $("#dlgNo").click();
   closePop(); closeDrawer({ focus: false });
+  if (WEALTH.includes(t)) app.wealthTab = t; // Wealth reopens on the section you were last in
   app.tab = t;
   if (app.household) render();
   window.scrollTo({ top: tabScroll[t] || 0 });
@@ -100,7 +101,13 @@ export function initEvents() {
     const pop = $("#pop"), path = e.composedPath();
     if (!path.includes(pop) && !e.target.closest("#menuBtn") && !e.target.closest("[data-fill]") && !e.target.closest('[data-goal-new="pick"]')) closePop();
     if (path.includes(pop)) return;
-    const tb = e.target.closest("[data-tab]");
+    let tb = e.target.closest("[data-tab]");
+    if (tb && tb.dataset.tab === "wealth") { // the Wealth button: the section you were last in (tapping it again: back to its top)
+      const t = WEALTH.includes(app.tab) ? app.tab : app.wealthTab || "networth";
+      if (t === app.tab) { tabScroll[app.tab] = 0; window.scrollTo({ top: 0, behavior: calm() ? "auto" : "smooth" }); return; }
+      const h = TAB_HASH[t]; if (location.hash !== "#" + h) location.hash = h; else switchTab(t);
+      return;
+    }
     if (tb) {
       const h = TAB_HASH[tb.dataset.tab];
       // tapping the tab you're already on goes back to its top (like a phone app); otherwise switch
@@ -217,7 +224,9 @@ export function initEvents() {
   });
 
   window.addEventListener("hashchange", () => {
-    const h = location.hash.replace(/^#/, ""), t = Object.keys(TAB_HASH).find(k => TAB_HASH[k] === h);
+    const t = tabFromHash();
+    // an old address (#net-worth, #investments, #progress, #joint-spending): show the new one instead
+    if (t && location.hash !== "#" + TAB_HASH[t]) history.replaceState(null, "", "#" + TAB_HASH[t]);
     if (t && t !== app.tab) switchTab(t);
   });
   // a mouse wheel over a focused % box would quietly change the number: scroll the page instead

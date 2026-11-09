@@ -23,7 +23,7 @@ const H = { entries: [], current: null, more: false, view: "list", busy: false }
 
 function sheet(title, html) {
   const d = $("#sheet");
-  d.innerHTML = `<div class="sheet-head"><h3>${esc(title)}</h3><button class="btn icon" type="button" data-sheet="close" aria-label="Close">✕</button></div><div class="sheet-body hist">${html}</div>`;
+  d.innerHTML = `<div class="sheet-head"><h3 tabindex="-1" autofocus>${esc(title)}</h3><button class="btn icon" type="button" data-sheet="close" aria-label="Close">✕</button></div><div class="sheet-body hist">${html}</div>`;
   if (!d.open) d.showModal();
 }
 const isOpen = () => $("#sheet").open && !!$("#sheet .hist");

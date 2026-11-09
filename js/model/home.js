@@ -1,0 +1,84 @@
+/* Phase 9A: what the Home screen shows. Nothing here works money out again: every figure comes
+   from compute() (model/calc.js), the same numbers the other tabs show. This file only decides
+   WHICH of them to show, the next payday, and which suggestions apply. No page code, so it's tested
+   on its own (tests/home.test.js).
+
+   Paydays are a plan, not money in the bank: Home says when pay is EXPECTED, from the "recent payday"
+   each person entered and how often they're paid. Nobody's pay is ever added to anyone else's. With
+   no payday entered there's no date: Home asks for one instead of guessing. */
+import { n, blank, parseDate, addDays, daysBetween, ymd } from "./util.js";
+
+const DAYS = { weekly: 7, fortnightly: 14 };
+
+/** The next payday on or after today, from any past or future payday and the pay frequency.
+    Monthly pay keeps the same day of the month (the 31st becomes the last day of shorter months). */
+export function nextPayday(payday, freq, today) {
+  const d0 = parseDate(payday); if (!d0) return null;
+  const t = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  if (freq === "monthly") {
+    const day = d0.getDate(), at = (y, m) => new Date(y, m, Math.min(day, new Date(y, m + 1, 0).getDate()));
+    if (d0 >= t) return d0;
+    let c = at(t.getFullYear(), t.getMonth());
+    if (c < t) c = at(t.getFullYear(), t.getMonth() + 1);
+    return c;
+  }
+  const step = DAYS[freq] || 14, diff = daysBetween(d0, t);
+  if (diff <= 0) return d0;
+  return addDays(d0, Math.ceil(diff / step) * step);
+}
+
+/** Each person with pay: their own next payday (or null), their own pay per pay, in date order
+    (people with no payday last). */
+export function paydays(S, C, today) {
+  return C.people.filter(p => n(p.pay) > 0).map(p => {
+    const d = nextPayday(p.payday, p.freq, today);
+    return { id: p.id, name: p.name || "", colour: p.colour, pay: n(p.pay), freq: p.freq, date: d ? ymd(d) : null, inDays: d ? daysBetween(today, d) : null,
+      pct: C.tot.pct[p.id], annual: p.annual };
+  }).sort((a, b) => (a.date === null) - (b.date === null) || (a.inDays ?? 0) - (b.inDays ?? 0));
+}
+
+/** How much of everyone's pay has a plan (the Budget tab's own totals). Says nothing about whether
+    the plan is affordable: that's a different question (Phase 9B). */
+export function planStatus(C) {
+  const earning = C.people.filter(p => p.annual > 0);
+  if (!earning.length) return { k: "none", left: 0, over: 0 };
+  const left = earning.reduce((s, p) => s + Math.max(0, p.annual - C.tot.amt[p.id]), 0);
+  const over = earning.reduce((s, p) => s + Math.max(0, C.tot.amt[p.id] - p.annual), 0);
+  const all = earning.every(p => Math.round(C.tot.pct[p.id] * 1e4) === 1e4);
+  return { k: all ? "ok" : over > 0.5 ? "over" : "left", left, over, pct: C.incTotal ? C.tot.t / C.incTotal : 0 };
+}
+
+const size = x => Array.isArray(x) ? x.length : Object.keys(x || {}).length;
+/** Suggestions, most useful first, only for things that are really missing. At most `max`.
+    ctx.snapshots: the household's snapshots, or null while they're unknown (then nothing is said about them). */
+export function homeActions(S, C, { snapshots = null, max = 3 } = {}) {
+  const out = [], earners = C.people.filter(p => p.annual > 0);
+  if (!earners.length) out.push({ key: "pay", to: "person", id: (C.people[0] || {}).id });
+  const noDay = earners.find(p => blank(p.payday));
+  if (noDay) out.push({ key: "payday", to: "person", id: noDay.id, name: noDay.name || "" });
+  const st = planStatus(C);
+  if (st.k === "over") out.push({ key: "over", to: "budget", amount: st.over });
+  else if (st.k === "left") out.push({ key: "left", to: "budget", amount: st.left });
+  if (!S.nw.accounts.length) out.push({ key: "accounts", to: "networth" });
+  else if (C.reviewDue) out.push({ key: "review", to: "networth" });
+  if (!size(S.goals.joint) && !Object.values(S.goals.personal || {}).some(L => size(L))) out.push({ key: "goal", to: "goals" });
+  if (!S.spend.length && earners.length) out.push({ key: "bills", to: "spending" });
+  if (Array.isArray(snapshots) && !snapshots.length && S.nw.accounts.length) out.push({ key: "snapshot", to: "progress" });
+  return out.slice(0, max);
+}
+
+/** The few figures Home shows, all per year from compute() (shown per period by the page), labelled
+    for what they are: planned amounts are plans; balances are what was entered. */
+export function homeFigures(S, C) {
+  const pg = Object.values(C.pool.personalGoals || {}).reduce((s, v) => s + n(v), 0);
+  const ef = S.goals.ef || {};
+  return {
+    hasAccounts: S.nw.accounts.length > 0,
+    netWorth: C.nw.net,
+    saving: C.pool.emergency + C.pool.goals.t + pg,          // planned each period to the emergency fund and goals
+    investing: C.pool.invest,                                 // planned each period to investments
+    committed: C.committed, spendingBudget: C.pool.spending,  // planned expenses vs the money set aside for them
+    hasSpend: S.spend.length > 0,
+    ef: blank(ef.target) || !n(ef.target) ? null : { saved: n(ef.saved), target: n(ef.target) },
+  };
+}

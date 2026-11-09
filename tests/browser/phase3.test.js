@@ -32,8 +32,9 @@ for (const [name, device] of [["iPhone", IPHONE], ["Android", PIXEL]]) {
     const vh = page.viewportSize().height;
     const bar = await page.locator("#tabs").boundingBox();
     assert.ok(Math.abs(bar.y + bar.height - vh) < 2, "tab bar sits at the bottom of the screen");
-    assert.equal(await page.isVisible("#tabs .ts >> text=Spending"), true, "short tab names");
-    for (const tab of ["budget", "networth", "spending", "goals", "invest", "progress"]) {
+    assert.equal(await page.isVisible("#tabs .ts >> text=Expenses"), true, "short tab names");
+    assert.equal(await page.locator("#tabs .tab").count(), 5, "five places (Phase 9A)");
+    for (const tab of ["home", "budget", "networth", "spending", "goals", "invest", "progress"]) {
       await goTab(page, tab);
       assert.equal(await sideways(page), false, `${tab}: no sideways scrolling`);
       assert.deepEqual(await tinyTargets(page), [], `${tab}: everything is big enough to tap`);

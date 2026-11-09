@@ -37,7 +37,7 @@ const dis = () => readOnly() ? " disabled" : "";
 /* ---------- the sheet ---------- */
 function show(title, body) {
   const d = $("#sheet");
-  d.innerHTML = `<div class="sheet-head"><h3>${esc(title)}</h3><button class="btn small primary" type="button" data-sheet="close">Done</button></div><div class="sheet-body bsheet">${body}</div>`;
+  d.innerHTML = `<div class="sheet-head"><h3 tabindex="-1" autofocus>${esc(title)}</h3><button class="btn small primary" type="button" data-sheet="close">Done</button></div><div class="sheet-body bsheet">${body}</div>`;
   if (!d.open) d.showModal();
 }
 const isOurs = () => $("#sheet").open && !!$("#sheet .bsheet");

@@ -16,7 +16,7 @@ const friendly = e => app.friendly ? app.friendly(e) : (e && e.message) || "Some
 
 function open(title, html) {
   const d = $("#sheet");
-  d.innerHTML = `<div class="sheet-head"><h3>${esc(title)}</h3><button class="btn icon" type="button" data-sheet="close" aria-label="Close">✕</button></div><div class="sheet-body">${html}</div>`;
+  d.innerHTML = `<div class="sheet-head"><h3 tabindex="-1" autofocus>${esc(title)}</h3><button class="btn icon" type="button" data-sheet="close" aria-label="Close">✕</button></div><div class="sheet-body">${html}</div>`;
   if (!d.open) d.showModal();
 }
 const msg = (id, text, kind = "err") => { const m = $("#" + id); if (m) { m.className = "msg " + kind; m.textContent = text; } };

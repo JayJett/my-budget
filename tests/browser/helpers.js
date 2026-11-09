@@ -45,7 +45,7 @@ after(async () => { if (browser) await browser.close(); if (server) server.close
 
 /** Open the app with a given saved budget (or a full fake setup via opts.init).
     Returns the page and a list of errors seen. waitFor: what to wait for before returning. */
-export async function open(budget, { width = 1280, seq = 0, init = null, waitFor = "#app .viewas", storage = null, device = null, welcome = false, motion = "reduce", initScript = null } = {}) {
+export async function open(budget, { width = 1280, seq = 0, init = null, waitFor = "#app .viewas", storage = null, device = null, welcome = false, motion = "reduce", initScript = null, hash = "budget" } = {}) {
   // Phase 7C redesign: someone new sees the welcome slides first. Older tests start as someone who has
   // already been past them on this device (pass welcome: true to see them).
   if (!welcome) storage = { "mb-welcome-seen": "1", ...(storage || {}) };
@@ -59,7 +59,8 @@ export async function open(budget, { width = 1280, seq = 0, init = null, waitFor
   page.on("response", r => { if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`); });
   await page.route(/fonts\.(googleapis|gstatic)\.com/, r => r.fulfill({ contentType: "text/css", body: "" }));
   await page.addInitScript(([i, st]) => { window.__FAKE_INIT = i; if (st) for (const [k, v] of Object.entries(st)) localStorage.setItem(k, v); }, [init || { budget, seq }, storage]);
-  await page.goto(base);
+  // Phase 9A: the app now opens on Home; older tests start on Budget, through its address (hash: "" for none)
+  await page.goto(base + (hash ? "#" + hash : ""));
   try { await page.waitForSelector(waitFor, { timeout: 10000 }); }
   catch (e) {
     await page.screenshot({ path: join(SHOTS, "failed-to-load.png") });
@@ -71,6 +72,10 @@ export const settle = page => page.waitForFunction(() => document.querySelector(
 export const fake = (page, expr) => page.evaluate(expr);
 /** Click a tab and wait until it's showing. */
 export async function goTab(page, tab) {
+  // Phase 9A: Net worth, Investments and Progress live under Wealth (Accounts, Investments, History)
+  if (["networth", "invest", "progress"].includes(tab) && !(await page.locator(`.wl-nav [data-tab="${tab}"]`).count())) {
+    await page.click('#tabs [data-tab="wealth"]'); await page.waitForSelector(".wl-nav");
+  }
   await page.click(`[data-tab="${tab}"]`);
   await page.waitForSelector(`[data-tab="${tab}"][aria-selected="true"]`);
 }

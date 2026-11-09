@@ -104,7 +104,7 @@ test("first visits: each tab offers its own tour once; 'Not now' sticks; your pr
   // Net worth asks for itself
   await goTab(page, "networth");
   await invite(page);
-  assert.match(await page.textContent(".tinv"), /New to Net worth\?.*what you own and owe/);
+  assert.match(await page.textContent(".tinv"), /New to Accounts\?.*what you own and owe/);
   await page.click('[data-tinv="no"]');
   // back to Budget and Net worth: not asked again
   await goTab(page, "budget"); await page.waitForTimeout(1600);
@@ -134,7 +134,7 @@ test("a tour: spotlight steps for the tab, then done; nothing in the budget chan
   const before = await writes(page);
   await page.click('[data-tinv="go"]');
   await page.waitForSelector(".tour:not([hidden])");
-  assert.match(await page.textContent(".tour-n"), /Net worth · 1 of 3/);
+  assert.match(await page.textContent(".tour-n"), /Accounts · 1 of 3/);
   assert.equal(await page.textContent("#tourT"), "Your net worth");
   assert.equal(await page.evaluate(() => document.activeElement.dataset.tour), "next", "focus on Next");
   await shot(page, "tour-networth-1");
