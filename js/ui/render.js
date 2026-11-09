@@ -17,6 +17,7 @@ import * as goals from "./views/goals.js";
 import * as invest from "./views/invest.js";
 import * as progress from "./views/progress.js";
 import { hhAvatarHTML } from "./household-look.js";
+import { householdMenuOpen } from "./household-menu.js";
 
 const VIEWS_BY_TAB = { home, budget, networth, spending, goals, invest, progress };
 
@@ -59,7 +60,12 @@ export function renderBrand() {
     if (btn) btn.setAttribute("aria-label", nm ? `Open account menu (${nm})` : "Open account menu");
   }
   const brand = $("#brandNames");
-  if (brand) brand.innerHTML = `${app.household ? hhAvatarHTML(app.household, "sm") : ""}<span class="brand-tx"><span class="brand-t">${esc(title)}</span>${P.length > 1 && names.length ? `<small>${esc(listNames(names))}</small>` : ""}</span>`;
+  // Phase 9A: the household's picture and name are a button of their own: they open the household menu
+  // (switch, settings, create). Your avatar on the left still opens your own menu.
+  const tx = `<span class="brand-tx"><span class="brand-t">${esc(title)}</span>${P.length > 1 && names.length ? `<small>${esc(listNames(names))}</small>` : ""}</span>`;
+  if (brand) brand.innerHTML = app.household
+    ? `<button class="hh-trigger" id="hhBtn" type="button" aria-haspopup="menu" aria-expanded="${householdMenuOpen()}" aria-label="${esc(title)}: switch or manage households">${hhAvatarHTML(app.household, "sm")}${tx}<svg class="hh-caret" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 6.5 8 10l3.5-3.5"/></svg></button>`
+    : tx;
   document.title = `${title} · Budget`;
 }
 

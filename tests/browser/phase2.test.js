@@ -42,10 +42,10 @@ test("switch between households from the menu", { skip }, async () => {
   ] };
   const { page, errors, ctx } = await open(null, { init });
   await settle(page);
-  await page.click("#menuBtn");
-  assert.ok(await page.isVisible("text=Households"));
+  await page.click("#hhBtn"); // Phase 9A: the household menu, from the household's name in the header
+  assert.ok(await page.isVisible("#hhPop >> text=Switch to"));
   await page.screenshot({ path: join(SHOTS, "menu-switcher.png") });
-  await page.click('[data-switch="hh-2"]');
+  await page.click('#hhPop [data-switch="hh-2"]');
   await page.waitForFunction(() => document.querySelector('[data-f="note"]')?.value === "Mum’s numbers");
   assert.match(await page.textContent("#brandNames .brand-t"), /Mum’s budget/);
   // Remembered on this device
@@ -59,7 +59,7 @@ test("household settings: rename, roles, remove, invite with a role", { skip }, 
     members: [me("owner"), other("u-madi", "Madi", "editor"), other("u-sam", "Sam", "viewer")] }] };
   const { page, errors, ctx } = await open(null, { init });
   await settle(page);
-  await page.click("#menuBtn"); await page.click('[data-act="household"]');
+  await page.click("#hhBtn"); await page.click('#hhPop [data-hp="settings"]');
   await page.waitForSelector("#sheet[open] .hh-list");
   await page.screenshot({ path: join(SHOTS, "household-settings.png"), fullPage: true });
   await page.fill('#setHHName input[name="name"]', "The Jett house");
@@ -87,7 +87,7 @@ test("editors don't see owner-only controls", { skip }, async () => {
   const init = { households: [{ id: "hh-1", name: "Our place", role: "editor", budget: RICH_V3, members: [other("u-madi", "Madi", "owner"), me("editor")] }] };
   const { page, errors, ctx } = await open(null, { init });
   await settle(page);
-  await page.click("#menuBtn"); await page.click('[data-act="household"]');
+  await page.click("#hhBtn"); await page.click('#hhPop [data-hp="settings"]');
   await page.waitForSelector("#sheet[open] .hh-list");
   assert.equal(await page.locator("#setHHName").count(), 0, "no rename");
   assert.equal(await page.locator("[data-role-for]").count(), 0, "no role changes");
@@ -103,13 +103,13 @@ test("leaving a household moves you to your other one; creating one starts the s
   ] };
   const { page, errors, ctx } = await open(null, { init });
   await settle(page);
-  await page.click("#menuBtn"); await page.click('[data-act="household"]');
+  await page.click("#hhBtn"); await page.click('#hhPop [data-hp="settings"]');
   await page.waitForSelector("#sheet[open]");
   assert.match(await page.textContent("#sheet"), /Madi will become the owner/);
   await page.click('[data-sheet="leave"]'); await page.click("#dlgYes");
   await page.waitForFunction(() => /Mum’s budget/.test(document.querySelector("#brandNames .brand-t").textContent));
   assert.equal(await fake(page, () => window.__fake.hh("hh-1").members[0].role), "owner", "Madi now owns it");
-  await page.click("#menuBtn"); await page.click('[data-act="household"]');
+  await page.click("#hhBtn"); await page.click('#hhPop [data-hp="settings"]');
   await page.fill('#setNewHH input[name="name"]', "Holiday house");
   await page.click("#setNewHH button");
   await page.waitForSelector(".ob");

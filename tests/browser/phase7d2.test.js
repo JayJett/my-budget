@@ -75,10 +75,10 @@ test("every menu destination still works: profile, household, reminders, history
   const go = async (act, sel) => { await page.click("#menuBtn"); await page.waitForSelector("#drawer:not([hidden])"); await page.click(`#drawer [data-act="${act}"]`); await page.waitForSelector(sel); };
   await page.click("#menuBtn"); await page.waitForSelector("#drawer:not([hidden])");
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "no sideways scroll with a long name");
-  assert.equal(await page.locator('#drawer [data-switch]').count(), 2, "both households to switch between");
+  assert.equal(await page.locator('#drawer [data-switch]').count(), 0, "households are in the household menu now (Phase 9A)");
   await shot(page, "drawer-320-long");
   await page.keyboard.press("Escape"); await page.waitForSelector("#drawer", { state: "hidden" });
-  for (const [act, sel] of [["profile", "#sheet .prof"], ["household", "#sheet[open]"], ["reminders", "#sheet .rem-switches"], ["history", "#sheet .hist-intro, #sheet .hist-empty"], ["appearance", "#sheet .acc-picker"]]) {
+  for (const [act, sel] of [["profile", "#sheet .prof"], ["reminders", "#sheet .rem-switches"], ["history", "#sheet .hist-intro, #sheet .hist-empty"], ["appearance", "#sheet .acc-picker"]]) {
     await go(act, sel);
     await page.click('#sheet [data-sheet="close"]'); await page.waitForSelector("#sheet", { state: "hidden" });
   }
@@ -91,7 +91,7 @@ test("every menu destination still works: profile, household, reminders, history
   for (const a of ["csv", "backup", "import"]) assert.equal(await page.locator(`#drawer [data-act="${a}"]`).count(), 1, a);
   const dl = page.waitForEvent("download"); await page.click('#drawer [data-act="csv"]'); await dl;
   assert.equal(await page.isVisible("#drawer"), false, "choosing something closes the drawer");
-  await page.click("#menuBtn"); await page.click('#drawer [data-switch="hh-2"]');
+  await page.click("#hhBtn"); await page.click('#hhPop [data-switch="hh-2"]');
   await page.waitForFunction(() => /A very long household/.test(document.querySelector(".brand-t")?.textContent || ""));
   assert.deepEqual(errors, []); await ctx.close();
 });

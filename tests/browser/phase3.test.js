@@ -84,7 +84,8 @@ test("phone: the menu and settings slide up from the bottom", { skip: skip || !I
   const dr = await page.locator("#drawer").boundingBox(), vp = page.viewportSize();
   assert.ok(dr.x === 0 && dr.height >= vp.height - 1 && dr.width < vp.width && dr.width >= vp.width * 0.8, "the menu is a drawer from the left, with the page still showing");
   await page.screenshot({ path: join(SHOTS, "phone-menu.png") });
-  await page.click('[data-act="household"]');
+  await page.keyboard.press("Escape"); await page.waitForSelector("#drawer", { state: "hidden" });
+  await page.click("#hhBtn"); await page.click('#hhPop [data-hp="settings"]'); // Phase 9A: from the household menu
   await page.waitForSelector("#sheet[open]");
   const sheet = await page.locator("#sheet").boundingBox();
   assert.ok(Math.abs(sheet.y + sheet.height - vp.height) < 2, "settings sit at the bottom");

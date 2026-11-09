@@ -11,6 +11,7 @@ import { openMenu } from "./menu.js";
 import { closeDrawer } from "./drawer.js";
 import { startSetup } from "./onboarding.js";
 import { calm } from "./motion.js";
+import { closeHouseholdMenu } from "./household-menu.js";
 
 /* Phase 7D: each tab remembers how far down you were, so coming back puts you where you left off.
    Switching tab also closes anything left open over the old one (an editing sheet, the menu, a
@@ -22,7 +23,7 @@ export function switchTab(t) {
   tabScroll[app.tab] = window.scrollY;
   const sheet = $("#sheet"); if (sheet && sheet.open) sheet.close();
   const dlg = $("#dlg"); if (dlg && dlg.open) $("#dlgNo").click();
-  closePop(); closeDrawer({ focus: false });
+  closePop(); closeDrawer({ focus: false }); closeHouseholdMenu();
   if (WEALTH.includes(t)) app.wealthTab = t; // Wealth reopens on the section you were last in
   app.tab = t;
   if (app.household) render();

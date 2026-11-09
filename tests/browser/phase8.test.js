@@ -23,8 +23,8 @@ async function setUp(page, mode, pay = "2000") {
   await page.waitForSelector(".ob-buckets");
 }
 async function openHousehold(page) {
-  await page.click("#menuBtn"); await page.waitForSelector("#drawer:not([hidden])");
-  await page.click('#drawer [data-act="household"]');
+  await page.click("#hhBtn"); await page.waitForSelector("#hhPop");
+  await page.click('#hhPop [data-hp="settings"]');
   await page.waitForSelector("#hhModeSec");
 }
 
@@ -264,9 +264,9 @@ test("household look: colour and icon show in the header, the switcher and setti
   assert.equal(await page.getAttribute("#brandNames .hh-av", "data-oc"), "purple");
   assert.equal(await page.locator("#brandNames .hh-av svg").count(), 1, "the icon, in the header");
   assert.equal(await page.locator("#meSlot .av").count(), 1, "your own avatar still opens the menu");
-  await page.click("#menuBtn"); await page.waitForSelector("#drawer:not([hidden])");
-  assert.equal(await page.getAttribute('#drawer [data-switch="hh-1"] .hh-av', "data-oc"), "purple");
-  assert.equal(await page.getAttribute('#drawer [data-switch="hh-2"] .hh-av', "data-oc"), "rose", "other households show their own look");
+  await page.click("#hhBtn"); await page.waitForSelector("#hhPop");
+  assert.equal(await page.getAttribute('#hhPop [data-switch="hh-1"] .hh-av', "data-oc"), "purple");
+  assert.equal(await page.getAttribute('#hhPop [data-switch="hh-2"] .hh-av', "data-oc"), "rose", "other households show their own look");
   await shot(page, "household-switcher");
   // the household's look isn't in the budget, and didn't change any money
   assert.equal(JSON.stringify(await fake(page, () => window.__fake.hh("hh-1").budget)).includes("purple"), false);

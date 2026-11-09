@@ -103,7 +103,7 @@ test("a save that fails adds nothing to Undo; switching household or signing out
   await page.waitForFunction(() => document.querySelector("#saveText")?.textContent === "Saved", null, { timeout: 20000 });
   assert.equal(await undoShown(page), true, "once it really saves, it can be undone");
   // another household: its Undo starts empty (never reaches back into the first)
-  await page.click("#menuBtn"); await page.click('#drawer [data-switch="hh-2"]');
+  await page.click("#hhBtn"); await page.click('#hhPop [data-switch="hh-2"]');
   await page.waitForFunction(() => document.querySelector(".brand-t")?.textContent === "Holiday house");
   assert.equal(await undoShown(page), false);
   assert.deepEqual(errors.filter(e => !/Failed to fetch/.test(e)), []); await ctx.close();
@@ -125,9 +125,9 @@ test("header: your avatar opens the account menu (the ⋯ button is gone); long 
     assert.ok(r.av.right <= r.name.left + 1 && r.name.right <= r.right.left + 1, `w=${w}: header pieces overlap`);
     await btn.click();
     await page.waitForSelector("#drawer:not([hidden])");
-    for (const a of ["profile", "reminders", "history", "household", "appearance", "tours", "data", "signout"])
+    for (const a of ["profile", "reminders", "history", "appearance", "tours", "data", "signout"])
       assert.equal(await page.locator(`#drawer [data-act="${a}"]`).count(), 1, `menu still has ${a}`);
-    assert.equal(await page.locator('#drawer [data-switch="hh-2"]').count(), 1, "switching household is still there");
+    assert.equal(await page.locator('#drawer [data-switch], #drawer [data-act="household"]').count(), 0, "households now live in the household menu (Phase 9A)");
     if (w === 390) await page.screenshot({ path: join(SHOTS, "p7d1-header-menu.png") });
     await page.keyboard.press("Escape");
     await page.waitForSelector("#drawer", { state: "hidden" });
