@@ -2383,3 +2383,27 @@ dialog.sheet::backdrop{ animation:fade-in .24s var(--ease); }
 @media (hover:hover){ .hp-hh:hover:not([aria-checked="true"]), .hp-act:hover{ background:var(--surface-2); } }
 .hh-pop button:focus-visible{ outline:2px solid var(--accent); outline-offset:-2px; }
 @media (prefers-reduced-motion: reduce){ .hh-pop{ transition:none; } }
+
+/* --- setup step 4: your accounts --- */
+.ob-accs{ list-style:none; margin:4px 0 10px; padding:0; display:grid; gap:8px; }
+.ob-acc{ display:flex; align-items:center; gap:6px; }
+.ob-acc-row{ flex:1; min-width:0; display:flex; align-items:center; gap:12px; padding:10px 12px; border:1px solid var(--line); border-radius:16px; background:var(--surface-2); color:var(--ink); font:inherit; text-align:left; cursor:pointer; }
+.ob-acc-t{ flex:1; min-width:0; display:grid; } .ob-acc-t b{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; } .ob-acc-t small{ color:var(--muted); font-size:var(--fs-xs); }
+.ob-acc-v{ font-weight:700; text-align:right; white-space:nowrap; display:grid; } .ob-acc-v small{ color:var(--muted); font-size:var(--fs-xs); font-weight:600; }
+.ob-acc-v.owed{ color:var(--bad); }
+.ob-acc-x{ width:40px; height:40px; flex:none; border:0; background:none; color:var(--muted); border-radius:50%; cursor:pointer; font-size:1rem; }
+.ob-acc-sum{ grid-template-columns:repeat(3, 1fr); }
+.ob-acc-form{ display:grid; gap:10px; padding:14px; border:1px solid var(--line); border-radius:18px; background:var(--surface-2); margin:4px 0 8px; }
+.ob-acc-form .ob-field{ margin:0; border:0; padding:0; } .ob-acc-form legend{ padding:0; margin-bottom:6px; }
+.ob-acc-types{ flex-wrap:wrap; }
+.ob-acc-amt input{ font-size:1.4rem; }
+.ob-acc-form .ob-nav{ margin-top:4px; }
+.ob-acc-form select{ min-height:44px; }
+.ob-acc-form{ min-width:0; overflow:hidden; }
+.ob-acc-form .ob-field input, .ob-acc-form .ob-field select{ width:100%; min-width:0; box-sizing:border-box; }
+.ob-acc-form .ob-acc-amt{ display:flex; align-items:center; gap:8px; min-width:0; width:100%; box-sizing:border-box; }
+.ob-acc-form .ob-acc-amt input{ flex:1; min-width:0; }
+.ob-acc-types{ display:flex; flex-wrap:wrap; gap:4px; }
+.ob-acc-types label{ flex:1 1 30%; min-width:0; }
+.ob-acc-types label span{ white-space:nowrap; }
+.ob-acc-form .ob-acc-amt input[type=text]{ border:0; background:none; padding:8px 0; border-radius:0; box-shadow:none; }

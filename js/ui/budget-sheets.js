@@ -119,6 +119,7 @@ function networthSheet(a) {
       <small class="bs-sub">Goals find this account by its name, so give each account a different one.</small></label>
     <fieldset class="bs-field"><legend>Type ${tipq(NW_TYPES.map(x => `${x.key}: ${x.help}`).join(" "))}</legend><div class="seg seg-radio wrap">${types.map(k => `<label><input type="radio" name="nwtype-${esc(a.id)}" value="${esc(k)}" ${attrs("nw", a.id, "type", "text")}${a.type === k ? " checked" : ""}${dis()}><span>${esc(nwType(k).label)}</span></label>`).join("")}</div>
       <small class="bs-sub">${esc(t.help)}</small></fieldset>
+    ${isShared(app.state) ? `<label class="bs-field"><span>Whose account</span><select class="bs-in" ${attrs("nw", a.id, "owner", "text")}${dis()}><option value=""${a.owner ? "" : " selected"}>Shared</option>${app.state.people.map(p => `<option value="${esc(p.id)}"${a.owner === p.id ? " selected" : ""}>${esc(p.name || "Unnamed")}</option>`).join("")}</select><small class="bs-sub">Just a label: it doesn’t change any totals.</small></label>` : ""}
     ${goalBox}
     ${appearanceHTML({ l: "nw", id: a.id, icon: a.icon, def: nwIcon(a.type), colour: a.colour, colours: OBJECT_COLOURS, defColour: t.col, disabled: readOnly() })}
     ${readOnly() ? "" : `<button class="btn danger-soft block" type="button" data-del="nw" data-i="${esc(a.id)}">Delete account</button>`}`;
