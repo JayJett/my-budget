@@ -30,7 +30,7 @@ export function insightCopy(x, S = app.state, C = app.C) {
     case "bills": return { t: "Add your regular expenses", s: "To see what your plan commits to", go: "spending", click: "[data-sp-new]" };
     case "unmarked": return { t: `${x.count === 1 ? "1 expense isn’t" : `${x.count} expenses aren’t`} marked essential or flexible`, s: "Mark them to see your essentials", go: "spending", click: x.item ? `[data-edit-sp="${x.item}"]` : "" };
     case "snapshot": return { t: "Save your first snapshot", s: "Start tracking your progress over time", go: "progress" };
-    case "planned": return { t: "Every dollar of pay has a plan", s: "That’s about the plan being complete, not whether it’s right for you", go: "budget" };
+    case "planned": return { t: "Every dollar of pay has a plan", s: "", go: "budget" };
     case "covered": return { t: "Your entered expenses fit their budget", s: x.amount > 0.004 ? `${per(C, x.amount)} of it isn’t assigned to an expense yet` : "Exactly, to the cent", go: "spending" };
     case "marked": return { t: "Every expense is marked", s: "Essential or flexible, your call", go: "spending" };
   }
@@ -42,29 +42,29 @@ export function insightRows(list, S = app.state, C = app.C) {
   if (!list.length) return "";
   return `<ul class="in-list">${list.map(x => { const c = insightCopy(x, S, C);
     return `<li class="in-row ${x.level}"><button type="button" class="in-btn" data-home-go="${c.go}"${c.person ? ` data-home-person="${esc(c.person)}"` : ""}${c.click && !readOnly() ? ` data-home-click="${esc(c.click)}"` : ""} data-insight="${x.id}">
-      <span class="in-ic" aria-hidden="true">${ICON[x.level]}</span><span class="in-t"><b>${esc(c.t)}</b><small>${esc(c.s)}</small></span>
+      <span class="in-ic" aria-hidden="true">${ICON[x.level]}</span><span class="in-t"><b>${esc(c.t)}</b>${c.s ? `<small>${esc(c.s)}</small>` : ""}</span>
       <svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5L10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button></li>`; }).join("")}</ul>`;
 }
 
-/* ---------- room to adjust (Budget, and a line on Home) ---------- */
+/* ---------- room to adjust (inside "View breakdown" on Budget) ----------
+   Rows only, no paragraphs: each part, any shortfall that comes off first, and the total. */
 export function roomHTML(S = app.state, C = app.C) {
   const R = breathingRoom(S, C); if (!R.known) return "";
-  const P = R.parts, rows = [
+  const P = R.parts, names = R.adjustable.map(a => (a.name || "Unnamed") + (a.owner && isShared(S) ? ` (${(S.people.find(p => p.id === a.owner) || {}).name || ""})` : ""));
+  const rows = [
     ["Pay with no plan yet", P.unallocated],
     [`${allocName(S)} not assigned to an expense`, P.unassigned],
-    ["Allocations you marked adjustable", P.adjustable],
-    ["Expenses you marked flexible", P.flexible],
+    [names.length ? `Marked adjustable: ${names.join(", ")}` : "Marked adjustable", P.adjustable],
+    ["Expenses marked flexible", P.flexible],
   ].filter(r => r[1] > 0.004);
-  const owners = R.adjustable.length && isShared(S) ? `<p class="in-note">Adjustable: ${R.adjustable.map(a => esc(a.name || "Unnamed") + (a.owner ? ` (${esc((S.people.find(p => p.id === a.owner) || {}).name || "")})` : "")).join(", ")}.</p>` : "";
   const deficit = R.shortfall + R.over;
+  const minus = deficit > 0.004 ? `<li class="neg"><span>${R.shortfall > 0.004 ? "Less expenses over budget" : "Less over-allocation"}</span><b>−${per(C, deficit)}</b></li>` : "";
   return `<div class="room" id="roomBox"><div class="room-h"><span>Room to adjust</span><b>${rows.length ? `up to ${per(C, R.total)}` : "—"}</b></div>
-    ${rows.length ? `<ul class="room-rows">${rows.map(([l, v]) => `<li><span>${esc(l)}</span><b>${per(C, v)}</b></li>`).join("")}</ul>` : ""}
-    ${deficit > 0.004 ? `<p class="in-note warn">${R.shortfall > 0.004 ? `Expenses are over budget by ${per(C, R.shortfall)}` : `The plan is over-allocated by ${per(C, R.over)}`}, which would need to come out of this first.</p>` : ""}
-    ${owners}
-    <p class="in-note">${R.marked ? "Based on what you’ve marked. It’s a plan, not money in your account." : "Mark allocations as adjustable, or expenses as flexible, to see more here. Nothing is assumed."}</p></div>`;
+    ${rows.length || minus ? `<ul class="room-rows">${rows.map(([l, v]) => `<li><span>${esc(l)}</span><b>${per(C, v)}</b></li>`).join("")}${minus}</ul>` : ""}
+    ${R.marked ? "" : `<p class="in-note">Mark allocations adjustable or expenses flexible to add them here.</p>`}</div>`;
 }
 
-/* ---------- where pay goes (Budget): only when the parts truly add up to pay ---------- */
+/* ---------- where pay goes: only when the parts truly add up to pay ---------- */
 const PARTS = { essential: ["Essential expenses", "var(--cat-fixed)"], otherExpenses: ["Other expenses", "var(--cat-flex)"], unassigned: ["Bills budget not yet assigned", "var(--line-strong)"],
   saving: ["Saving & investing", "var(--invest)"], other: ["Other allocations", "var(--c-gold)"], unallocated: ["No plan yet", "var(--unalloc)"] };
 export function breakdownHTML(S = app.state, C = app.C) {
@@ -72,19 +72,46 @@ export function breakdownHTML(S = app.state, C = app.C) {
   const shown = B.filter(p => p.v > 0.004), none = !commitments(S, C).count;
   const name = k => k === "unassigned" && none ? "Bills budget (no expenses entered yet)" : PARTS[k][0];
   const label = shown.map(p => `${name(p.key)} ${pct(p.share)}`).join(", ");
-  return `<div class="ib"><div class="ib-bar" role="img" aria-label="Where planned pay goes: ${esc(label)}">${shown.map(p => `<span style="width:${(p.share * 100).toFixed(2)}%;background:${PARTS[p.key][1]}"></span>`).join("")}</div>
+  return `<div class="ib"><h3 class="pc-sub">Where pay goes</h3><div class="ib-bar" role="img" aria-label="Where planned pay goes: ${esc(label)}">${shown.map(p => `<span style="width:${(p.share * 100).toFixed(2)}%;background:${PARTS[p.key][1]}"></span>`).join("")}</div>
     <ul class="ib-key">${shown.map(p => `<li><i style="background:${PARTS[p.key][1]}" aria-hidden="true"></i><span>${esc(name(p.key))}</span><b>${per(C, p.v)}</b><small>${pct(p.share)}</small></li>`).join("")}</ul></div>`;
 }
 
-/** Budget: the plan check card (where pay goes, room to adjust, and what needs a look). */
+/* ---------- Budget: one finding about the expenses, details on request (Phase 9B.1) ----------
+   The card shows the single most important fact about whether the entered expenses are funded: a
+   shortfall first, then "no budget", then covered. Whether every dollar has a plan is already the
+   Budget status card's job, so it isn't repeated here. Everything else from Phase 9B (where pay goes,
+   room to adjust, unmarked expenses) sits behind "View breakdown". */
+export function primaryFinding(S = app.state, C = app.C) {
+  const cv = coverage(S, C);
+  if (!(C.incTotal > 0)) return { id: "pay", level: "review", t: "Add your pay to check your expenses", s: "", act: { label: "Add pay", go: "budget", person: (C.people[0] || {}).id } };
+  if (cv.state === "short") return { id: "short", level: "attention", t: "Expenses are over budget", s: `${per(C, cv.short)} short`, act: { label: "Review expenses", go: "spending" } };
+  if (cv.state === "nobudget") return { id: "nobudget", level: "attention", t: "Your expenses have no budget yet", s: `Give ${allocName(S)} a share of pay`, act: { label: "Set a budget", go: "budget", click: cv.allocation ? `[data-edit-acc="${cv.allocation.id}"]` : "" } };
+  if (cv.state === "covered") return { id: "covered", level: "good", t: "Your expenses are covered", s: `${per(C, cv.unassigned)} not yet assigned to an expense`, act: null };
+  if (cv.state === "even") return { id: "covered", level: "good", t: "Your expenses are covered", s: "Exactly, to the cent", act: null };
+  return { id: "bills", level: "review", t: "Add expenses to check they’re covered", s: "", act: { label: "Add expenses", go: "spending", click: "[data-sp-new]" } };
+}
+let pcOpen = false;
+const ACT_ATTRS = a => `data-home-go="${a.go}"${a.person ? ` data-home-person="${esc(a.person)}"` : ""}${a.click && !readOnly() ? ` data-home-click="${esc(a.click)}"` : ""}`;
+/** Budget: the compact expense check, under the income card. No visible title: the finding says it. */
 export function planCheckHTML(S = app.state, C = app.C) {
-  if (!(C.incTotal > 0)) return `<section class="card b-check" id="planCheck"><h2>Plan check</h2><p class="dim">Add your pay to see how your plan fits together.</p></section>`;
-  const L = insights(S, C).filter(x => ["over", "short", "nobudget", "left", "unmarked", "bills"].includes(x.id));
-  const good = insights(S, C).filter(x => x.level === "good" && ["planned", "covered"].includes(x.id));
-  return `<section class="card b-check" id="planCheck" aria-labelledby="pcT"><h2 id="pcT">Plan check</h2>
-    ${breakdownHTML(S, C)}${insightRows([...L.filter(x => x.level === "attention"), ...L.filter(x => x.level !== "attention"), ...good].slice(0, 4), S, C)}${roomHTML(S, C)}</section>`;
+  const F = primaryFinding(S, C);
+  const unmarked = insights(S, C).filter(x => x.id === "unmarked");
+  const body = C.incTotal > 0 ? `${breakdownHTML(S, C)}${roomHTML(S, C)}${insightRows(unmarked, S, C)}` : "";
+  return `<section class="card b-check" id="planCheck" aria-label="Expense check">
+    <div class="pc-main ${F.level}" data-insight="${F.id}"><span class="pc-ic" aria-hidden="true">${ICON[F.level]}</span>
+      <div class="pc-t"><p class="pc-h">${esc(F.t)}</p>${F.s ? `<p class="pc-s">${esc(F.s)}</p>` : ""}</div></div>
+    ${F.act || body ? `<div class="pc-acts">${F.act ? `<button type="button" class="pc-act" ${ACT_ATTRS(F.act)}>${esc(F.act.label)}</button>` : ""}
+      ${body ? `<button type="button" class="pc-more" data-pc-toggle aria-expanded="${pcOpen}" aria-controls="pcBody">${pcOpen ? "Hide breakdown" : "View breakdown"}<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>` : ""}</div>` : ""}
+    ${body ? `<div class="pc-body" id="pcBody"${pcOpen ? "" : " hidden"}>${body}</div>` : ""}</section>`;
 }
 export function refreshPlanCheck() { const el = document.getElementById("planCheck"); if (el && app.C) el.outerHTML = planCheckHTML(); }
+if (typeof document !== "undefined") document.addEventListener("click", e => {
+  const b = e.target.closest && e.target.closest("[data-pc-toggle]"); if (!b) return;
+  pcOpen = b.getAttribute("aria-expanded") !== "true";
+  const body = document.getElementById("pcBody"); if (!body) return;
+  b.setAttribute("aria-expanded", String(pcOpen)); b.firstChild.textContent = pcOpen ? "Hide breakdown" : "View breakdown";
+  body.hidden = !pcOpen;
+});
 
 /** Expenses: what's essential, flexible or not marked, and how that compares with pay. */
 export function essentialsHTML(S = app.state, C = app.C) {
