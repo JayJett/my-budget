@@ -66,14 +66,14 @@
 ## H. Financial integrity
 - **Never changed by viewing or ticking:** budgets, balances, net worth, goals and saved amounts, investments, snapshots, history and Undo. Tested: viewing and ticking send no budget saves, and the budget is byte-for-byte the same.
 
-## I. Supabase changes (not yet applied: needs your OK)
+## I. Supabase changes (applied with your OK)
 - **New migration file:** `supabase/migrations/20261120001100_payday_playbook.sql`. It's additive only:
   - `household_members.person_id` (+ unique per household, length check) and `link_budget_person()`.
   - New table `payday_checks` (household, user, person, date, plan copy, done; size limits). RLS lets people read only their own rows; direct writes are revoked.
   - Functions `payday_check_get`, `payday_check_mark` and `payday_check_replan` check that you're a member and that the person is yours. Your own checklists older than about 400 days are tidied away.
   - `reminder_prefs.payday` (default off); `start_reminder_run` and `reminder_run_data` updated to include it and each member's `person_id`.
 - **Edge function `send-reminders`:** `run.js` and the model copies changed, so it needs redeploying.
-- **Until both are done:** the Playbook works for viewing (amounts, dates, destinations). The checklist, "this is me" and the payday reminder stay hidden.
+- **Done:** the migration is applied to the live database and checked (new column and table present, row-level security on, direct writes blocked). `send-reminders` is redeployed (version 5), and every deployed file was compared with the repo and matches.
 - **No other external configuration.**
 
 ## J. Technical changes
@@ -106,11 +106,11 @@
 - **Browser:**
   - 8 new: new solo, destinations and grouping, tick, reopen, untick, next payday, nothing financial changes, plan change, failed tick, over 100%, couples with different paydays and people, choosing destinations in the sheets, "before the database part", reminders switch and link, 320–430px
   - Full suite: all 306 pass.
-- **Not verified:** a real iPhone, and the live database (the migration isn't applied yet).
+- **Not verified:** a real iPhone, and a real payday reminder arriving (the next one goes out on an actual payday morning).
 
 ## L. Git
 - **Branch:** `phase-10-payday-playbook`.
-- **Pull request:** draft. Merge after your "go". The database step and function deploy are separate, with your OK.
+- **Pull request:** [JayJett/my-budget#31](https://github.com/JayJett/my-budget/pull/31), merged after your "go".
 
 ## M. iPhone checklist
 1. **Opening it:** Home → "See/Set up your payday plan" opens it.
@@ -120,7 +120,7 @@
 5. **Grouping:** point two allocations at the same account. One "Transfer to", showing "2 parts".
 6. **Keep:** your pay sheet → "Pay goes into" Everyday, and an allocation going to Everyday → "Keep in Everyday".
 7. **Missing destination:** it's "Set aside", with "Choose where it goes".
-8. **Checklist** (after the database step): "Yes, this is me", then tick an item. You see "1 of N marked done".
+8. **Checklist:** "Yes, this is me", then tick an item. You see "1 of N marked done".
 9. **Revisit:** close and reopen, or refresh. The tick is still there.
 10. **Second payday:** Next › shows the next payday's own empty list.
 11. **Budget change:** change an allocation's % after ticking. "Your budget changed…", then Use the new plan.
@@ -129,7 +129,6 @@
 14. **Nothing financial moves:** Wealth balances and net worth are unchanged after ticking.
 
 ## N. Known limitations
-- The checklist, identity link and payday reminder need the migration and function deploy (I). They're hidden until then.
 - One payday reminder per payday at about 8:30am NZ time. Time zones outside NZ use NZ dates (unchanged from existing reminders).
 - Existing members aren't linked automatically; each says "this is me" once.
 - No account numbers or banking details are stored, on purpose.
