@@ -2669,3 +2669,59 @@ details.help{ margin-top:20px; border-top:0; padding-top:0; }
 .ob-payday.bad input{ border-color:var(--bad); }
 .ob-err{ margin:6px 0 0; color:var(--bad); font-size:var(--fs-sm); font-weight:600; }
 .im .ob-err{ color:#F6A396; }
+
+/* ============ Phase 10: Payday Playbook ============ */
+.ho-pb{ display:flex; align-items:center; justify-content:space-between; gap:8px; width:100%; min-height:44px; margin-top:14px; padding:0; border:0; border-top:1px solid rgba(255,255,255,.12); padding-top:12px;
+  background:none; color:var(--acc-d, #8FE0B9); font:inherit; font-weight:650; font-size:var(--fs-sm); cursor:pointer; text-align:left; }
+.ho-pb svg{ width:16px; height:16px; flex:none; }
+.b-inc-acts{ display:flex; flex-wrap:wrap; justify-content:space-between; gap:4px 12px; }
+.pb{ display:grid; gap:16px; padding-top:14px; }
+.pb-people{ display:flex; gap:6px; flex-wrap:wrap; }
+.pb-chip{ min-height:40px; padding:6px 14px; border-radius:99px; border:1px solid var(--line-strong); background:var(--surface); color:var(--ink); font:inherit; font-size:var(--fs-sm); font-weight:600; cursor:pointer; }
+.pb-chip.on{ background:var(--accent-soft); border-color:var(--accent); color:var(--ink); }
+.pb-hero{ background:var(--hero); color:#F3F7F5; border-radius:var(--r-lg); padding:18px 18px 10px; display:grid; gap:2px; }
+.pb-when{ margin:0; color:var(--acc-d, #8FE0B9); font-weight:650; font-size:var(--fs-sm); }
+.pb-date{ margin:0; font:700 1.5rem/1.15 var(--display); letter-spacing:-.02em; }
+.pb-pay{ margin:6px 0 0; display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
+.pb-pay b{ font:700 1.6rem/1.1 var(--display); font-variant-numeric:tabular-nums; } .pb-pay span{ color:#BAC7C3; font-size:var(--fs-sm); }
+.pb-nav{ display:flex; justify-content:space-between; margin-top:2px; }
+.pb-nav .linkish{ color:#BAC7C3; min-height:40px; text-decoration:none; font-weight:600; }
+.pb-list{ list-style:none; margin:0; padding:0; display:grid; gap:8px; }
+.pb-row{ display:flex; align-items:flex-start; gap:12px; padding:12px; border:1px solid var(--line); border-radius:var(--r); transition:background-color var(--m-sel, .2s), border-color var(--m-sel, .2s); }
+.pb-row.keep{ background:var(--surface-2); }
+.pb-row.aside{ border-style:dashed; }
+.pb-row.done{ border-color:color-mix(in srgb, var(--ok) 45%, var(--line)); }
+.pb-row.done .pb-t b, .pb-row.done .pb-amt{ color:var(--muted); }
+.pb-t{ flex:1; min-width:0; display:grid; gap:1px; }
+.pb-t b{ font-weight:650; overflow-wrap:anywhere; } .pb-t small{ color:var(--muted); font-size:var(--fs-xs); }
+.pb-verb{ text-transform:uppercase; letter-spacing:.06em; font-size:.68rem !important; font-weight:700; }
+.pb-amt{ font:700 1.05rem var(--display); font-variant-numeric:tabular-nums; white-space:nowrap; }
+.pb-check{ width:30px; height:30px; flex:none; border-radius:50%; border:2px solid var(--line-strong); background:var(--surface); display:grid; place-items:center; cursor:pointer; padding:0; color:transparent;
+  transition:background-color var(--m-sel, .2s), border-color var(--m-sel, .2s), color var(--m-sel, .2s), transform var(--m-fast, .12s); position:relative; }
+.pb-check::after{ content:""; position:absolute; inset:-7px; } /* a 44px tap area */
+.pb-check svg{ width:16px; height:16px; }
+.pb-check[aria-checked="true"]{ background:var(--ok); border-color:var(--ok); color:#fff; }
+.pb-check:active{ transform:scale(.92); }
+.pb-check[aria-busy="true"]{ opacity:.6; }
+.pb-check:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+.pb-choose{ justify-self:start; min-height:36px; font-size:var(--fs-sm); }
+.pb-parts summary{ cursor:pointer; color:var(--muted); font-size:var(--fs-xs); font-weight:650; min-height:32px; display:inline-flex; align-items:center; }
+.pb-parts ul{ list-style:none; margin:2px 0 0; padding:0; display:grid; gap:4px; }
+.pb-parts li{ display:flex; justify-content:space-between; gap:10px; font-size:var(--fs-sm); color:var(--muted); } .pb-parts li b{ color:var(--ink); font-weight:600; font-variant-numeric:tabular-nums; }
+.pb-progress{ margin:0; display:flex; align-items:center; gap:10px; color:var(--muted); font-size:var(--fs-sm); font-weight:600; }
+.pb-prog-bar{ flex:1; height:6px; border-radius:99px; background:var(--surface-3, var(--line)); overflow:hidden; }
+.pb-prog-bar i{ display:block; height:100%; background:var(--ok); transition:width .3s var(--ease-out, ease); }
+.pb-left, .pb-me{ margin:0; color:var(--muted); font-size:var(--fs-sm); }
+.pb-me .linkish, .pb-left .linkish{ min-height:40px; display:inline-flex; align-items:center; }
+.pb-changed{ display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:4px 10px; padding:10px 12px; border-radius:var(--r); background:var(--warn-soft); font-size:var(--fs-sm); }
+.pb-warn{ padding:14px; border-radius:var(--r); background:var(--bad-soft); } .pb-warn p{ margin:4px 0 10px; color:var(--muted); font-size:var(--fs-sm); }
+.pb-acts{ display:flex; gap:8px; flex-wrap:wrap; }
+.pb-setup{ min-height:48px; justify-content:center; }
+.pb-foot{ display:flex; justify-content:center; } .pb-foot .linkish{ min-height:44px; }
+@media (prefers-reduced-motion: reduce){ .pb-check, .pb-row, .pb-prog-bar i{ transition:none; } }
+/* destinations in the allocation and pay sheets */
+.pd-dest select.bs-in, .pd-dest .pd-label{ width:100%; min-height:44px; font-size:16px; }
+.pd-dest .pd-label{ margin-top:8px; }
+.pd-each summary{ cursor:pointer; min-height:40px; display:inline-flex; align-items:center; font-size:var(--fs-sm); color:var(--muted); font-weight:650; }
+.pd-person{ margin:6px 0 !important; }
+.pb-hero .pb-date, .pb-hero .pb-pay b{ color:#F3F7F5; }

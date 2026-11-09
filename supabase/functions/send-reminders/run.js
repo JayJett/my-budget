@@ -10,7 +10,7 @@ import { remindersFor } from "./model/reminders.js";
 import { sendPush } from "./webpush.js";
 
 /** Where each tab lives in the app (matches TAB_HASH in js/ui/ctx.js). */
-const TAB_HASH = { budget: "budget", networth: "net-worth", spending: "joint-spending", goals: "goals", invest: "investments", progress: "progress" };
+const TAB_HASH = { budget: "budget", networth: "net-worth", spending: "joint-spending", goals: "goals", invest: "investments", progress: "progress", payday: "payday" };
 
 /** One notification per person: a single reminder as it is, several as "3 new reminders". */
 export function notificationFor(list) {
@@ -50,7 +50,7 @@ export async function runReminders(sb, token, opts = {}) {
       const S = migrate(h.state);
       if (!S) continue;
       for (const p of h.people || []) {
-        for (const r of remindersFor(S, p.prefs, today)) items.push({ ...r, user_id: p.user_id, household_id: h.id });
+        for (const r of remindersFor(S, p.prefs, today, { personId: p.person_id || null })) items.push({ ...r, user_id: p.user_id, household_id: h.id });
       }
     } catch (e) {
       problems.push(`${h.id}: ${e && e.message}`); // one odd budget shouldn't stop everyone else's reminders

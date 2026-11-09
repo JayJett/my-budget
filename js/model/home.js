@@ -9,24 +9,9 @@
 import { n, blank, parseDate, addDays, daysBetween, ymd } from "./util.js";
 import { insights, incomplete } from "./intelligence.js";
 
-const DAYS = { weekly: 7, fortnightly: 14 };
-
-/** The next payday on or after today, from any past or future payday and the pay frequency.
-    Monthly pay keeps the same day of the month (the 31st becomes the last day of shorter months). */
-export function nextPayday(payday, freq, today) {
-  const d0 = parseDate(payday); if (!d0) return null;
-  const t = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  if (freq === "monthly") {
-    const day = d0.getDate(), at = (y, m) => new Date(y, m, Math.min(day, new Date(y, m + 1, 0).getDate()));
-    if (d0 >= t) return d0;
-    let c = at(t.getFullYear(), t.getMonth());
-    if (c < t) c = at(t.getFullYear(), t.getMonth() + 1);
-    return c;
-  }
-  const step = DAYS[freq] || 14, diff = daysBetween(d0, t);
-  if (diff <= 0) return d0;
-  return addDays(d0, Math.ceil(diff / step) * step);
-}
+// (Phase 10: the payday maths moved to paydate.js, unchanged, so the daily reminders can use it too)
+import { nextPayday } from "./paydate.js";
+export { nextPayday };
 
 /** Each person with pay: their own next payday (or null), their own pay per pay, in date order
     (people with no payday last). */

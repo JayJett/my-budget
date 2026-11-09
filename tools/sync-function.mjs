@@ -4,7 +4,7 @@
      node tools/sync-function.mjs --check  (fail if the copies are out of date; the tests run this) */
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 
-const FILES = ["reminders.js", "calc.js", "migrate.js", "schema.js", "util.js", "periods.js", "format.js"];
+const FILES = ["reminders.js", "calc.js", "migrate.js", "schema.js", "util.js", "periods.js", "format.js", "paydate.js"];
 const from = new URL("../js/model/", import.meta.url), to = new URL("../supabase/functions/send-reminders/model/", import.meta.url);
 const NOTE = "// COPY of js/model/ — don't edit here. Change js/model/ and run: node tools/sync-function.mjs\n";
 

@@ -49,7 +49,7 @@ export function view() {
         <span class="av">${esc(initial(p))}</span>
         <span class="m-main"><span class="m-name">${esc(p.name || "Unnamed")}</span><small>${K(`pp.${p.id}.line`)}</small></span>
         <span class="m-amt">${K(`inc.${p.id}.v`)}${multi ? `<small>${K(`inc.${p.id}.share`)}</small>` : ""}</span>${CHEV}</button></li>`).join("")}</ul>
-    ${!ro && P.length < MAX_PEOPLE ? `<button class="link-btn" type="button" data-person-new>+ Add a person</button>` : ""}
+    <div class="b-inc-acts">${!ro && P.length < MAX_PEOPLE ? `<button class="link-btn" type="button" data-person-new>+ Add a person</button>` : ""}${P.some(p => Number(p.pay) > 0) ? `<button class="link-btn pb-link" type="button" data-pb-open>Payday plan ›</button>` : ""}</div>
   </section>`;
 
   const status = `<section class="card b-status" id="allocStatus" aria-live="polite">

@@ -17,7 +17,7 @@ describe("everything is off unless switched on", () => {
     assert.ok(Object.entries(DEFAULT_PREFS).every(([k, v]) => typeof v !== "boolean" || v === false));
   });
   test("every switch in settings has a plain-language explanation", () => {
-    assert.equal(REMINDER_TYPES.length, 6);
+    assert.equal(REMINDER_TYPES.length, 7); // (Phase 10: + payday)
     REMINDER_TYPES.forEach(t => { assert.ok(t.pref in DEFAULT_PREFS); assert.ok(t.help.length > 40); });
   });
   test("an empty budget gives nothing (and doesn't break)", () => {
