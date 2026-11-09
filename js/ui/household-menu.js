@@ -20,7 +20,7 @@ const GEAR = I('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .
 const PLUS = I('<path d="M12 5v14M5 12h14"/>');
 const TICK = '<svg class="hp-tick" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7"/></svg>';
 
-let pop = null, trigger = null;
+let pop = null, trigger = null, openedAt = 0;
 export const householdMenuOpen = () => !!pop;
 
 function menuHTML() {
@@ -57,7 +57,8 @@ export function openHouseholdMenu(btn) {
   if (first) first.focus({ preventScroll: true });
   pop.addEventListener("click", onPick);
   pop.addEventListener("keydown", onKey);
-  setTimeout(() => document.addEventListener("pointerdown", outside, true), 0);
+  // listen for outside taps straight away; the tap that opened the menu came before this moment
+  openedAt = performance.now(); document.addEventListener("pointerdown", outside, true);
   window.addEventListener("resize", closeHouseholdMenu, { once: true });
 }
 export function closeHouseholdMenu({ focus = false } = {}) {
@@ -67,7 +68,7 @@ export function closeHouseholdMenu({ focus = false } = {}) {
   if (trigger) { trigger.setAttribute("aria-expanded", "false"); if (focus && trigger.isConnected) trigger.focus({ preventScroll: true }); }
   if (calm()) p.remove(); else { p.classList.add("out"); setTimeout(() => p.remove(), 140); }
 }
-function outside(e) { if (pop && !pop.contains(e.target) && !(trigger && trigger.contains(e.target))) closeHouseholdMenu(); }
+function outside(e) { if (e.timeStamp && e.timeStamp < openedAt) return; if (pop && !pop.contains(e.target) && !(trigger && trigger.contains(e.target))) closeHouseholdMenu(); }
 function onKey(e) {
   if (e.key === "Escape") { e.preventDefault(); closeHouseholdMenu({ focus: true }); return; }
   if (e.key === "Tab") { closeHouseholdMenu(); return; }
