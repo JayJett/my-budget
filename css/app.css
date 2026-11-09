@@ -2516,3 +2516,48 @@ body.compact :is(.home, .budget, .sp-page, .nw-page, .gl-page, .iv-page, .pg-pag
 :root{ --shadow:none; }
 .card{ border-color:var(--line); }
 :is(.b-income, .nw-hero, .sp-sum, .gl-sum, .iv-hero, .pg-hero).card{ box-shadow:none; }
+
+/* ============ Phase 9C: rebalance ============ */
+.b-acts{ display:inline-flex; gap:2px; }
+.rb{ display:grid; gap:18px; padding-top:14px; }
+.rb-sec{ display:grid; gap:10px; min-width:0; }
+.rb h4{ margin:0; font:650 .95rem var(--display); }
+.rb-h{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+.rb .bs-field{ display:grid; gap:6px; margin:0; min-width:0; } .rb .bs-field > span{ font-size:var(--fs-xs); font-weight:650; color:var(--muted); }
+.rb select.bs-in{ width:100%; min-height:46px; font-size:16px; }
+.rb .unit.money{ justify-content:flex-start; min-height:46px; }
+.rb .unit.money input{ width:100%; flex:1; min-width:0; text-align:left; font-size:16px; }
+.rb .unit.money.big input{ font:700 1.35rem var(--display); font-variant-numeric:tabular-nums; padding:8px 0; }
+.rb-now{ margin:2px 0 0; color:var(--muted); font-size:var(--fs-sm); font-variant-numeric:tabular-nums; }
+.rb .pos{ color:var(--ok); } .rb .neg{ color:var(--bad); }
+.rb-who .seg{ display:flex; flex-wrap:wrap; }
+.rb-left{ margin:0; font-size:var(--fs-sm); color:var(--muted); font-variant-numeric:tabular-nums; }
+.rb-left.bad{ color:var(--bad); } .rb-left.ok{ color:var(--ok); font-weight:650; }
+.rb-list{ list-style:none; margin:0; padding:0; display:grid; gap:6px; }
+.rb-src{ border:1px solid var(--line); border-radius:var(--r); transition:border-color var(--m-sel, .2s), background-color var(--m-sel, .2s); }
+.rb-src.on{ border-color:var(--accent); background:var(--accent-soft); }
+.rb-pick{ display:flex; align-items:center; gap:10px; min-height:56px; padding:8px 12px; cursor:pointer; min-width:0; }
+.rb-free{ border:1px dashed var(--line-strong); border-radius:var(--r); }
+.rb-pick input[type=checkbox]{ width:20px; height:20px; flex:none; accent-color:var(--accent); margin:0; }
+.rb .a-ic.sm{ width:30px; height:30px; flex:none; }
+.rb-n{ flex:1; min-width:0; display:grid; } .rb-n b{ font-weight:650; font-size:.93rem; overflow-wrap:anywhere; } .rb-n small{ color:var(--muted); font-size:var(--fs-xs); }
+.rb-d{ font-weight:650; font-variant-numeric:tabular-nums; white-space:nowrap; font-size:var(--fs-sm); }
+.rb-keep{ color:var(--faint); font-weight:500; font-size:var(--fs-xs); }
+.rb-exact{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:0 12px 10px 42px; font-size:var(--fs-xs); color:var(--muted); }
+.rb-exact .unit.money{ min-height:40px; width:9.5rem; } .rb-exact .unit.money input{ text-align:right; }
+.rb-hint{ margin:0; color:var(--muted); font-size:var(--fs-xs); }
+.rb-rows{ list-style:none; margin:0; padding:0; display:grid; gap:10px; }
+.rb-rows li{ display:flex; align-items:center; gap:10px; min-width:0; }
+.rb-ba{ display:grid; justify-items:end; font-variant-numeric:tabular-nums; font-size:var(--fs-sm); white-space:nowrap; } .rb-ba small{ font-weight:650; font-size:var(--fs-xs); }
+.rb-who-l{ color:var(--muted); }
+.rb-out{ list-style:none; margin:4px 0 0; padding:10px 0 0; border-top:1px solid var(--line); display:grid; gap:6px; }
+.rb-out li{ display:flex; justify-content:space-between; gap:12px; font-size:var(--fs-sm); color:var(--muted); }
+.rb-out li b{ color:var(--ink); font-weight:650; text-align:right; } .rb-out li.bad b{ color:var(--bad); } .rb-out li.ok b{ color:var(--ok); } .rb-out li.warn b{ color:var(--warn); }
+.rb-msg{ margin:0; padding:10px 12px; border-radius:var(--r); background:var(--surface-2); font-size:var(--fs-sm); }
+.rb-msg.bad{ background:var(--bad-soft); color:var(--bad); } .rb-msg.warn{ background:var(--warn-soft); color:var(--ink); }
+.rb-foot{ position:sticky; bottom:0; display:grid; gap:4px; padding:12px 0 calc(4px + env(safe-area-inset-bottom, 0px)); background:var(--surface); border-top:1px solid var(--line); margin:0 -20px; padding-left:20px; padding-right:20px; z-index:1; }
+.rb-foot .btn{ min-height:48px; width:100%; }
+.sheet-head [data-rb="close"].btn.icon{ border:0; background:none; box-shadow:none; width:44px; height:44px; min-width:44px; padding:0; margin-right:-8px; border-radius:50%; display:grid; place-items:center; color:var(--muted); font-size:1.15rem; }
+.sheet-head [data-rb="close"].btn.icon:active{ background:var(--surface-2); }
+.rb-foot .btn{ justify-content:center; text-align:center; }
+.rb-src .rb-pick{ border-radius:var(--r); }
