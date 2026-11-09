@@ -52,7 +52,7 @@ export async function open(budget, { width = 1280, seq = 0, init = null, waitFor
   // Reduced motion: sheets appear in place, so tests can measure them straight away (and the setting is exercised).
   const ctx = await browser.newContext({ ...(device ? { ...device } : { viewport: { width, height: 900 } }), reducedMotion: motion });
   const page = await ctx.newPage();
-  if (initScript) await page.addInitScript(initScript);
+  if (initScript) await (Array.isArray(initScript) ? page.addInitScript(initScript[0], initScript[1]) : page.addInitScript(initScript));
   const errors = [];
   page.on("pageerror", e => errors.push(String(e)));
   page.on("console", m => { if (m.type() === "error") errors.push(m.text()); });
@@ -123,4 +123,17 @@ export async function editNetWorth(page, id) {
 export async function editGoal(page, key, id) {
   await page.click(`[data-edit-goal="${key}"][data-i="${id}"]`);
   await page.waitForSelector(`#sheet .bsheet [data-l="${key}"][data-i="${id}"][data-f="target"]`);
+}
+/** Phase 9A: after the plan is saved, setup has an optional step 4 (accounts). Skip it, like a person
+    who has nothing to add, and wait for the "ready" screen. */
+export async function skipAccounts(page) {
+  await page.waitForSelector('.ob-done, [data-obact="acc-skip"]');
+  if (await page.locator('[data-obact="acc-skip"]').count()) await page.click('[data-obact="acc-skip"]');
+  return page.waitForSelector(".ob-done");
+}
+/** Phase 9A: finishing setup opens Home. Tests that carry on in Budget go there. */
+export async function afterSetup(page) {
+  await page.waitForSelector("#app .home, #app .b-income");
+  if (await page.locator("#app .home").count()) { await page.click('#tabs [data-tab="budget"]'); }
+  return page.waitForSelector("#app .b-income");
 }

@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { RICH_V3 } from "../fixtures.js";
 import { migrate } from "../../js/model/migrate.js";
 import { toStored } from "../../js/model/schema.js";
-import { setup, skip, SHOTS, open, fake, goTab } from "./helpers.js";
+import { setup, skip, SHOTS, open, fake, goTab, skipAccounts } from "./helpers.js";
 
 setup();
 const RICH = toStored(migrate(RICH_V3));
@@ -45,7 +45,7 @@ test("setup: short steps fit the screen exactly; long ones scroll and every butt
   await page.fill('[data-ob="people.0.pay"]', "2000");
   await page.click('[data-obact="next"]');
   assert.equal(await page.evaluate(() => window.__bar === document.querySelector(".ob-prog span")), true, "same progress bar");
-  assert.match(await page.textContent(".ob-stage"), /Step 3 of 3/);
+  assert.match(await page.textContent(".ob-stage"), /Step 3 of 4/);
   f = await fits(page); assert.ok(f.h > f.vh, "the plan is longer than the screen, so it scrolls");
   // the plan's status and button stay on screen while scrolling the list
   for (const y of [0, 300, 99999]) {
@@ -60,9 +60,9 @@ test("setup: short steps fit the screen exactly; long ones scroll and every butt
   assert.match(await page.textContent('[data-obk="status"]'), /5% left to plan/, "percent logic unchanged");
   await page.fill('[data-ob="split.0"]', "50");
   await page.click('[data-obact="next"]');
-  await page.waitForSelector(".ob-done");
+  await skipAccounts(page);
   f = await fits(page); assert.ok(f.h <= f.vh, `the ready screen fits (${f.h} ≤ ${f.vh})`);
-  assert.equal(await page.getAttribute(".ob-prog", "aria-valuenow"), "3");
+  assert.equal(await page.getAttribute(".ob-prog", "aria-valuenow"), "4");
   await shot(page, "4-ready");
   assert.deepEqual(errors, []); await ctx.close();
 });
@@ -76,7 +76,7 @@ test("setup on a small phone: opening 'More pay details' makes it scroll, and th
   assert.equal(await page.isVisible('[data-ob="people.0.payday"]'), true);
   await page.locator('[data-obact="next"]').scrollIntoViewIfNeeded();
   await page.click('[data-obact="next"]');
-  assert.match(await page.textContent(".ob-stage"), /Step 3 of 3/);
+  assert.match(await page.textContent(".ob-stage"), /Step 3 of 4/);
   assert.ok((await fits(page)).w <= 320, "nothing sideways at 320px");
   assert.deepEqual(errors, []); await ctx.close();
 });
@@ -226,7 +226,7 @@ test("after setup: 'Open my budget' doesn't ask about the Budget tour again; 'Sh
     const { page, errors, ctx } = await open({}, { waitFor: ".ob", ...PHONE, storage: fresh });
     await page.fill('[data-ob="people.0.pay"]', "2000");
     await page.click('[data-obact="next"]'); await page.click('[data-obact="next"]');
-    await page.waitForSelector(".ob-done");
+    await skipAccounts(page);
     await page.click(`[data-obact="${choice}"]`);
     if (choice === "tour") {
       await page.waitForSelector(".tour:not([hidden])");

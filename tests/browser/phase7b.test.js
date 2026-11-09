@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import { readFileSync } from "node:fs";
-import { setup, skip, SHOTS, open, settle, fake } from "./helpers.js";
+import { setup, skip, SHOTS, open, settle, fake, skipAccounts, afterSetup } from "./helpers.js";
 import { emergencyTarget } from "../../js/model/onboarding.js";
 
 setup();
@@ -18,7 +18,7 @@ const shot = (page, name) => page.screenshot({ path: join(SHOTS, `setup7b-${name
 
 test("one person: income, then the plan, then 'ready' only once it's saved; the budget is right", { skip }, async () => {
   const { page, errors, ctx } = await empty();
-  assert.match(await stepText(page), /Step 2 of 3\s*Your income/);
+  assert.match(await stepText(page), /Step 2 of 4\s*Your income/);
   assert.equal(await doneCount(page), "1", "step 1 (the household) is done");
   assert.equal(await page.isVisible(".top"), false, "setup has its own small header");
   assert.equal(await page.locator('[data-ob="people.0.name"]').count(), 0, "your name isn't asked for again");
@@ -28,7 +28,7 @@ test("one person: income, then the plan, then 'ready' only once it's saved; the 
   await page.click(".ob-more summary");
   await shot(page, "2-income-details");
   await next(page);
-  assert.match(await stepText(page), /Step 3 of 3\s*Your starting plan/);
+  assert.match(await stepText(page), /Step 3 of 4\s*Your starting plan/);
   assert.equal(await doneCount(page), "2");
   assert.equal(await page.textContent('[data-obk="tot"]'), "100%");
   assert.match(await page.textContent(".ob-sum"), /\$2,000\/fn/);
@@ -46,8 +46,8 @@ test("one person: income, then the plan, then 'ready' only once it's saved; the 
   assert.match(await page.textContent('[data-obk="status"]'), /All planned/);
   assert.equal(await writes(page), 0, "nothing saved while planning");
   await next(page);
-  await page.waitForSelector("text=Your budget is ready, Jarden!");
-  assert.equal(await doneCount(page), "3");
+  await skipAccounts(page); await page.waitForSelector("text=Your budget is ready, Jarden!");
+  assert.equal(await doneCount(page), "4"); // Phase 9A: four steps, the last skipped
   assert.ok(await writes(page) >= 1, "saved before saying so");
   await shot(page, "4-ready");
   const b = await saved(page);
@@ -59,7 +59,7 @@ test("one person: income, then the plan, then 'ready' only once it's saved; the 
   assert.deepEqual(Object.keys(b.goals.joint || {}), [], "no goals made up");
   assert.equal(b.goals.ef.target, emergencyTarget([{ pay: 2000, freq: "fortnightly" }], "solo"));
   await page.click('[data-obact="finish"]');
-  await page.waitForSelector("#app .viewas");
+  await page.waitForSelector("#app .home"); // Phase 9A: setup opens Home
   assert.equal(await page.isVisible(".tour:not([hidden])"), false, "the tour is optional");
   assert.equal(await page.isVisible(".top"), true);
   assert.match(await page.textContent("#app"), /\$2,000/);
@@ -69,7 +69,7 @@ test("one person: income, then the plan, then 'ready' only once it's saved; the 
 test("with someone: their pay is optional; added, it's shared in proportion to income, one personal pot each", { skip }, async () => {
   const { page, errors, ctx } = await empty();
   await page.click('[data-obact="back"]');
-  assert.match(await stepText(page), /Step 1 of 3/);
+  assert.match(await stepText(page), /Step 1 of 4/);
   await shot(page, "1-in-setup");
   await page.check('input[name="obmode"][value="with"]');
   await next(page);
@@ -83,7 +83,7 @@ test("with someone: their pay is optional; added, it's shared in proportion to i
   assert.match(await page.textContent(".ob-sum"), /\$3,846\/fn/, "$100,000 a year together, per fortnight");
   assert.match(await page.textContent(".ob-buckets"), /one each/);
   await next(page);
-  await page.waitForSelector(".ob-done"); await settle(page);
+  await skipAccounts(page); await settle(page);
   const b = await saved(page), people = Object.values(b.people);
   assert.deepEqual(people.map(p => [p.name, p.pay, p.freq]), [["Jarden", 2000, "fortnightly"], ["Madi", 4000, "monthly"]]);
   for (const p of people) {
@@ -116,9 +116,9 @@ test("no income yet: the plan shows percentages only (no $0 or NaN), and can sti
   assert.doesNotMatch(await page.textContent(".ob-card"), /NaN|Infinity|undefined|\$0/);
   await shot(page, "3-plan-no-income");
   await next(page);
-  await page.waitForSelector(".ob-done"); await settle(page);
+  await skipAccounts(page); await settle(page);
   assert.equal(Object.values((await saved(page)).people)[0].pay, null, "no income made up");
-  await page.click('[data-obact="finish"]'); await page.waitForSelector("#app .viewas");
+  await page.click('[data-obact="finish"]'); await afterSetup(page);
   assert.doesNotMatch(await page.textContent("#app"), /NaN|Infinity|undefined/);
   assert.deepEqual(errors, []); await ctx.close();
 });
@@ -142,7 +142,7 @@ test("if saving fails it says so (never 'ready'), and Try again works", { skip }
   assert.equal(await page.locator(".ob-done").count(), 0);
   assert.equal(await page.textContent('[data-obact="next"]'), "Try again");
   await next(page);
-  await page.waitForSelector(".ob-done");
+  await skipAccounts(page);
   await ctx.close();
 });
 
@@ -150,14 +150,14 @@ test("a missing name is asked for once, with the pay", { skip }, async () => {
   const { page, ctx } = await open(null, { init: { meta: { name: "" }, households: [{ id: "hh-1", name: "Ours", role: "owner", budget: {}, members: [{ user_id: "u-me", display_name: "", email: "jarden@example.com", role: "owner", joined_at: "2026-01-01" }] }] }, waitFor: ".ob" });
   await page.fill('[data-ob="people.0.name"]', "Sam");
   await page.fill('[data-ob="people.0.pay"]', "1000"); await next(page); await next(page);
-  await page.waitForSelector("text=Your budget is ready, Sam!"); await settle(page);
+  await skipAccounts(page); await page.waitForSelector("text=Your budget is ready, Sam!"); await settle(page);
   assert.equal(Object.values((await saved(page)).people)[0].name, "Sam");
   await ctx.close();
 });
 
 test("step 1 for a brand-new account: nothing pre-chosen; 'joining' explains invitations; 'with someone' carries into step 2", { skip }, async () => {
   const { page, errors, ctx } = await open(null, { init: { households: [] }, waitFor: "#fHousehold", width: 390 });
-  assert.match(await page.textContent(".ob-stage"), /Step 1 of 3/);
+  assert.match(await page.textContent(".ob-stage"), /Step 1 of 4/);
   assert.equal(await page.getAttribute(".ob-prog", "aria-valuenow"), "0");
   assert.equal(await page.locator('input[name="obmode"]:checked').count(), 0, "no choice made for you");
   assert.equal(await page.isDisabled('#fHousehold button[type="submit"]'), true);
@@ -170,7 +170,7 @@ test("step 1 for a brand-new account: nothing pre-chosen; 'joining' explains inv
   await shot(page, "1-selected");
   await page.click('#fHousehold button[type="submit"]');
   await page.waitForSelector(".ob .ob-stage");
-  assert.match(await stepText(page), /Step 2 of 3/);
+  assert.match(await stepText(page), /Step 2 of 4/);
   assert.equal(await page.locator('[data-obact="addperson"]').count(), 1, "'with someone' offers to add their pay");
   assert.equal(await fake(page, () => window.__fake.rpcCalls.filter(c => c.name === "create_household").length), 1);
   assert.deepEqual(errors, []); await ctx.close();

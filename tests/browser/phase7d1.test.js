@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { RICH_V3 } from "../fixtures.js";
 import { migrate } from "../../js/model/migrate.js";
 import { toStored } from "../../js/model/schema.js";
-import { setup, skip, SHOTS, open, fake, goTab, settle } from "./helpers.js";
+import { setup, skip, SHOTS, open, fake, goTab, settle, skipAccounts, afterSetup } from "./helpers.js";
 
 setup();
 const RICH = toStored(migrate(RICH_V3));
@@ -24,9 +24,9 @@ async function finishSetup(page, { partner = false } = {}) {
   await page.click('.ob-freq label:has(input[value="fortnightly"])');
   if (partner) { await page.click('[data-obact="addperson"]'); await page.fill('[data-ob="people.1.name"]', "Sam"); await page.fill('[data-ob="people.1.pay"]', "1500"); }
   await page.click('[data-obact="next"]'); await page.click('[data-obact="next"]');
-  await page.waitForSelector(".ob-done");
+  await skipAccounts(page);
   await page.click('[data-obact="finish"]');
-  await page.waitForSelector("#app .b-income");
+  await afterSetup(page);
 }
 
 /* ---------------- Undo ---------------- */
@@ -173,7 +173,7 @@ for (const [w, h] of [[320, 568], [375, 667], [390, 664], [430, 932]]) test(`set
   assert.ok(last.bottom <= foot.top + 0.5, `the last row (${Math.round(last.bottom)}) is under the footer (${Math.round(foot.top)})`);
   assert.deepEqual(await tappable(page), [], "step 3 buttons and % boxes' rows");
   if (w === 390) await page.screenshot({ path: join(SHOTS, "p7d1-step3-end.png") });
-  await page.click('[data-obact="next"]'); await page.waitForSelector(".ob-done");
+  await page.click('[data-obact="next"]'); await skipAccounts(page);
   await artClear(page, "done");
   assert.deepEqual(await tappable(page), [], "done buttons");
   assert.deepEqual(errors, []); await ctx.close();
