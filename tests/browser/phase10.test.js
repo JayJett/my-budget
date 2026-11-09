@@ -7,7 +7,8 @@ import { setup, skip, SHOTS, open, fake } from "./helpers.js";
 
 setup();
 const ALL_DONE = { "mb-tours-u-me": JSON.stringify({ tabs: Object.fromEntries(["budget", "networth", "spending", "goals", "invest", "progress"].map(t => [t, "done"])) }) };
-const phone = (w = 390, h = 844) => ({ device: { viewport: { width: w, height: h }, hasTouch: true, isMobile: true } });
+// the tests' dates are worked out from Monday 9 November 2026, so "now" is fixed there (midday, local time)
+const phone = (w = 390, h = 844) => ({ device: { viewport: { width: w, height: h }, hasTouch: true, isMobile: true }, clock: new Date(2026, 10, 9, 12) });
 const shot = (page, name) => page.screenshot({ path: join(SHOTS, `p10-${name}.png`) });
 const budgetOf = page => fake(page, () => window.__fake.budget);
 const pb = page => page.textContent("#sheet .pb");
