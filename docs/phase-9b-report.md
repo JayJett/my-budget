@@ -110,7 +110,7 @@
   - no-expenses states; the unmarked finding opening the expense
   - viewing saves nothing; switching households
   - shared mixed pay; 320–430 px with big numbers
-  - The full-suite result is in the PR.
+  - Full browser suite: 275 tests. The first run caught one real problem (the new "Mark them" link was too small to tap on phones). That is now fixed, and the mobile tests pass.
 - **Regression:** the existing calculation, onboarding, history, goals, investment, net worth and snapshot tests pass. The Spending baseline's numbers are unchanged; only two labels were reworded.
 - **Not verified:** a real iPhone. Separately, Playwright's touch emulation had trouble tapping the bottom bar over Home tiles in one screenshot script (a known emulator quirk), so the new tests tap tabs directly; existing navigation tests are unaffected.
 

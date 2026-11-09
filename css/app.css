@@ -2466,6 +2466,7 @@ body.compact :is(.home, .budget, .sp-page, .nw-page, .gl-page, .iv-page, .pg-pag
 .room-rows b{ color:var(--ink); font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap; }
 .in-note{ margin:8px 0 0; color:var(--muted); font-size:var(--fs-xs); }
 .in-note.warn{ color:var(--warn); }
+.in-note .linkish{ display:inline-flex; align-items:center; min-height:44px; padding:0 4px; }
 .a-cov{ display:block; font-size:var(--fs-xs); font-weight:600; margin-top:2px; }
 .a-cov.ok{ color:var(--ok); } .a-cov.bad{ color:var(--bad); } .a-cov:empty{ display:none; }
 .sp-ess{ margin-top:0; }
