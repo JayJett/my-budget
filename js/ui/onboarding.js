@@ -22,6 +22,7 @@ import { blankBudget, MAX_PEOPLE, isShared, nextPos } from "../model/schema.js";
 import { WORDS, freqToView, perYear } from "../model/periods.js";
 import { money as fmtMoney } from "../model/format.js";
 import { n, blank, uid, ymd } from "../model/util.js";
+import { openExpensePicker } from "./expense-picker.js";
 import { nwType, nwIcon } from "./views/networth.js";
 import { HERO } from "./hero-art.js";
 import { setThemeColour } from "./auth.js";
@@ -68,7 +69,7 @@ const planOf = () => ans && ans.mode === "solo" ? { mode: "solo", purpose: "solo
    it twice. They're saved like the plan itself: one whole-budget save marked as the setup, so Undo
    never offers to take them away. Skipping saves nothing and invents nothing. */
 const ACC_KEY = () => `mb-ob-accounts-${app.household ? app.household.id : "x"}`;
-let accs = [], accForm = null, accErr = "";
+let accs = [], accForm = null, accErr = "", expAdded = 0; // expAdded (Phase 9C.1): expenses added from the suggestions
 const keepAccs = () => { try { sessionStorage.setItem(ACC_KEY(), JSON.stringify(accs)); } catch (_) {} };
 const dropAccs = () => { try { sessionStorage.removeItem(ACC_KEY()); } catch (_) {} };
 /** After a refresh: accounts started on step 4 but not yet saved (null when there's nothing to resume). */
@@ -80,7 +81,7 @@ export function resumeAccounts(list) {
 }
 
 export function startSetup() {
-  accs = []; accForm = null; accErr = "";
+  accs = []; accForm = null; accErr = ""; expAdded = 0;
   const me = app.members.find(m => m.user_id === app.meId);
   const md = (app.session && app.session.user && app.session.user.user_metadata) || {};
   const myName = (me && me.display_name) || md.name || (md.full_name || "").trim().split(/\s+/)[0] || "";
@@ -113,7 +114,8 @@ function accountsStep(P) {
     ${accErr ? `<p class="msg err" role="alert">${esc(accErr)}</p>` : ""}
     ${accForm ? "" : accs.length
       ? `<div class="ob-nav"><button class="btn primary block" type="button" data-obact="next"${saving ? " disabled" : ""}>${saving ? "Saving…" : accErr ? "Try again" : "Save and continue"}</button></div>`
-      : `<div class="ob-nav ob-nav-stack"><button class="btn primary block" type="button" data-obact="acc-add">+ Add an account</button><button class="linkish ob-skip-link" type="button" data-obact="acc-skip">Skip for now</button></div>`}`;
+      : `<div class="ob-nav ob-nav-stack"><button class="btn primary block" type="button" data-obact="acc-add">+ Add an account</button><button class="linkish ob-skip-link" type="button" data-obact="acc-skip">${expAdded ? "Done for now" : "Skip for now"}</button></div>`}
+    ${accForm ? "" : expAdded ? `<p class="ob-exp-done">✓ ${expAdded} regular ${expAdded === 1 ? "expense" : "expenses"} added</p>` : `<p class="ob-exp"><button class="linkish" type="button" data-obact="acc-exp">Or choose your regular expenses</button></p>`}`;
 }
 const ACC_TYPES = ["Operating", "Savings", "Investment", "Super", "Debt"];
 function accFormHTML(shared) {
@@ -158,6 +160,7 @@ function accountAct(act, i) {
     if (f.k === null) accs.push(a); else accs[f.k] = a;
     accForm = null; keepAccs(); draw(); return;
   }
+  if (act === "acc-exp") { openExpensePicker({ onDone: k => { expAdded += k; draw(); } }); return; }
   if (act === "acc-skip") { dropAccs(); accs = []; done = 4; stage = 5; dir = 1; draw(); return; }
 }
 const focusName = () => setTimeout(() => { const el = document.querySelector('[data-acc="name"]'); if (el) el.focus(); }, 30);

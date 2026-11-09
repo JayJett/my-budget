@@ -79,7 +79,7 @@ function section(S, grp, ui, ro) {
   const addBtn = ro || grp.kind === "ef" || (grp.kind === "joint" && !anyGoals(S)) ? "" : `<button class="icon-add" type="button" data-goal-new="${esc(grp.key)}" aria-label="Add a goal to ${esc(grp.title)}">+</button>`;
   // How much of each pool is shared out between the goals (unchanged checks: 100%, % left, over)
   const alloc = ui.reorder || !grp.goals.length ? "" : grp.kind === "joint"
-    ? `<p class="gl-alloc"><span>Shared out</span>${P.map(p => `<span class="${pc(p)}">${P.length > 1 ? `<i class="gl-dot"></i>${esc(p.name || "Unnamed")} ` : ""}${K(`gj.c.${p.id}`, "chip")}</span>`).join("")}${tipq("Each goal gets a % of the fund. Below 100%, the rest stays in reserve; over 100%, goals are promised more than the fund has.")}</p>`
+    ? `<p class="gl-alloc"><span>Shared out</span>${P.map(p => `<span class="${pc(p)}">${P.length > 1 ? `${esc(p.name || "Unnamed")} ` : ""}${K(`gj.c.${p.id}`, "chip")}</span>`).join("")}${tipq("Each goal gets a % of the fund. Below 100%, the rest stays in reserve; over 100%, goals are promised more than the fund has.")}</p>`
     : isPerson ? `<p class="gl-alloc"><span>Shared out</span>${K(`gp.${grp.kind.id}.c`, "chip")}</p>` : "";
   const spare = grp.kind === "joint" ? `<p class="gl-spare" data-k="gl.gj.spare" data-base="gl-spare"></p>` : isPerson ? `<p class="gl-spare" data-k="gl.${esc(grp.kind.id)}.spare" data-base="gl-spare"></p>` : "";
   const body = grp.goals.length ? `<ul class="gl-list">${grp.goals.map((g, i) => card(g, grp, ui, i)).join("")}</ul>`

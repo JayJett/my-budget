@@ -17,6 +17,7 @@ export const accIcon = a => itemIcon(accIconKey(a));
 import { WORDS, VIEWS, perYear, freqToView } from "../../model/periods.js";
 import { money, m0, pct, listNames } from "../../model/format.js";
 import { drawDonuts, drawFlow, drawSplit, personVar } from "../charts.js";
+import { miniDonut } from "../mini-donut.js";
 import { spendLabel } from "./labels.js";
 import { budgetUI } from "../budget-sheets.js";
 import { planCheckHTML, refreshPlanCheck } from "../insight-view.js";
@@ -43,8 +44,7 @@ export function view() {
 
   const income = `<section class="card b-income">
     <div class="b-row"><span class="eyebrow">${multi ? "Household income" : "Income"}</span>${seg}</div>
-    <div class="hero-amt"><span class="amt">${K("inc.c")}</span><span class="per">${esc(w.per)}</span></div>
-    ${multi ? `<div class="ribbon" id="ribbon" aria-hidden="true"></div>` : ""}
+    <div class="hero-amt b-inc-row"><span class="b-inc-t"><span class="amt">${K("inc.c")}</span><span class="per">${esc(w.per)}</span></span>${multi ? `<span class="b-donut" id="incDonut"></span>` : ""}</div>
     <ul class="members">${P.map(p => `<li><button class="member-row ${pc(p)}" type="button" data-edit-person="${esc(p.id)}" aria-label="${esc(p.name || "Unnamed")}: pay and settings">
         <span class="av">${esc(initial(p))}</span>
         <span class="m-main"><span class="m-name">${esc(p.name || "Unnamed")}</span><small>${K(`pp.${p.id}.line`)}</small></span>
@@ -68,7 +68,7 @@ export function view() {
         <span class="a-main"><span class="a-name">${esc(a.name || "Unnamed")}</span>
           <span class="a-meta">${esc(typeLine(a, P, S))}${multi ? "" : ` · ${K(`acc.${a.id}.pct.${P[0].id}`)}`}</span>
           ${a.role === "spending" ? `<span data-k="acc.${esc(a.id)}.cov" data-base="a-cov"></span>` : ""}
-          ${multi ? `<span class="a-parts">${P.map(p => `<span data-k="acc.${esc(a.id)}.part.${esc(p.id)}" data-base="a-part ${pc(p)}" class="a-part ${pc(p)}"></span>`).join("")}</span>` : ""}</span>
+          ${multi && !(a.type === "Personal" && a.owner) ? `<span class="a-parts">${P.map(p => `<span data-k="acc.${esc(a.id)}.part.${esc(p.id)}" data-base="a-part ${pc(p)}" class="a-part ${pc(p)}"></span>`).join("")}</span>` : ""}</span>
         <span class="a-amt">${K(`acc.${a.id}.t`)}<small>${esc(w.short)}</small></span>${ui.reorder ? "" : CHEV}</button>
       ${ui.reorder ? `<span class="mv-row"><button class="mv-btn" type="button" data-move="up" data-l="acc" data-i="${esc(a.id)}" aria-label="Move ${esc(a.name || "this")} up"${i === 0 ? " disabled" : ""}>↑</button><button class="mv-btn" type="button" data-move="down" data-l="acc" data-i="${esc(a.id)}" aria-label="Move ${esc(a.name || "this")} down"${i === S.accounts.length - 1 ? " disabled" : ""}>↓</button></span>` : ""}
     </li>`).join("")}</ul>
@@ -202,7 +202,8 @@ export function fill(D, C) {
 
 export function draw(C) {
   const v = C.v, $ = s => document.querySelector(s);
-  const rib = $("#ribbon"); if (rib) rib.innerHTML = C.incTotal ? C.people.map(p => `<span style="width:${p.annual / C.incTotal * 100}%;background:${personVar(p)}"></span>`).join("") : "";
+  // Phase 9C.1: each person's share of the household's pay, as a small doughnut (it was a thin bar)
+  const dn = $("#incDonut"); if (dn) dn.innerHTML = miniDonut(C.people.map(p => ({ label: p.name || "Unnamed", v: p.annual, col: personVar(p) })), "Share of household pay", { size: 58 });
   drawDonuts(C, app.colours, app.state, WORDS[C.view]);
   drawFlow(C, app.colours, spendLabel(app.state));
   drawSplit($("#invsplit"), [{ name: "Investing", v: v(C.investment), col: "var(--invest)" }, { name: "Cash savings", v: v(C.cash), col: "var(--joint)" }], v(C.investment + C.cash));

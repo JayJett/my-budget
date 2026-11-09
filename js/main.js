@@ -17,6 +17,7 @@ import { initReminders } from "./ui/reminders.js";
 import { initAccent } from "./ui/accent.js";
 import { initBudgetSheets } from "./ui/budget-sheets.js";
 import { initRebalance } from "./ui/rebalance.js";
+import { initExpensePicker } from "./ui/expense-picker.js";
 import { initHouseholdMode } from "./ui/household-mode.js";
 import { initHouseholdLook } from "./ui/household-look.js";
 import { initFeedback } from "./ui/feedback.js";
@@ -43,6 +44,7 @@ initReminders();
 initAccent();
 initBudgetSheets();
 initRebalance(); // after the budget sheets: it chains their redraw hook
+initExpensePicker();
 
 // Ctrl/Cmd+S saves straight away; leaving the page saves anything pending.
 document.addEventListener("keydown", e => {
