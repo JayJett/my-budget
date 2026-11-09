@@ -65,6 +65,8 @@ test("destinations: keep, grouped transfer with its parts, set aside; ticks are 
   await page.waitForFunction(() => /1 of 2 marked done/.test(document.querySelector("#sheet .pb").textContent));
   assert.equal(await page.getAttribute('#sheet [data-pb-tick="move:nw:sv"]', "aria-checked"), "true");
   await shot(page, "ticked");
+  // the tick shows at once; wait for it to be saved before looking at what was saved
+  await page.waitForFunction(() => Object.keys(window.__fake.checks).length && !document.querySelector("#sheet [data-pb-tick][aria-busy]"));
   const chk = await fake(page, () => window.__fake.checks);
   const k = Object.keys(chk)[0];
   assert.match(k, /^hh-1\|u-me\|j\|2026-11-11$/); assert.deepEqual(chk[k].done, { "move:nw:sv": true });
@@ -74,7 +76,7 @@ test("destinations: keep, grouped transfer with its parts, set aside; ticks are 
   await page.click(".ho-pay [data-pb-open]"); await page.waitForSelector('#sheet [data-pb-tick="move:nw:sv"][aria-checked="true"]');
   await page.click('#sheet [data-pb-tick="move:nw:sv"]');
   await page.waitForFunction(() => /0 of 2 marked done/.test(document.querySelector("#sheet .pb").textContent));
-  await page.click('#sheet [data-pb-tick="keep:nw:ev"]'); await page.waitForFunction(() => /1 of 2/.test(document.querySelector("#sheet .pb").textContent));
+  await page.click('#sheet [data-pb-tick="keep:nw:ev"]'); await page.waitForFunction(() => /1 of 2/.test(document.querySelector("#sheet .pb").textContent)); await page.waitForFunction(() => !document.querySelector("#sheet [data-pb-tick][aria-busy]"));
   // the next payday is a list of its own
   await page.click('#sheet [data-pb-k="1"]'); await page.waitForFunction(() => /Wednesday 25 Nov/.test(document.querySelector("#sheet .pb").textContent));
   await page.waitForFunction(() => /0 of 2 marked done/.test(document.querySelector("#sheet .pb").textContent));
@@ -87,7 +89,7 @@ test("destinations: keep, grouped transfer with its parts, set aside; ticks are 
 test("the budget changes after ticking: the kept list stays until you choose the new plan", { skip }, async () => {
   const { page, errors, ctx } = await open(null, { ...phone(), storage: ALL_DONE, init: one(solo({ dests: true }), "j"), hash: "budget", waitFor: "#app .b-income" });
   await page.click("#app [data-pb-open]"); await page.waitForSelector("#sheet .pb-check");
-  await page.click('#sheet [data-pb-tick="keep:nw:ev"]'); await page.waitForFunction(() => /1 of 2/.test(document.querySelector("#sheet .pb").textContent));
+  await page.click('#sheet [data-pb-tick="keep:nw:ev"]'); await page.waitForFunction(() => /1 of 2/.test(document.querySelector("#sheet .pb").textContent)); await page.waitForFunction(() => !document.querySelector("#sheet [data-pb-tick][aria-busy]"));
   // someone moves 5% from Spending to Investments
   await page.evaluate(async () => { const { app, changed } = await import("./js/ui/ctx.js"); const a = app.state.accounts; a.find(x => x.role === "spending").split.j = 0.45; a.find(x => x.role === "invest").split.j = 0.15; changed({ full: true }); });
   await page.waitForSelector("#sheet .pb-changed");
