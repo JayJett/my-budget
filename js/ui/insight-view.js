@@ -93,7 +93,9 @@ export function primaryFinding(S = app.state, C = app.C) {
   if (cv.state === "nobudget") return { id: "nobudget", level: "attention", t: "Your expenses have no budget yet", s: `Give ${allocName(S)} a share of pay`, act: { label: "Set a budget", go: "budget", click: cv.allocation ? `[data-edit-acc="${cv.allocation.id}"]` : "" } };
   if (cv.state === "covered") return { id: "covered", level: "good", t: "Your expenses are covered", s: `${per(C, cv.unassigned)} not yet assigned to an expense`, act: null };
   if (cv.state === "even") return { id: "covered", level: "good", t: "Your expenses are covered", s: "Exactly, to the cent", act: null };
-  return { id: "bills", level: "review", t: "Add expenses to check they’re covered", s: "", act: { label: "Add expenses", go: "spending", click: "[data-sp-new]" } };
+  const todo = commitments(S, C).incompleteIds; // Phase 9C.2: named, waiting for an amount (never a $0 bill)
+  if (todo.length) return { id: "amounts", level: "review", t: "Add amounts to check your expenses", s: `${todo.length === 1 ? "1 expense needs" : `${todo.length} expenses need`} an amount`, act: { label: "Add amounts", go: "spending", click: `[data-edit-sp="${todo[0]}"]` } };
+  return { id: "bills", level: "review", t: "Add expenses to check they’re covered", s: "", act: { label: "Add expenses", go: "spending", click: "[data-xp-open]" } };
 }
 let pcOpen = false;
 const ACT_ATTRS = a => `data-home-go="${a.go}"${a.person ? ` data-home-person="${esc(a.person)}"` : ""}${a.click && !readOnly() ? ` data-home-click="${esc(a.click)}"` : ""}`;
@@ -101,7 +103,13 @@ const ACT_ATTRS = a => `data-home-go="${a.go}"${a.person ? ` data-home-person="$
 export function planCheckHTML(S = app.state, C = app.C) {
   const F = primaryFinding(S, C);
   const unmarked = insights(S, C).filter(x => x.id === "unmarked");
-  const body = C.incTotal > 0 ? `${breakdownHTML(S, C)}${roomHTML(S, C)}${insightRows(unmarked, S, C)}` : "";
+  // Phase 9C.2: open, it shows the two numbers behind the finding; the fuller picture (where pay goes,
+  // room to adjust) is one more tap away. With no expenses (or only ones waiting for an amount) there's
+  // nothing to break down, so there's no breakdown: just the next step.
+  const cv = coverage(S, C), known = C.incTotal > 0 && ["covered", "even", "short", "nobudget"].includes(cv.state);
+  const deep = known ? `${breakdownHTML(S, C)}${roomHTML(S, C)}` : "";
+  const body = known ? `<ul class="pc-sum"><li><span>Entered expenses</span><b>${per(C, cv.planned)}</b></li><li><span>Budget for them</span><b>${per(C, cv.budget)}</b></li></ul>
+    ${insightRows(unmarked, S, C)}${deep ? `<details class="pc-deep"><summary>More detail</summary><div class="pc-deep-b">${deep}</div></details>` : ""}` : "";
   return `<section class="card b-check" id="planCheck" aria-label="Expense check">
     <div class="pc-main ${F.level}" data-insight="${F.id}"><span class="pc-ic" aria-hidden="true">${ICON[F.level]}</span>
       <div class="pc-t"><p class="pc-h">${esc(F.t)}</p>${F.s ? `<p class="pc-s">${esc(F.s)}</p>` : ""}</div></div>

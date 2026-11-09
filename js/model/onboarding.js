@@ -154,3 +154,19 @@ export function buildBudget(answers, split, today = new Date()) {
     invest: { rate: 0.07, growth: 0, fee: 0 },
   };
 }
+
+/** Phase 9C.2: setup step 2. Everyone whose pay is entered needs a valid last payday of their own,
+    today or earlier (it sets their payday plan). Someone with no pay yet needs none. Nothing is filled
+    in for anyone. Returns { index: message } for the ones that can't be used yet (empty when all fine). */
+export function paydayErrors(people, todayYmd) {
+  const out = {};
+  (people || []).forEach((p, i) => {
+    if (!(Number(p.pay) > 0)) return;
+    const d = String(p.payday || "").trim();
+    if (!d) { out[i] = "Add the date you were last paid"; return; }
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d), dt = m && new Date(+m[1], +m[2] - 1, +m[3]);
+    if (!m || !dt || dt.getFullYear() !== +m[1] || dt.getMonth() !== +m[2] - 1 || dt.getDate() !== +m[3]) { out[i] = "That isn’t a date"; return; }
+    if (todayYmd && d > todayYmd) out[i] = "Pick your last payday: today or earlier";
+  });
+  return out;
+}

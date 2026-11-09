@@ -68,7 +68,7 @@ export function view() {
 
   let list;
   if (!L.length) list = `<section class="card sp-empty"><div class="sp-empty-ic" aria-hidden="true">${typeIcon("Flexible")}</div><h2>No expenses yet</h2>
-    <p class="dim">Add what this budget pays for: rent, groceries, the yearly car rego.</p>${ro ? "" : `<button class="btn primary" type="button" data-xp-open>Choose from common expenses</button><button class="linkish sp-own" type="button" data-sp-new="Flexible">+ Add your own</button>`}</section>`;
+    <p class="dim">Add what this budget pays for: rent, groceries, the yearly car rego.</p>${ro ? "" : `<div class="sp-empty-acts"><button class="btn primary" type="button" data-xp-open>Choose from common expenses</button><button class="linkish sp-own" type="button" data-sp-new="Flexible">+ Add your own</button></div>`}</section>`;
   else if (ui.reorder) list = `<section class="sp-list">
     <div class="b-row sec"><h2>Expenses</h2><button class="btn small ghost" type="button" data-reorder aria-pressed="true">Done</button></div>
     <p class="dim small-note">Move expenses up or down. The order is kept within each type.</p>

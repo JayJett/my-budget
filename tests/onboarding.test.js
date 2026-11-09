@@ -142,3 +142,18 @@ describe("building the budget from the answers", () => {
     assert.equal(new Set(s.people.map(p => p.colour)).size, 4, "everyone gets their own colour");
   });
 });
+
+/* Phase 9C.2: setup needs each earner's own last payday */
+import { paydayErrors } from "../js/model/onboarding.js";
+test("payday: needed for everyone with pay, never for someone without; each their own; today or earlier", () => {
+  const T = "2026-11-09";
+  assert.deepEqual(paydayErrors([{ pay: 2000, payday: "" }], T), { 0: "Add the date you were last paid" });
+  assert.deepEqual(paydayErrors([{ pay: 2000, payday: "2026-11-05" }], T), {});
+  assert.deepEqual(paydayErrors([{ pay: null, payday: "" }], T), {}, "pay left for later: no date needed");
+  assert.deepEqual(paydayErrors([{ pay: 0, payday: "" }], T), {});
+  assert.deepEqual(paydayErrors([{ pay: 2000, payday: "2026-11-05" }, { pay: 900, payday: "" }], T), { 1: "Add the date you were last paid" }, "one person's date isn't used for another");
+  assert.deepEqual(paydayErrors([{ pay: 2000, payday: "2026-11-10" }], T), { 0: "Pick your last payday: today or earlier" });
+  assert.deepEqual(paydayErrors([{ pay: 2000, payday: "2026-02-30" }], T), { 0: "That isn’t a date" });
+  assert.deepEqual(paydayErrors([{ pay: 2000, payday: "2024-02-29" }], T), {}, "leap day");
+  assert.deepEqual(paydayErrors([{ pay: 2000, payday: T }], T), {}, "today is fine");
+});

@@ -97,7 +97,8 @@ export function view() {
   const pools = groups.map(g => `<li class="${g.kind !== "ef" && g.kind !== "joint" ? pc(g.kind) : g.kind}"><i class="gl-dot"></i><span>${esc(g.title)}</span><b>${g.kind === "ef" ? K("g.ef.fn") : g.kind === "joint" ? K("gp.jg") : K(`gpool.${g.kind.id}`)}</b></li>`).join("");
   const summary = `<section class="card gl-sum" aria-live="polite">
     <div class="b-row"><span class="eyebrow">Goals</span>${seg}</div>
-    <div class="sp-head"><span class="amt">${K("gl.saved")}</span><span class="lab">saved so far</span></div>
+    <div class="gl-hero-top"><div class="gl-top-l"><span class="lab">Saved so far</span><span class="amt">${K("gl.saved")}</span></div>
+      <div class="gl-top-r"><span class="lab">Your goals</span><span class="gl-count">${K("gl.count")}</span>${K("gl.count.sub", "gl-count-sub")}</div></div>
     <p class="gl-sub">${K("gl.saved.sub")}</p>
     <div class="gl-bar big" aria-hidden="true"><span data-k="gl.bar"></span></div>
     <div class="gl-pools"><span class="eyebrow">Going to goals ${K("gl.perword")} ${tipq("The plan from the Budget tab. It isn’t counted as saved until you update a goal’s Saved amount.")}</span><ul>${pools}</ul></div>
@@ -209,7 +210,9 @@ export function fill(D, C) {
   const saved = all.reduce((s, g) => s + n(g.saved), 0), targets = all.filter(g => !blank(g.target)).reduce((s, g) => s + n(g.target), 0);
   const reached = all.filter(isDone).length;
   D["gl.saved"] = money(saved);
-  D["gl.saved.sub"] = !all.length ? "No goals yet" : `${targets > 0 ? `of ${money(targets)} in targets · ` : ""}${all.length} ${all.length === 1 ? "goal" : "goals"}${reached ? `, ${reached} reached` : ""}`;
+  // Phase 9C.2: the number of goals sits beside the saved amount, so it isn't repeated in the line below
+  D["gl.count"] = String(all.length); D["gl.count.sub"] = reached ? `${reached} reached` : "";
+  D["gl.saved.sub"] = !all.length ? "No goals yet" : targets > 0 ? `of ${money(targets)} total target` : "";
   D["gl.bar"] = { w: targets > 0 ? Math.min(1, saved / targets) : 0 };
   D["gl.per"] = w.short; D["gl.perword"] = w.per.replace("per ", "each ");
   // months of cover: the same sum as the emergency fund message above, shown short on the card

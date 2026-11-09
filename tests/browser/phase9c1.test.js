@@ -82,7 +82,7 @@ test("again later: what you have is marked; adding another is on purpose; closin
 
 test("setup step 4: optional; skipping adds nothing; choosing adds only what's picked, outside Undo", { skip }, async () => {
   const { page, errors, ctx } = await open({}, { ...phone(), storage: ALL_DONE, hash: "", waitFor: ".ob" });
-  await page.fill('[data-ob="people.0.pay"]', "2000"); await page.click('[data-obact="next"]'); await page.click('[data-obact="next"]');
+  await page.fill('[data-ob="people.0.pay"]', "2000"); await page.fill('[data-ob="people.0.payday"]', "2026-11-05"); await page.click('[data-obact="next"]'); await page.click('[data-obact="next"]');
   await page.waitForSelector('[data-obact="acc-exp"]');
   assert.equal(await page.locator('.ob [data-obact="acc-add"].primary').count(), 1, "adding an account is still the main button");
   await shot(page, "step4");
@@ -102,7 +102,7 @@ test("setup step 4: optional; skipping adds nothing; choosing adds only what's p
 
 test("setup step 4: skipping everything adds no expenses", { skip }, async () => {
   const { page, errors, ctx } = await open({}, { ...phone(), storage: ALL_DONE, hash: "", waitFor: ".ob" });
-  await page.fill('[data-ob="people.0.pay"]', "2000"); await page.click('[data-obact="next"]'); await page.click('[data-obact="next"]');
+  await page.fill('[data-ob="people.0.pay"]', "2000"); await page.fill('[data-ob="people.0.payday"]', "2026-11-05"); await page.click('[data-obact="next"]'); await page.click('[data-obact="next"]');
   await page.click('[data-obact="acc-skip"]'); await page.waitForSelector(".ob-done");
   await page.click('[data-obact="finish"]'); await page.waitForSelector("#app .home");
   assert.equal(Object.keys((await budgetOf(page)).spend || {}).length, 0);

@@ -23,6 +23,7 @@ import { WORDS, freqToView, perYear } from "../model/periods.js";
 import { money as fmtMoney } from "../model/format.js";
 import { n, blank, uid, ymd } from "../model/util.js";
 import { openExpensePicker } from "./expense-picker.js";
+import { paydayErrors } from "../model/onboarding.js";
 import { nwType, nwIcon } from "./views/networth.js";
 import { HERO } from "./hero-art.js";
 import { setThemeColour } from "./auth.js";
@@ -69,7 +70,8 @@ const planOf = () => ans && ans.mode === "solo" ? { mode: "solo", purpose: "solo
    it twice. They're saved like the plan itself: one whole-budget save marked as the setup, so Undo
    never offers to take them away. Skipping saves nothing and invents nothing. */
 const ACC_KEY = () => `mb-ob-accounts-${app.household ? app.household.id : "x"}`;
-let accs = [], accForm = null, accErr = "", expAdded = 0; // expAdded (Phase 9C.1): expenses added from the suggestions
+let accs = [], accForm = null, accErr = "", expAdded = 0;
+let payErr = {}; // Phase 9C.2: person index → why their payday can't be used yet // expAdded (Phase 9C.1): expenses added from the suggestions
 const keepAccs = () => { try { sessionStorage.setItem(ACC_KEY(), JSON.stringify(accs)); } catch (_) {} };
 const dropAccs = () => { try { sessionStorage.removeItem(ACC_KEY()); } catch (_) {} };
 /** After a refresh: accounts started on step 4 but not yet saved (null when there's nothing to resume). */
@@ -81,7 +83,7 @@ export function resumeAccounts(list) {
 }
 
 export function startSetup() {
-  accs = []; accForm = null; accErr = ""; expAdded = 0;
+  accs = []; accForm = null; accErr = ""; expAdded = 0; payErr = {};
   const me = app.members.find(m => m.user_id === app.meId);
   const md = (app.session && app.session.user && app.session.user.user_metadata) || {};
   const myName = (me && me.display_name) || md.name || (md.full_name || "").trim().split(/\s+/)[0] || "";
@@ -299,8 +301,8 @@ function body() {
       <div class="ob-done-art" aria-hidden="true">${HERO.grow()}<span class="ob-done-ic"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5l3 3 6-7"/></svg></span></div>
       <h2 id="obTitle" tabindex="-1">Your budget is ready${first ? `, ${esc(first)}` : ""}!</h2>
       <p class="lead">${withAccs ? "Your plan and accounts are saved. You can change anything whenever you like." : "Your plan is saved. Add your accounts any time in Wealth, and your goals when you’re ready."}</p></div>
-    <div class="ob-done-acts"><button class="btn primary block" type="button" data-obact="finish">Open Moni Money</button>
-    <button class="btn ghost block" type="button" data-obact="tour">Show me around</button></div></div>`;
+    <div class="ob-done-acts"><button class="btn primary block" type="button" data-obact="tour">Show me around</button>
+    <button class="linkish ob-skip-link" type="button" data-obact="finish">Open Moni Money</button></div></div>`;
 }
 
 function payBlock(p, i) {
@@ -310,9 +312,10 @@ function payBlock(p, i) {
       : ans.people.length > 1 ? `<p class="ob-who">${esc(p.name || "You")}</p>` : ""}
     <label class="ob-amount"><span class="sr-only">${other ? "Their" : "Your"} take-home pay</span><span class="ob-cur" aria-hidden="true">$</span><input type="text" inputmode="decimal" autocomplete="off" data-ob="people.${i}.pay" data-obt="num" value="${blank(p.pay) ? "" : fmtNum(p.pay)}" placeholder="0"></label>
     <div class="seg seg-radio ob-freq" role="radiogroup" aria-label="How often">${FREQS.map(([v, l]) => `<label><input type="radio" name="freq${i}" value="${v}" data-ob="people.${i}.freq"${p.freq === v ? " checked" : ""}><span>${l}</span></label>`).join("")}</div>
-    <details class="ob-more"${p.payday ? " open" : ""}><summary>More pay details</summary>
-      <label class="ob-field"><span>A recent payday <em>(optional)</em></span><input type="date" data-ob="people.${i}.payday" value="${esc(p.payday)}"></label>
-      <small class="ob-small">Lets the app spot years with an extra payday.</small></details>
+    ${(() => { const err = payErr[i], id = `obPd${i}`; // Phase 9C.2: with pay entered, the last payday is needed (it sets the payday plan)
+      return `<label class="ob-field ob-payday${err ? " bad" : ""}"><span>${other ? "When were they last paid?" : "When were you last paid?"}</span>
+      <input type="date" id="${id}" data-ob="people.${i}.payday" value="${esc(p.payday)}" max="${ymd(app.today)}"${n(p.pay) > 0 ? ` required aria-required="true"` : ""}${err ? ` aria-invalid="true" aria-describedby="${id}e"` : ""}></label>
+      ${err ? `<p class="ob-err" id="${id}e" role="alert">${esc(err)}</p>` : ""}`; })()}
   </section>`;
 }
 
@@ -387,6 +390,8 @@ export function initSetupEvents() {
     }
     if (el.type === "radio" && !el.checked) return;
     setAns(key, el.dataset.obt === "num" ? num(el.value) : el.value);
+    const pm = /^people\.(\d+)\.payday$/.exec(key); // a payday typed in: its message goes (it's checked again on Continue)
+    if (pm && payErr[pm[1]]) { delete payErr[pm[1]]; const f = el.closest(".ob-payday"); if (f) f.classList.remove("bad"); el.removeAttribute("aria-invalid"); const m = document.getElementById(el.id + "e"); if (m) m.remove(); }
     // Pay, how often, payday or a name changed: the plan's percentages (including any you changed) stay;
     // only the dollars, worked out from the new pay, change. Adding or removing a person redoes the plan.
   });
@@ -420,6 +425,11 @@ export function initSetupEvents() {
       if (stage === 1) { if (ans.mode === "solo") { ans.people = ans.people.slice(0, 1); split = null; } return go(2); }
       if (stage === 2) {
         ans.people = ans.people.filter((p, k) => k === 0 || !blank((p.name || "").trim()) || n(p.pay) > 0);
+        // Phase 9C.2: everyone whose pay is entered needs their own last payday (nobody else's, never made up).
+        // Pay left blank for now needs no date.
+        payErr = paydayErrors(ans.people, ymd(app.today));
+        const bad = Object.keys(payErr);
+        if (bad.length) { draw(); const el = document.getElementById(`obPd${bad[0]}`); if (el) el.focus(); return; }
         done = Math.max(done, 2); return go(3);
       }
       if (stage === 3) return finishBudget();
@@ -431,7 +441,7 @@ export function initSetupEvents() {
       const ins = document.querySelectorAll('[data-ob$=".name"]'); if (ins.length) ins[ins.length - 1].focus();
       return;
     }
-    if (act === "rmperson") { ans.people.splice(i, 1); split = null; return draw(); }
+    if (act === "rmperson") { ans.people.splice(i, 1); payErr = {}; split = null; return draw(); }
     if (act === "finish" || act === "tour") {
       // "Show me around" is the Budget tour; "Open Moni Money" (Phase 9A: to Home) counts as having been offered it
       if (act === "finish") markTour("budget", "offered");

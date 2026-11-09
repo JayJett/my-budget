@@ -30,7 +30,8 @@ test("every Goals figure is exactly what the old screen worked out (four situati
 test("a couple: summary, emergency fund, joint and each person's goals as cards, with no form fields on the page", { skip }, async () => {
   const { page, errors, ctx } = await goalsTab(CASES.rich, { width: 390 });
   assert.equal(await text(page, "gl.saved"), "$13,200");
-  assert.equal(await text(page, "gl.saved.sub"), "of $103,600 in targets · 7 goals, 2 reached");
+  assert.equal(await text(page, "gl.saved.sub"), "of $103,600 total target");
+  assert.equal(await text(page, "gl.count"), "7"); assert.equal(await text(page, "gl.count.sub"), "2 reached"); // (Phase 9C.2: the count sits beside the saved amount)
   assert.deepEqual(await page.$$eval(".gl-group h3", els => els.map(e => e.textContent)), ["Emergency fund", "Joint goals", "Jarden’s goals", "Madi’s goals"]);
   assert.equal(await page.locator(".gl-main input, .gl-main select").count(), 0, "no form fields on the main screen");
   assert.equal(await page.locator(".viewas").count(), 1, "one period switch, in the summary");

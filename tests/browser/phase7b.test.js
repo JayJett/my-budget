@@ -23,9 +23,8 @@ test("one person: income, then the plan, then 'ready' only once it's saved; the 
   assert.equal(await page.isVisible(".top"), false, "setup has its own small header");
   assert.equal(await page.locator('[data-ob="people.0.name"]').count(), 0, "your name isn't asked for again");
   await shot(page, "2-income-empty");
-  await page.fill('[data-ob="people.0.pay"]', "2000");
+  await page.fill('[data-ob="people.0.pay"]', "2000"); await page.fill('[data-ob="people.0.payday"]', "2026-11-05");
   await page.click('.ob-freq label:has(input[value="fortnightly"])');
-  await page.click(".ob-more summary");
   await shot(page, "2-income-details");
   await next(page);
   assert.match(await stepText(page), /Step 3 of 4\s*Your starting plan/);
@@ -73,10 +72,10 @@ test("with someone: their pay is optional; added, it's shared in proportion to i
   await shot(page, "1-in-setup");
   await page.check('input[name="obmode"][value="with"]');
   await next(page);
-  await page.fill('[data-ob="people.0.pay"]', "2000");
+  await page.fill('[data-ob="people.0.pay"]', "2000"); await page.fill('[data-ob="people.0.payday"]', "2026-11-05");
   await page.click('[data-obact="addperson"]');
   await page.fill('[data-ob="people.1.name"]', "Madi");
-  await page.fill('[data-ob="people.1.pay"]', "4000");
+  await page.fill('[data-ob="people.1.pay"]', "4000"); await page.fill('[data-ob="people.1.payday"]', "2026-11-05");
   await page.click('.ob-pay:nth-of-type(2) .ob-freq label:has(input[value="monthly"])');
   await shot(page, "2-income-two");
   await next(page);
@@ -96,12 +95,12 @@ test("with someone: their pay is optional; added, it's shared in proportion to i
 
 test("back keeps your answers and your plan changes; changing pay updates the plan's dollars", { skip }, async () => {
   const { page, ctx } = await empty();
-  await page.fill('[data-ob="people.0.pay"]', "2000"); await next(page);
+  await page.fill('[data-ob="people.0.pay"]', "2000"); await page.fill('[data-ob="people.0.payday"]', "2026-11-05"); await next(page);
   await page.fill('[data-ob="split.0"]', "40");
   await page.click('[data-obact="back"]');
   assert.equal(await page.inputValue('[data-ob="people.0.pay"]'), "2,000");
   assert.equal(await page.isChecked('.ob-freq input[value="fortnightly"]'), true);
-  await page.fill('[data-ob="people.0.pay"]', "3000"); await next(page);
+  await page.fill('[data-ob="people.0.pay"]', "3000"); await page.fill('[data-ob="people.0.payday"]', "2026-11-05"); await next(page);
   assert.equal(await page.inputValue('[data-ob="split.0"]'), "40", "your own change to the plan is kept");
   assert.match(await page.textContent('[data-obk="amt.0"]'), /^\$1,200\/fn$/, "and its dollars follow the new pay (40% of $3,000)");
   await ctx.close();
@@ -134,7 +133,7 @@ test("'Set up later' goes straight in with an empty budget and saves nothing", {
 
 test("if saving fails it says so (never 'ready'), and Try again works", { skip }, async () => {
   const { page, ctx } = await empty();
-  await page.fill('[data-ob="people.0.pay"]', "2000"); await next(page);
+  await page.fill('[data-ob="people.0.pay"]', "2000"); await page.fill('[data-ob="people.0.payday"]', "2026-11-05"); await next(page);
   await fake(page, () => { window.__fake.failNext = 2; });
   await next(page);
   await page.waitForSelector(".ob-card .msg.err");
@@ -149,7 +148,7 @@ test("if saving fails it says so (never 'ready'), and Try again works", { skip }
 test("a missing name is asked for once, with the pay", { skip }, async () => {
   const { page, ctx } = await open(null, { init: { meta: { name: "" }, households: [{ id: "hh-1", name: "Ours", role: "owner", budget: {}, members: [{ user_id: "u-me", display_name: "", email: "jarden@example.com", role: "owner", joined_at: "2026-01-01" }] }] }, waitFor: ".ob" });
   await page.fill('[data-ob="people.0.name"]', "Sam");
-  await page.fill('[data-ob="people.0.pay"]', "1000"); await next(page); await next(page);
+  await page.fill('[data-ob="people.0.pay"]', "1000"); await page.fill('[data-ob="people.0.payday"]', "2026-11-05"); await next(page); await next(page);
   await skipAccounts(page); await page.waitForSelector("text=Your budget is ready, Sam!"); await settle(page);
   assert.equal(Object.values((await saved(page)).people)[0].name, "Sam");
   await ctx.close();
@@ -202,7 +201,7 @@ for (const width of [320, 375, 390, 430, 1280]) {
       assert.deepEqual(await page.$$eval(".ob button, .ob summary, .ob-opt", els => els.filter(e => { const r = e.getBoundingClientRect(); return r.width && r.height < 40; }).map(e => e.textContent.trim().slice(0, 20))), [], `${label}: tappable`);
     };
     await check("income");
-    await page.fill('[data-ob="people.0.pay"]', "123456.78"); await next(page);
+    await page.fill('[data-ob="people.0.pay"]', "123456.78"); await page.fill('[data-ob="people.0.payday"]', "2026-11-05"); await next(page);
     await check("plan");
     const clipped = await page.$$eval(".ob-b-amt, .ob-sum b", els => els.filter(e => e.scrollWidth > e.clientWidth + 1).map(e => e.textContent));
     assert.deepEqual(clipped, [], "amounts aren't cut off");

@@ -108,10 +108,12 @@ export function view() {
     </details>
   </section>`;
 
-  const note = `<div class="b-note"><input class="note-input" ${attrs("root", "", "note", "text")} value="${esc(S.note)}" placeholder="Add a note" aria-label="Budget note">${S.note && !ro ? '<button class="note-x" type="button" id="noteX" aria-label="Remove note">×</button>' : ""}</div>`;
+  // Phase 9C.2: no note box at the bottom of the tab any more. A note someone already wrote isn't lost:
+  // it's kept as it is (and in downloads), and can be read, changed or removed under "Note" here.
+  const note = S.note ? `<details class="b-note-old"><summary>Note</summary><div class="b-note"><input class="note-input" ${attrs("root", "", "note", "text")} value="${esc(S.note)}" aria-label="Budget note">${!ro ? '<button class="note-x" type="button" id="noteX" aria-label="Remove note">×</button>' : ""}</div></details>` : "";
 
   // Phones: one column in this order. Wide screens: income, status and fair split on the left; allocations on the right.
-  return `<div class="budget"><div class="b-col">${income}${check}${status}${multi ? fair : `<div id="fairSec" hidden></div>`}</div><div class="b-col">${allocs}${insights}${note}</div></div>`;
+  return `<div class="budget"><div class="b-col">${income}${check}${status}${multi ? fair : `<div id="fairSec" hidden></div>`}</div><div class="b-col">${allocs}${insights.replace("</section>", note + "</section>")}</div></div>`;
 }
 
 /** Other periods, for the line under each pay: "≈ $2,000 a fortnight, $4,333 a month, $52,000 a year". */

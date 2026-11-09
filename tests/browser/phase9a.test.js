@@ -95,26 +95,27 @@ test("Home (shared): each person's own payday and pay, never added together; fig
 
 test("Home for a brand-new solo budget: no made-up balances or dates; next steps open the right place", { skip }, async () => {
   const { page, errors, ctx } = await open({}, { ...phone(), storage: ALL_DONE, hash: "", waitFor: ".ob" });
-  await page.fill('[data-ob="people.0.pay"]', "2000"); await page.click('[data-obact="next"]'); await page.click('[data-obact="next"]');
+  await page.fill('[data-ob="people.0.pay"]', "2000"); await page.fill('[data-ob="people.0.payday"]', "2026-11-05"); await page.click('[data-obact="next"]'); await page.click('[data-obact="next"]');
   await page.waitForSelector('[data-obact="acc-skip"]'); await page.click('[data-obact="acc-skip"]');
   await page.waitForSelector(".ob-done");
   assert.match(await page.textContent(".ob-done"), /Add your accounts any time in Wealth/);
   await page.click('[data-obact="finish"]'); await page.waitForSelector("#app .home");
   assert.equal(await hash(page), "#home");
-  assert.match(await page.textContent(".ho-pay"), /\$2,000/); assert.match(await page.textContent(".ho-pay"), /Set a payday/);
-  assert.doesNotMatch(await page.textContent(".ho-pay"), /In \d+ days|Today|Tomorrow/, "no countdown without a payday");
+  // Phase 9C.2: setup asks for the last payday, so the payday card counts down from the start
+  assert.match(await page.textContent(".ho-pay"), /\$2,000/); assert.match(await page.textContent(".ho-pay"), /Next payday/);
+  assert.doesNotMatch(await page.textContent(".ho-pay"), /Set a payday/);
   assert.equal((await page.textContent('.ho-fig[data-home-go="networth"] b')).trim(), "—", "no net worth without accounts");
   assert.match(await page.textContent(".ho-plan"), /100% of your pay has a plan/);
-  assert.deepEqual(await page.$$eval("[data-home-act]", e => e.map(x => x.dataset.homeAct)), ["payday", "accounts", "goal"]);
+  assert.deepEqual(await page.$$eval("[data-home-act]", e => e.map(x => x.dataset.homeAct)), ["accounts", "goal", "bills"]);
   await shot(page, "home-new-solo");
   await page.click('[data-home-act="accounts"]');
   await page.waitForSelector('#sheet [data-l="nw"][data-f="name"]');
   assert.equal(await hash(page), "#wealth/accounts", "straight to adding an account");
   await page.click('#sheet .sheet-head [data-sheet="close"]');
   await goTab(page, "home");
-  await page.click('[data-home-act="payday"]');
-  await page.waitForSelector('#sheet [data-l="pp"][data-f="payday"]');
-  assert.equal(await hash(page), "#budget");
+  await page.click('[data-home-act="bills"]');
+  await page.waitForSelector('#sheet [data-l="sp"][data-f="name"]');
+  assert.equal(await hash(page), "#expenses");
   assert.deepEqual(errors, []); await ctx.close();
 });
 
@@ -196,7 +197,7 @@ test("My profile: no ring round the ✕ when it opens; it still closes, and stil
 
 /* ---------------- setup step 4: your accounts ---------------- */
 async function toStep4(page, pay = "2000") {
-  await page.fill('[data-ob="people.0.pay"]', pay); await page.click('[data-obact="next"]'); await page.click('[data-obact="next"]');
+  await page.fill('[data-ob="people.0.pay"]', pay); if (Number(pay) > 0) await page.fill('[data-ob="people.0.payday"]', "2026-11-05"); await page.click('[data-obact="next"]'); await page.click('[data-obact="next"]');
   await page.waitForSelector('[data-obact="acc-add"]');
 }
 async function addAcc(page, name, type, bal) {

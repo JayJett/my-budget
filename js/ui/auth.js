@@ -1,6 +1,6 @@
 /* Signing in, choosing and switching households, roles, and starting the setup guide. */
 import { app } from "./ctx.js";
-import { $, esc, toast, closePop } from "./dom.js";
+import { $, esc, toast, closePop, openPop } from "./dom.js";
 import { render } from "./render.js";
 import { createStore, isNetworkError, clearDeviceCopies } from "../sync/store.js";
 import { blankBudget } from "../model/schema.js";
@@ -126,6 +126,8 @@ function nameOf(id) {
   const m = app.members.find(x => x.user_id === id); return (m && (m.display_name || (m.email || "").split("@")[0])) || "someone";
 }
 function showSaved(meta) {
+  if (meta !== undefined) lastSavedMeta = meta;
+  if (livePaused) { setStatus("Live updates paused", "paused"); delete $("#saveState").dataset.tip; return; }
   if (app.role === "viewer") { setStatus("View only", "ro", "You can see this budget but not change it. An owner can change your role."); return; }
   if (!meta || !meta.at) { setStatus("Saved", "", "Changes save automatically."); return; }
   const when = new Date(meta.at).toLocaleString("en-NZ", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }), who = nameOf(meta.by);
@@ -292,6 +294,7 @@ async function loadHouseholds() {
 /** Open one household's budget: roles, saving, live updates, and the setup guide if it's empty. */
 async function openHH(id) {
   if (app.store) { await app.store.stop(); app.store = null; }
+  livePaused = false; lastSavedMeta = null;
   endSetup();
   // Forget the last household's history views straight away, so nothing from it can show while this one loads
   app.snapshots = null; app.compareId = null; app.pgSel = null; app.snapshotsOffline = false;
@@ -308,9 +311,14 @@ async function openHH(id) {
     onStatus: (st, info) => {
       app.saveStatus = st;
       if (st === "saving") setStatus("Saving…", "wait");
-      else if (st === "saved") showSaved(info);
+      else if (st === "saved") { app.saveErrShown = false; showSaved(info); }
       else if (st === "offline") setStatus("Offline", "offline", "You’re offline. Changes are kept on this phone and will sync when you’re back online.");
-      else if (st === "error") setStatus("Couldn’t save", "off", /view-only/i.test((info && info.message) || "") ? "You have view-only access, so changes can’t be saved." : "Your last change didn’t save yet. It will keep trying; check your connection.");
+      else if (st === "error") {
+        const ro = /view-only/i.test((info && info.message) || "");
+        setStatus("Couldn’t save", "off", ro ? "You have view-only access, so changes can’t be saved." : "Your last change didn’t save yet. It will keep trying; check your connection.");
+        // a failed save is never just a small dot: say it once, over the page (nothing moves)
+        if (!app.saveErrShown) { app.saveErrShown = true; toast(ro ? "You have view-only access, so changes can’t be saved." : "Your last change didn’t save yet. It will keep trying; check your connection."); }
+      }
     },
     onRemote: meta => applyRemoteView(meta),
     onSaved: data => rememberChange(data),
@@ -343,11 +351,32 @@ async function openHH(id) {
   openFromHash();
   if (app.offline) return; // live updates start when the app reconnects
   ensureMonthly();
-  app.store.subscribe(status => {
-    if (status === "SUBSCRIBED") showConn(navigator.onLine === false ? OFFLINE_MSG : "");
-    else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") showConn("Live updates are paused. Your changes still save; refresh to see others’ latest changes.");
+  liveSubscribe();
+}
+
+/* ---------- live updates (Phase 9C.2) ----------
+   When the live connection drops (on iPhone it usually does when the app goes to the background), it
+   no longer puts a banner in the page that pushes everything down. The header's status dot turns
+   amber instead, and tapping it explains and offers to reconnect. The app also reconnects by itself
+   when it comes back to the front or back online, and fetches anything it missed. Saving doesn't use
+   the live connection, so a failed save is still shown loudly (see onStatus). */
+let livePaused = false, lastSavedMeta = null;
+function liveSubscribe() {
+  if (!app.store || app.offline) return;
+  const store = app.store;
+  store.subscribe(status => {
+    if (store !== app.store) return; // a household we've since left
+    if (status === "SUBSCRIBED") {
+      showConn(navigator.onLine === false ? OFFLINE_MSG : "");
+      if (livePaused) { livePaused = false; store.catchUp().catch(() => {}); refreshLive(); }
+    } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+      if (status === "CLOSED" && !livePaused && document.visibilityState === "visible" && navigator.onLine !== false) return; // closed on purpose (switching household)
+      livePaused = true; refreshLive();
+    }
   });
 }
+function refreshLive() { if (app.saveStatus === "saved" || !app.saveStatus) showSaved(lastSavedMeta); }
+function reconnectLive() { if (livePaused && app.household && navigator.onLine !== false) liveSubscribe(); }
 
 /** Re-read which households you're in (after creating, leaving or being removed), then open one. */
 async function reloadHouseholds(preferId) {
@@ -584,10 +613,18 @@ export function initAuth(sb) {
   });
 
   window.addEventListener("offline", () => { if (app.household) showConn(OFFLINE_MSG); });
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") reconnectLive(); });
+  // the amber dot: what it means, and a way to reconnect now
+  document.addEventListener("click", e => {
+    const ss = e.target.closest && e.target.closest("#saveState.paused"); if (!ss) return;
+    e.preventDefault(); e.stopPropagation();
+    openPop(ss, `<div class="live-pop"><b>Live updates paused</b><p>Your changes still save. Changes other people make may not show until it reconnects.</p><button class="btn primary small" type="button" data-live="retry">Reconnect</button></div>`, b => { if (b.dataset.live === "retry") { closePop(); reconnectLive(); } }, { label: "Live updates" });
+  }, true);
+  document.addEventListener("keydown", e => { if ((e.key === "Enter" || e.key === " ") && e.target.matches && e.target.matches("#saveState.paused")) { e.preventDefault(); e.target.click(); } });
   window.addEventListener("online", () => {
     if (app.session && app.session.offline) { location.reload(); return; } // sign in properly now; offline edits are kept and sent
     if (app.offline && app.household) { app.offline = false; reloadHouseholds(app.household.id).then(updateUndo); return; } // fetch the latest, merge offline edits
-    showConn("");
+    showConn(""); reconnectLive();
   });
 
   if (/type=recovery/.test(location.hash)) recovering = true;

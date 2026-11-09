@@ -160,7 +160,7 @@ test("iPhone: tab bar at the bottom, nothing hidden under it, everything big eno
   const vh = page.viewportSize().height, bar = await page.locator("#tabs").boundingBox();
   assert.ok(Math.abs(bar.y + bar.height - vh) < 2);
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-  const last = await page.locator(".b-note").boundingBox();
+  const last = await page.locator(".b-insights").boundingBox(); // (Phase 9C.2: the last card; the old note sits inside it)
   assert.ok(last.y + last.height <= bar.y + 1, "the last item can scroll clear of the tab bar");
   const small = await page.$$eval("#app button, #app summary, .top button:not([hidden])", els => els.filter(e => { const r = e.getBoundingClientRect(); return r.width && (r.height < 40 || r.width < 40); }).map(e => e.textContent.trim().slice(0, 20)));
   assert.deepEqual(small, []);

@@ -217,7 +217,7 @@ test("before the photo storage is switched on: a clear message, nothing breaks",
 /* ---------------- goals ---------------- */
 test("on your own with no goals yet: one card, one 'Add a goal', straight into the one Goals pot (Phase 8: a solo plan has one)", { skip }, async () => {
   const { page, errors, ctx } = await open({}, { waitFor: ".ob", ...phone(), storage: ALL_DONE });
-  await page.fill('[data-ob="people.0.pay"]', "2000");
+  await page.fill('[data-ob="people.0.pay"]', "2000"); await page.fill('[data-ob="people.0.payday"]', "2026-11-05");
   await page.click('[data-obact="next"]'); await page.click('[data-obact="next"]'); await skipAccounts(page); await page.click('[data-obact="finish"]');
   await afterSetup(page);
   await goTab(page, "goals");
@@ -250,7 +250,7 @@ test("shared households keep joint and each person's goals apart, by name", { sk
 test("hero cards: the switch sits on its own above; the label sits right on its number; changing the period never changes pay", { skip }, async () => {
   for (const w of [320, 390, 430]) {
     const { page, errors, ctx } = await open(RICH, { ...phone(w), storage: ALL_DONE });
-    for (const [tab, card, num] of [["budget", ".b-income", ".hero-amt"], ["spending", ".sp-sum", ".sp-head"], ["goals", ".gl-sum", ".sp-head"], ["invest", ".iv-hero", ".sp-head"]]) {
+    for (const [tab, card, num] of [["budget", ".b-income", ".hero-amt"], ["spending", ".sp-sum", ".sp-head"], ["goals", ".gl-sum", ".gl-hero-top"], ["invest", ".iv-hero", ".sp-head"]]) {
       if (tab !== "budget") await goTab(page, tab);
       const g = await page.evaluate(([card, num]) => {
         const c = document.querySelector(card), seg = c.querySelector(".b-row .seg").getBoundingClientRect(), lab = c.querySelector(".b-row .eyebrow").getBoundingClientRect(), n = c.querySelector(num).getBoundingClientRect();

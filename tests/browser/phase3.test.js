@@ -109,6 +109,7 @@ test("offline: the app opens with no connection, edits are kept, and they sync w
   await page.waitForSelector("#app .viewas");
   assert.match(await page.textContent("#conn"), /You’re offline/);
   assert.equal(await page.textContent("#saveText"), "Offline");
+  await page.click("#app .b-note-old summary"); // (Phase 9C.2: the old tab note is tucked away)
   assert.equal(await page.inputValue('[data-f="note"]'), "Test budget", "the budget comes from this phone");
   await editPerson(page, "j");
   await setField(page, '#sheet [data-l="pp"][data-i="j"][data-f="pay"]', "2500");
@@ -135,6 +136,7 @@ test("offline while the app is open: changes wait, then save when the connection
   const { page, errors, ctx } = await openInstalled({});
   await ctx.setOffline(true);
   await page.waitForFunction(() => !document.querySelector("#conn").hidden);
+  await page.click("#app .b-note-old summary"); // (Phase 9C.2: the old tab note is tucked away)
   await page.fill('[data-f="note"]', "Written on the bus");
   await page.waitForFunction(() => document.querySelector("#saveText").textContent === "Offline");
   await ctx.setOffline(false);
