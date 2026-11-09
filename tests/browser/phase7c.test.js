@@ -42,7 +42,7 @@ test("setup: short steps fit the screen exactly; long ones scroll and every butt
   await shot(page, "2-income");
   // the progress bar is kept between steps (so it can glide), not redrawn
   await page.evaluate(() => { window.__bar = document.querySelector(".ob-prog span"); });
-  await page.fill('[data-ob="people.0.pay"]', "2000");
+  await page.fill('[data-ob="people.0.pay"]', "2000"); await page.fill('[data-ob="people.0.payday"]', "2026-11-05");
   await page.click('[data-obact="next"]');
   assert.equal(await page.evaluate(() => window.__bar === document.querySelector(".ob-prog span")), true, "same progress bar");
   assert.match(await page.textContent(".ob-stage"), /Step 3 of 4/);
@@ -67,11 +67,8 @@ test("setup: short steps fit the screen exactly; long ones scroll and every butt
   assert.deepEqual(errors, []); await ctx.close();
 });
 
-test("setup on a small phone: opening 'More pay details' makes it scroll, and the payday box can be reached", { skip }, async () => {
+test("setup on a small phone: the payday box (Phase 9C.2: always shown) can be reached", { skip }, async () => {
   const { page, errors, ctx } = await open({}, { waitFor: ".ob", ...SMALL });
-  await page.click(".ob-more summary");
-  const f = await fits(page);
-  assert.ok(f.h > f.vh, "taller than the screen now");
   await page.locator('[data-ob="people.0.payday"]').scrollIntoViewIfNeeded();
   assert.equal(await page.isVisible('[data-ob="people.0.payday"]'), true);
   await page.locator('[data-obact="next"]').scrollIntoViewIfNeeded();
@@ -224,7 +221,7 @@ test("progress saved on your login counts on this device too, and invitations wa
 test("after setup: 'Open my budget' doesn't ask about the Budget tour again; 'Show me around' starts it", { skip }, async () => {
   for (const choice of ["finish", "tour"]) {
     const { page, errors, ctx } = await open({}, { waitFor: ".ob", ...PHONE, storage: fresh });
-    await page.fill('[data-ob="people.0.pay"]', "2000");
+    await page.fill('[data-ob="people.0.pay"]', "2000"); await page.fill('[data-ob="people.0.payday"]', "2026-11-05");
     await page.click('[data-obact="next"]'); await page.click('[data-obact="next"]');
     await skipAccounts(page);
     await page.click(`[data-obact="${choice}"]`);

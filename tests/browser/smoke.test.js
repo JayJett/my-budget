@@ -214,6 +214,7 @@ test("if saving fails, it says so and tries again", { skip }, async () => {
   const { page, errors, ctx } = await open(RICH_V3);
   await settle(page);
   await fake(page, () => { window.__fake.failNext = 2; });
+  await page.click("#app .b-note-old summary"); // (Phase 9C.2: the old tab note is tucked away)
   await page.fill('[data-f="note"]', "Offline edit");
   await page.waitForFunction(() => document.querySelector("#saveText").textContent === "Couldn’t save", null, { timeout: 8000 });
   await page.waitForFunction(() => document.querySelector("#saveText").textContent === "Saved", null, { timeout: 20000 });

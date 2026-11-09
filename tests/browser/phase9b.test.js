@@ -120,9 +120,8 @@ test("no expenses yet: no made-up coverage or essentials; one clear next step", 
   const pc = await page.textContent("#planCheck");
   assert.doesNotMatch(pc, /expenses are covered/i, "no 'covered' without expenses");
   assert.match(await page.textContent("#planCheck .pc-main"), /Add expenses to check they’re covered/);
-  assert.match(pc, /Bills budget \(no expenses entered yet\)/);
-  assert.match(pc, /Room to adjust\s*—/, "the bills budget isn't counted as room when nothing's entered");
-  await page.click("#planCheck .pc-act"); await page.waitForSelector("#sheet");
+  assert.equal(await page.locator("#planCheck [data-pc-toggle]").count(), 0, "Phase 9C.2: nothing to break down yet, so no breakdown");
+  await page.click("#planCheck .pc-act"); await page.waitForSelector("#sheet .xp");
   assert.deepEqual(errors, []); await ctx.close();
 });
 

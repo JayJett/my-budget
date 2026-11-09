@@ -20,9 +20,9 @@ const tap = (page, sel) => page.evaluate(s => document.querySelector(s).click(),
 /** Go through setup: income 2000 fortnightly (and a partner's pay when "with"), the suggested plan. */
 async function finishSetup(page, { partner = false } = {}) {
   if (partner) { await page.click('[data-obact="back"]'); await page.check('input[name="obmode"][value="with"]'); await page.click('[data-obact="next"]'); }
-  await page.fill('[data-ob="people.0.pay"]', "2000");
+  await page.fill('[data-ob="people.0.pay"]', "2000"); await page.fill('[data-ob="people.0.payday"]', "2026-11-05");
   await page.click('.ob-freq label:has(input[value="fortnightly"])');
-  if (partner) { await page.click('[data-obact="addperson"]'); await page.fill('[data-ob="people.1.name"]', "Sam"); await page.fill('[data-ob="people.1.pay"]', "1500"); }
+  if (partner) { await page.click('[data-obact="addperson"]'); await page.fill('[data-ob="people.1.name"]', "Sam"); await page.fill('[data-ob="people.1.pay"]', "1500"); await page.fill('[data-ob="people.1.payday"]', "2026-11-05"); }
   await page.click('[data-obact="next"]'); await page.click('[data-obact="next"]');
   await skipAccounts(page);
   await page.click('[data-obact="finish"]');
@@ -164,9 +164,7 @@ for (const [w, h] of [[320, 568], [375, 667], [390, 664], [430, 932]]) test(`set
   await artClear(page, "step 2");
   assert.deepEqual(await tappable(page), [], "step 2 buttons");
   if (w === 390) await page.screenshot({ path: join(SHOTS, "p7d1-step2.png") });
-  await page.click(".ob-more summary");
-  assert.deepEqual(await tappable(page), [], "step 2 with details open");
-  await page.fill('[data-ob="people.0.pay"]', "2000"); await page.click('[data-obact="next"]');
+  await page.fill('[data-ob="people.0.pay"]', "2000"); await page.fill('[data-ob="people.0.payday"]', "2026-11-05"); await page.click('[data-obact="next"]');
   // step 3: scroll to the end; the last plan row sits fully above the footer
   await page.evaluate(() => { const s = document.querySelector(".ob.im"); s.scrollTop = s.scrollHeight; });
   const last = await rect(page, ".ob-buckets li:last-child"), foot = await rect(page, ".ob-foot");

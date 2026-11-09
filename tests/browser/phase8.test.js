@@ -18,7 +18,7 @@ async function setUp(page, mode, pay = "2000") {
   await page.click('[data-obact="back"]'); // step 2 → step 1
   await page.check(`input[name="obmode"][value="${mode}"]`, { force: true });
   await page.click('[data-obact="next"]');
-  await page.fill('[data-ob="people.0.pay"]', pay);
+  await page.fill('[data-ob="people.0.pay"]', pay); if (Number(pay) > 0) await page.fill('[data-ob="people.0.payday"]', "2026-11-05");
   await page.click('[data-obact="next"]');
   await page.waitForSelector(".ob-buckets");
 }
@@ -338,7 +338,7 @@ test("setup step 1: 'Make it look like yours' is folded away, opens in place, sa
   assert.equal(await page.evaluate(() => document.documentElement.dataset.accent), "purple", "shows straight away");
   await page.waitForFunction(() => window.__fake.authCalls.some(c => c.name === "updateUser"), null, { timeout: 3000 });
   await page.check('input[name="obmode"][value="solo"]', { force: true });
-  await page.click('[data-obact="next"]'); await page.fill('[data-ob="people.0.pay"]', "1500"); await page.click('[data-obact="next"]');
+  await page.click('[data-obact="next"]'); await page.fill('[data-ob="people.0.pay"]', "1500"); await page.fill('[data-ob="people.0.payday"]', "2026-11-05"); await page.click('[data-obact="next"]');
   await page.click('[data-obact="next"]'); await skipAccounts(page); await page.click('[data-obact="finish"]');
   await afterSetup(page); await settle(page);
   const m = await meta(page);

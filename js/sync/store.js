@@ -175,8 +175,14 @@ export function createStore({ sb, householdId, getState, setState, onStatus, onR
     return { ok: true, data };
   }
 
+  /** Phase 9C.2: after live updates were paused, fetch the latest copy once so nothing missed is lost. */
+  async function catchUp() {
+    const { data: row, error } = await sb.from("budgets").select("state, seq, updated_by, updated_at").eq("household_id", householdId).maybeSingle();
+    if (!error && row) receive(row);
+  }
+
   return {
-    load, schedule, subscribe, stop, receive, commit,
+    load, schedule, subscribe, stop, receive, commit, catchUp,
     flushNow: () => { if (timer) { clearTimeout(timer); timer = null; } return flush(); },
     busy: () => !!(timer || writing),
     hasUnsaved: () => !!(timer || writing) || dirty(),

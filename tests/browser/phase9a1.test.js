@@ -67,7 +67,7 @@ test("bottom bar: the chosen tab is its colour and a bolder label, with no pill 
 
 test("step 4: '+ Add an account' is the main button and 'Skip for now' a quiet link; with accounts, 'Save and continue'", { skip }, async () => {
   const { page, errors, ctx } = await open({}, { ...phone(375, 667), storage: ALL_DONE, hash: "", waitFor: ".ob" });
-  await page.fill('[data-ob="people.0.pay"]', "2000"); await page.click('[data-obact="next"]'); await page.click('[data-obact="next"]');
+  await page.fill('[data-ob="people.0.pay"]', "2000"); await page.fill('[data-ob="people.0.payday"]', "2026-11-05"); await page.click('[data-obact="next"]'); await page.click('[data-obact="next"]');
   await page.waitForSelector('.ob-nav [data-obact="acc-add"]');
   assert.equal(await page.getAttribute('.ob-nav [data-obact="acc-add"]', "class"), "btn primary block");
   assert.equal(await page.getAttribute('[data-obact="acc-skip"]', "class"), "linkish ob-skip-link");

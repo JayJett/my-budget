@@ -18,7 +18,7 @@
      finished it is asked again.
    For each tab one word is kept: offered (invitation seen), dismissed ("Not now"), started, or done. */
 import { app, TAB_HASH } from "./ctx.js";
-import { $, esc, lockScroll, unlockScroll } from "./dom.js";
+import { $, esc, guardScroll } from "./dom.js";
 import { TABS } from "./views/labels.js";
 import { isShared } from "../model/schema.js";
 import { calm } from "./motion.js";
@@ -37,7 +37,7 @@ export const TOURS = {
       { sel: ["#allocStatus"], title: "Every dollar has a job", text: "How much of each person’s pay is planned. Aim for 100%, and use Fill to top up the last bit." },
       { sel: ["#app .b-allocs", "#app .alloc-list"], title: "Your allocations", text: "Where the pay goes, account by account. Tap one to change its share of each person’s pay." },
       { sel: ["#tabs"], title: "Getting around", text: "Home is your overview. Expenses is where the bills money goes, Goals is what you’re saving for, and Wealth has your accounts, investments and history." },
-      { sel: ["#menuBtn"], title: "Tap your initial for settings", text: "Your profile, appearance, reminders, downloads and a guided tour for every tab. Tap the household’s name to switch households or manage it." },
+      { sel: ["#menuBtn"], title: "Your settings", text: "Tap your initial for your profile, appearance, reminders and tours. Tap the household’s name to switch or manage households." },
     ],
   },
   networth: {
@@ -61,7 +61,7 @@ export const TOURS = {
   goals: {
     invite: "See how saving for goals works here.",
     stops: [
-      { sel: ["#app .gl-sum .sp-head", "#app .gl-sum"], title: "Your goals at a glance", text: "What’s saved so far across your goals, and how much the Budget tab sends to goals each pay." },
+      { sel: ["#app .gl-sum .gl-hero-top", "#app .gl-sum"], title: "Your goals at a glance", text: "What’s saved so far across your goals, and how much the Budget tab sends to goals each pay." },
       { sel: ["#app .gl-group.ef"], title: "Emergency fund", text: "A safety net for surprises. Set a target, and update Saved as you put money aside." },
       { sel: ["#app .gl-group.joint"], title: () => (isShared(app.state) ? "Joint goals" : "Your goals"),
         text: () => has("#app .gl-group.joint .gl-none") ? "Create your first goal here: a holiday, a car, a house deposit. Each goal gets a share of the money going to goals." : "Each goal gets a share of the money going to goals, and shows how close it is. Higher in the list is funded first." },
@@ -186,7 +186,7 @@ export async function startTour(tab = app.tab || "budget") {
   cur = tab; i = 0; opener = document.activeElement;
   record(tab, "started");
   el.hidden = false; el.classList.toggle("calm", calm());
-  lockScroll();
+  guardScroll(true);
   go(0, 1);
 }
 
@@ -230,16 +230,20 @@ function place() {
   if (!cur) return;
   const t = find(stops[i]);
   if (!t) return; // gone mid-stop: the next tap moves on
+  // Phase 9C.2: measure against the part of the screen you can actually see (iPhone's visual viewport)
+  const vv = window.visualViewport, vw = vv ? vv.width : window.innerWidth, vh = vv ? vv.height : window.innerHeight;
   const r = t.getBoundingClientRect(), pad = 6, spot = el.querySelector(".tour-spot"), card = el.querySelector(".tour-card");
-  const vw = window.innerWidth, vh = window.innerHeight;
+  const onScreen = r.bottom > 0 && r.top < vh && r.right > 0 && r.left < vw;
   const top = Math.max(4, r.top - pad), left = Math.max(4, r.left - pad);
   const h = Math.max(0, Math.min(r.bottom + pad, vh - 4) - top), w = Math.min(r.width + pad * 2, vw - left - 4);
+  spot.hidden = !onScreen;
   Object.assign(spot.style, { top: top + "px", left: left + "px", width: w + "px", height: h + "px" });
-  const cw = card.offsetWidth, ch = card.offsetHeight, { a, b } = room();
-  // below the spotlight if it fits, else above it, else at the bottom of the screen (over the target's lower part)
-  let y = top + h + 12;
-  if (y + ch > Math.max(b, vh * 0.6) - 8) y = top - ch - 12;
-  if (y < Math.min(a, top) + 4 && y < 8) y = Math.max(8, Math.min(vh, b) - ch - 12);
+  const cw = card.offsetWidth, ch = card.offsetHeight, { a, b } = room(), floor = Math.min(vh, b);
+  let y;
+  if (!onScreen) y = floor - ch - 12;                                   // nothing to point at: sit at the bottom
+  else if (top + h + 12 + ch <= floor - 8) y = top + h + 12;             // below the spotlight
+  else if (top - ch - 12 >= Math.max(8, Math.min(a, top))) y = top - ch - 12; // above it
+  else y = floor - ch - 12;                                              // neither fits: dock at the bottom
   y = Math.max(8, Math.min(y, vh - ch - 8));
   const x = Math.min(vw - cw - 8, Math.max(8, r.left + r.width / 2 - cw / 2));
   Object.assign(card.style, { top: y + "px", left: x + "px" });
@@ -249,7 +253,7 @@ function end(finished, { quiet = false } = {}) {
   if (!cur) return;
   const tab = cur; cur = null;
   if (el) el.hidden = true;
-  unlockScroll();
+  guardScroll(false);
   if (finished) record(tab, "done");
   if (!quiet && opener && opener.isConnected && !opener.closest("[inert]")) opener.focus({ preventScroll: true });
   opener = null;

@@ -73,18 +73,28 @@ export function lockScroll() {
   const root = document.documentElement, bar = window.innerWidth - root.clientWidth;
   document.body.style.paddingRight = bar > 0 ? bar + "px" : "";
   root.classList.add("scroll-locked");
-  document.addEventListener("touchstart", touchStart, { passive: true });
-  document.addEventListener("touchmove", touchGuard, { passive: false });
-  document.addEventListener("wheel", wheelGuard, { passive: false });
+  syncGuards();
 }
 export function unlockScroll() {
   if (!lockCount) return;
   if (--lockCount) return;
   document.documentElement.classList.remove("scroll-locked");
   document.body.style.paddingRight = "";
-  document.removeEventListener("touchstart", touchStart);
-  document.removeEventListener("touchmove", touchGuard);
-  document.removeEventListener("wheel", wheelGuard);
+  syncGuards();
+}
+/* Phase 9C.2: the guided tour stops the page scrolling by catching touches and the wheel only. It
+   doesn't hide the page's overflow: on iPhone Safari that unsticks the sticky header, which then
+   scrolls off the top, taking the avatar (the tour's last stop) out of view. */
+let guardCount = 0, guarded = false;
+export function guardScroll(on) { guardCount = Math.max(0, guardCount + (on ? 1 : -1)); syncGuards(); }
+function syncGuards() {
+  const want = lockCount > 0 || guardCount > 0;
+  if (want === guarded) return;
+  guarded = want;
+  const f = want ? "addEventListener" : "removeEventListener";
+  document[f]("touchstart", touchStart, { passive: true });
+  document[f]("touchmove", touchGuard, { passive: false });
+  document[f]("wheel", wheelGuard, { passive: false });
 }
 export const setBehind = on => BEHIND.forEach(s => { const el = $(s); if (el) { if (on) el.setAttribute("inert", ""); else el.removeAttribute("inert"); } });
 

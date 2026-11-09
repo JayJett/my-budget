@@ -82,7 +82,7 @@
 
   const fake = window.__fake = {
     households, rpcCalls: [], authCalls: [], backups: [], remUpdates: [], prefSaves: [], devices: copy(init.devices || []), fnCalls: [],
-    pushKey: init.pushKey === undefined ? "BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4" : init.pushKey, listeners: [], failNext: 0, files: copy(init.files || {}), storageCalls: [], failUpload: 0, storageOn: init.storageOn !== false, noLook: !!init.noLook, deleted: false, createMode: init.createMode || null, invite: init.invite || null, failMembers: init.failMembers || 0, createDelay: init.createDelay || 0, resendWait: init.resendWait || 0,
+    pushKey: init.pushKey === undefined ? "BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4" : init.pushKey, listeners: [], failNext: 0, liveCb: null, liveDown: false, live(st) { if (this.liveCb) this.liveCb(st); }, files: copy(init.files || {}), storageCalls: [], failUpload: 0, storageOn: init.storageOn !== false, noLook: !!init.noLook, deleted: false, createMode: init.createMode || null, invite: init.invite || null, failMembers: init.failMembers || 0, createDelay: init.createDelay || 0, resendWait: init.resendWait || 0,
     get budget() { return households[0].budget; },
     get seq() { return households[0].seq; },
     hh: id => households.find(h => h.id === id),
@@ -356,7 +356,7 @@
         } },
         channel(name) {
           const id = String(name).replace(/^budget-/, "");
-          const ch = { on(_e, _f, fn) { fake.listeners.push({ id, fn }); return ch; }, subscribe(cb) { setTimeout(() => cb("SUBSCRIBED"), 0); return ch; } };
+          const ch = { on(_e, _f, fn) { fake.listeners.push({ id, fn }); return ch; }, subscribe(cb) { fake.liveCb = cb; fake.subscribes = (fake.subscribes || 0) + 1; setTimeout(() => cb(fake.liveDown ? "CHANNEL_ERROR" : "SUBSCRIBED"), 0); return ch; } };
           return ch;
         },
         removeChannel() {},
