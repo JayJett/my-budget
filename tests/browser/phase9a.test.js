@@ -101,7 +101,7 @@ test("Home for a brand-new solo budget: no made-up balances or dates; next steps
   assert.match(await page.textContent(".ob-done"), /Add your accounts any time in Wealth/);
   await page.click('[data-obact="finish"]'); await page.waitForSelector("#app .home");
   assert.equal(await hash(page), "#home");
-  assert.match(await page.textContent(".ho-pay"), /\$2,000/); assert.match(await page.textContent(".ho-pay"), /Add a payday/);
+  assert.match(await page.textContent(".ho-pay"), /\$2,000/); assert.match(await page.textContent(".ho-pay"), /Set a payday/);
   assert.doesNotMatch(await page.textContent(".ho-pay"), /In \d+ days|Today|Tomorrow/, "no countdown without a payday");
   assert.equal((await page.textContent('.ho-fig[data-home-go="networth"] b')).trim(), "—", "no net worth without accounts");
   assert.match(await page.textContent(".ho-plan"), /100% of your pay has a plan/);
@@ -134,7 +134,7 @@ test("household menu: your avatar still opens your menu; the household opens a s
   const { page, errors, ctx } = await open(null, { ...phone(320, 640), storage: ALL_DONE, init: TWO() });
   await page.click("#menuBtn"); await page.waitForSelector("#drawer:not([hidden])");
   assert.equal(await page.locator('#drawer [data-act="household"], #drawer [data-switch]').count(), 0, "household things moved out of your menu");
-  for (const a of ["profile", "reminders", "history", "appearance", "tours", "data", "signout"]) assert.equal(await page.locator(`#drawer [data-act="${a}"]`).count(), 1, a);
+  for (const a of ["profile", "history", "appearance", "tours", "data", "signout"]) assert.equal(await page.locator(`#drawer [data-act="${a}"]`).count(), 1, a);
   await page.keyboard.press("Escape"); await page.waitForSelector("#drawer", { state: "hidden" });
   await page.click("#hhBtn"); await page.waitForSelector("#hhPop");
   assert.equal(await page.getAttribute("#hhBtn", "aria-expanded"), "true");

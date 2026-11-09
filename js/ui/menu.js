@@ -44,7 +44,6 @@ export function mainMenu() {
   const switcher = "";
   return `<div class="dr-top">${profile}${close}</div>${switcher}
     <nav class="dr-sec" aria-label="Menu">
-      ${row("reminders", "reminders", "Reminders")}
       ${row("history", "history", "History")}
       ${row("appearance", "appearance", "Appearance")}
       ${row("tours", "tours", "Guided tours")}

@@ -104,13 +104,16 @@ function accountsStep(P) {
   }).join("");
   const own = accs.filter(a => a.type !== "Debt").reduce((s, a) => s + n(a.balance), 0), owe = accs.filter(a => a.type === "Debt").reduce((s, a) => s + n(a.balance), 0);
   const totals = accs.length ? `<div class="ob-sum ob-acc-sum"><div><small>You have</small><b>${v(own)}</b></div><div><small>You owe</small><b>${v(owe)}</b></div><div><small>Net worth</small><b>${v(own - owe)}</b></div></div>` : "";
-  const form = accForm ? accFormHTML(shared) : `<button class="add-row ob-add" type="button" data-obact="acc-add">+ Add ${accs.length ? "another" : "an"} account</button>`;
+  // Phase 9A.1: before any account, "+ Add an account" is THE button and "Skip for now" a quiet link;
+  // once there are accounts, "Save and continue" is the button and adding another is the quieter row.
+  const form = accForm ? accFormHTML(shared) : accs.length ? `<button class="add-row ob-add" type="button" data-obact="acc-add">+ Add another account</button>` : "";
   return `${accs.length || accForm ? "" : `<div class="ob-art" aria-hidden="true">${HERO.jar()}</div>`}<h2 id="obTitle" tabindex="-1">Let’s add your accounts</h2>
     <p class="lead">Add what you have and what you owe. You can always do this later.</p>
     ${rows ? `<ul class="ob-accs">${rows}</ul>` : ""}${totals}${form}
     ${accErr ? `<p class="msg err" role="alert">${esc(accErr)}</p>` : ""}
-    ${accForm ? "" : `<div class="ob-nav">${accs.length ? `<button class="btn ob-back" type="button" data-obact="acc-skip">Skip for now</button><button class="btn primary" type="button" data-obact="next"${saving ? " disabled" : ""}>${saving ? "Saving…" : accErr ? "Try again" : `Save ${accs.length === 1 ? "account" : `${accs.length} accounts`}`}</button>`
-      : `<button class="btn primary block" type="button" data-obact="acc-skip">Skip for now</button>`}</div>`}`;
+    ${accForm ? "" : accs.length
+      ? `<div class="ob-nav"><button class="btn primary block" type="button" data-obact="next"${saving ? " disabled" : ""}>${saving ? "Saving…" : accErr ? "Try again" : "Save and continue"}</button></div>`
+      : `<div class="ob-nav ob-nav-stack"><button class="btn primary block" type="button" data-obact="acc-add">+ Add an account</button><button class="linkish ob-skip-link" type="button" data-obact="acc-skip">Skip for now</button></div>`}`;
 }
 const ACC_TYPES = ["Operating", "Savings", "Investment", "Super", "Debt"];
 function accFormHTML(shared) {

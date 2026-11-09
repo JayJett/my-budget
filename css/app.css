@@ -2319,14 +2319,9 @@ dialog.sheet::backdrop{ animation:fade-in .24s var(--ease); }
 .ho-big{ margin:6px 0 2px; font:700 1.75rem/1.15 var(--display); letter-spacing:-.02em; }
 .ho-big small{ font:600 .95rem var(--body); color:#BAC7C3; }
 .ho-sub{ margin:6px 0 0; color:#D7E0DD; font-size:var(--fs-sm); display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
-.ho-when{ background:var(--acc-d); color:var(--on-acc-d); border:0; font-weight:700; }
-.ho-note{ margin:12px 0 0; color:#9FB0AB; font-size:var(--fs-xs); }
+.ho-when{ margin:2px 0 0; color:var(--acc-d); font-weight:650; font-size:var(--fs-sm); }
 .ho-hero .btn{ margin-top:12px; }
 .ho-hero .btn.soft{ background:#38494C; color:#F3F7F5; border-color:transparent; }
-.ho-others{ list-style:none; margin:12px 0 0; padding:10px 0 0; border-top:1px solid #435559; display:grid; gap:8px; }
-.ho-others li{ display:grid; grid-template-columns:auto 1fr auto; gap:2px 8px; align-items:center; font-size:var(--fs-sm); }
-.ho-others small{ grid-column:2 / -1; color:#9FB0AB; font-size:var(--fs-xs); }
-.ho-others b{ font-weight:650; }
 .ho-dot{ width:8px; height:8px; border-radius:50%; background:var(--pc); }
 .ho-hero .person{ --pc:var(--c-blue); } .ho-hero .pc-gold{ --pc:#E9C06A; } .ho-hero .pc-blue{ --pc:#8AB7EA; } .ho-hero .pc-coral{ --pc:#EFA185; } .ho-hero .pc-rose{ --pc:#E99AC2; } .ho-hero .pc-slate{ --pc:#A9C3D0; } .ho-hero .pc-teal{ --pc:#7AD3C9; } .ho-hero .pc-purple{ --pc:#CDAEF0; } .ho-hero .pc-green{ --pc:#ADD585; }
 .ho-tap{ display:flex; align-items:center; gap:12px; width:100%; text-align:left; font:inherit; color:var(--ink); cursor:pointer; }
@@ -2407,3 +2402,37 @@ dialog.sheet::backdrop{ animation:fade-in .24s var(--ease); }
 .ob-acc-types label{ flex:1 1 30%; min-width:0; }
 .ob-acc-types label span{ white-space:nowrap; }
 .ob-acc-form .ob-acc-amt input[type=text]{ border:0; background:none; padding:8px 0; border-radius:0; box-shadow:none; }
+
+/* ============ Phase 9A.1 ============ */
+/* Home: the payday card, calmer: one date, the countdown, then who's paid and how much */
+.ho-pays{ list-style:none; margin:16px 0 0; padding:12px 0 0; border-top:1px solid rgba(255,255,255,.12); display:grid; gap:10px; }
+.ho-pays li{ display:flex; align-items:baseline; gap:10px; font-size:.95rem; }
+.ho-who{ display:flex; align-items:center; gap:8px; min-width:0; flex:1; color:#E4ECE9; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ho-on{ color:#9FB0AB; font-size:var(--fs-xs); white-space:nowrap; }
+.ho-amt{ font-weight:700; font-variant-numeric:tabular-nums; white-space:nowrap; color:#F3F7F5; }
+.ho-pay .eyebrow + .ho-pays{ margin-top:10px; border-top:0; padding-top:0; }
+#app .home section, #app .home .ho-greet{ margin-top:0; }
+
+/* Bottom bar: the chosen tab is shown by its colour and a slightly bolder icon and label (no pill) */
+@media (max-width:760px){
+  .tab .ti, .tab[aria-selected="true"] .ti{ background:none; }
+  .tab .ti{ transition:color var(--dur) var(--ease); }
+  .tab[aria-selected="true"] .ts{ font-weight:750; }
+  .tab[aria-selected="true"] svg{ stroke-width:2; }
+}
+
+/* Date boxes (e.g. "A recent payday"): Safari on iPhone gives them a built-in minimum width and its own
+   styling, so they ignored the card's width and ran off the edge. Plain appearance + full width + no
+   minimum keeps them inside, and the iPhone date wheel still opens on tap. */
+input[type="date"].bs-in, .ob-field input[type="date"]{ -webkit-appearance:none; appearance:none; display:block; width:100%; max-width:100%; min-width:0; box-sizing:border-box; text-align:left; }
+input[type="date"]::-webkit-date-and-time-value{ text-align:left; margin:0; }
+input[type="date"].bs-in{ min-height:46px; line-height:1.3; }
+.bs-field{ min-width:0; }
+.bs-pay{ min-width:0; } .bs-pay .unit, .bs-pay select{ min-width:0; }
+
+/* Setup step 4: "+ Add an account" is the main button; "Skip for now" a quiet link under it */
+.ob-nav-stack{ flex-direction:column; align-items:stretch; gap:6px; }
+.ob-skip-link{ align-self:center; min-height:44px; padding:0 16px; font-weight:600; }
+/* "Compact" spacing (Appearance) used to win over these screens' own "no gap above each section",
+   leaving big gaps above Home's greeting and Wealth's cards. These screens space their own sections. */
+body.compact :is(.home, .budget, .sp-page, .nw-page, .gl-page, .iv-page, .pg-page) section{ margin-top:0; }

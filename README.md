@@ -316,6 +316,16 @@ The closing audit's findings, fixes and remaining items are in `docs/phase6-audi
   - New plans no longer create an empty "Emergency Fund" account: the emergency fund is a goal, and its money is the balance of whichever account you choose for it.
 - Tests: `tests/home.test.js`, `tests/browser/phase9a.test.js`.
 
+### Polish after live testing (Phase 9A.1)
+
+- **Payday card:** one date and the countdown, then each person paid that day and their pay. People paid on another day are listed with their own date. The "Planned, not yet in your account" line is gone, and nothing is ever totalled.
+- **Your menu:** Reminders removed. The bell has them, with Reminder settings at the bottom.
+- **Bottom bar:** no pill behind the chosen tab; it's shown by its colour and a bolder icon and label.
+- **Setup step 4:** "+ Add an account" is the main button and "Skip for now" a quiet link. Once there are accounts, the button becomes "Save and continue" and "+ Add another account" sits above it.
+- **Date boxes** ("A recent payday"): Safari on iPhone gave them a built-in minimum width, so they ran off the card. They now fill the card's width and no more, and the iPhone date wheel still works.
+- **Compact spacing** no longer adds big gaps above Home's greeting or Wealth's cards.
+- Tests: `tests/browser/phase9a1.test.js`.
+
 ## How saving works
 
 The whole budget lives in one row (`budgets.state`), but the app never overwrites it. Each edit is

@@ -37,18 +37,23 @@ const FREQ = { weekly: "weekly", fortnightly: "fortnightly", monthly: "monthly" 
 const hello = () => { const h = new Date().getHours(); return h < 5 ? "Hello" : h < 12 ? "Morning" : h < 18 ? "Afternoon" : "Evening"; };
 
 function payCard(S, C, w) {
-  const L = paydays(S, C, app.today), shared = isShared(S), many = L.length > 1;
+  const L = paydays(S, C, app.today), shared = isShared(S) && S.people.length > 1;
   if (!L.length) return `<section class="card ho-pay ho-hero"><span class="eyebrow">Payday</span>
     <p class="ho-big">Add your pay</p><p class="ho-sub">Tell Moni Money what you take home, and it’ll plan where every dollar goes.</p>
     ${readOnly() ? "" : `<button class="btn primary small" type="button" data-home-go="budget" data-home-person="${esc((S.people[0] || {}).id || "")}">Add your pay</button>`}</section>`;
-  const first = L[0], who = p => shared && p.name ? ` for ${esc(p.name)}` : "";
-  const top = first.date
-    ? `<p class="ho-big">${esc(dateLine(first.date))}</p><p class="ho-sub"><span class="chip ho-when">${when(first.inDays)}</span> ${money(first.pay)} ${FREQ[first.freq] || ""} pay${who(first)}</p>`
-    : `<p class="ho-big">${money(first.pay)}<small> ${FREQ[first.freq] || ""}</small></p><p class="ho-sub">${shared && first.name ? `${esc(first.name)}’s pay. ` : ""}Add a payday to see when it’s next due.</p>
-       ${readOnly() ? "" : `<button class="btn soft small" type="button" data-home-go="budget" data-home-person="${esc(first.id)}">Set payday</button>`}`;
-  const rest = many ? `<ul class="ho-others">${L.slice(1).map(p => `<li class="person pc-${esc(p.colour)}"><i class="ho-dot" aria-hidden="true"></i><span>${esc(p.name || "Someone")}</span><b>${p.date ? `${esc(dateLine(p.date))}` : "No payday yet"}</b><small>${money(p.pay)} ${FREQ[p.freq] || ""}</small></li>`).join("")}</ul>` : "";
-  return `<section class="card ho-pay ho-hero" aria-labelledby="hoPayT"><span class="eyebrow" id="hoPayT">${first.date ? "Next payday" : "Your pay"}</span>${top}${rest}
-    <p class="ho-note">Planned, not yet in your account.</p></section>`;
+  // Phase 9A.1: one date, the countdown, then who's paid that day and how much. People paid on another
+  // day (or with no payday yet) are listed underneath with their own date. Nobody's pay is added up.
+  const first = L[0], day = first.date, same = L.filter(p => p.date && p.date === day), rest = L.filter(p => !same.includes(p));
+  const amt = p => `<b class="ho-amt">${money(p.pay)}</b>`;
+  const who = p => shared ? `<span class="ho-who"><i class="ho-dot" aria-hidden="true"></i>${esc(p.name || "Someone")}</span>` : `<span class="ho-who">Your pay</span>`;
+  const row = (p, when = "") => `<li class="person pc-${esc(p.colour)}">${who(p)}${when ? `<small class="ho-on">${esc(when)}</small>` : ""}${amt(p)}</li>`;
+  const short = s => { const d = parseDate(s); return `${DAYNAMES[d.getDay()].slice(0, 3)} ${d.getDate()} ${MON[d.getMonth()]}`; };
+  if (!day) return `<section class="card ho-pay ho-hero"><span class="eyebrow">Your pay</span>
+    <ul class="ho-pays">${L.map(p => row(p)).join("")}</ul>
+    ${readOnly() ? "" : `<button class="btn soft small" type="button" data-home-go="budget" data-home-person="${esc(first.id)}">Set a payday</button>`}</section>`;
+  return `<section class="card ho-pay ho-hero" aria-labelledby="hoPayT"><span class="eyebrow" id="hoPayT">Next payday</span>
+    <p class="ho-big">${esc(dateLine(day))}</p><p class="ho-when">${when(first.inDays)}</p>
+    <ul class="ho-pays">${same.map(p => row(p)).join("")}${rest.map(p => row(p, p.date ? short(p.date) : "No payday yet")).join("")}</ul></section>`;
 }
 
 function planCard(S, C, w) {

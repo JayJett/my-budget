@@ -78,7 +78,7 @@ test("every menu destination still works: profile, household, reminders, history
   assert.equal(await page.locator('#drawer [data-switch]').count(), 0, "households are in the household menu now (Phase 9A)");
   await shot(page, "drawer-320-long");
   await page.keyboard.press("Escape"); await page.waitForSelector("#drawer", { state: "hidden" });
-  for (const [act, sel] of [["profile", "#sheet .prof"], ["reminders", "#sheet .rem-switches"], ["history", "#sheet .hist-intro, #sheet .hist-empty"], ["appearance", "#sheet .acc-picker"]]) {
+  for (const [act, sel] of [["profile", "#sheet .prof"], ["history", "#sheet .hist-intro, #sheet .hist-empty"], ["appearance", "#sheet .acc-picker"]]) {
     await go(act, sel);
     await page.click('#sheet [data-sheet="close"]'); await page.waitForSelector("#sheet", { state: "hidden" });
   }
