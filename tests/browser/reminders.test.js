@@ -82,7 +82,7 @@ test("settings remember what you chose last time", { skip }, async () => {
   const prefs = { user_id: "u-me", household_id: "hh-1", review: true, review_day: 15, sink_due: false, due_weeks: 6, sink_behind: true, goal_done: false, goal_risk: false, allocation: false };
   const { page, errors, ctx } = await open(null, { init: init([], "owner", prefs) });
   await settle(page);
-  await page.click("#menuBtn"); await page.click('#drawer [data-act="reminders"]');
+  await page.click("#bellBtn"); await page.click('#drawer [data-rem="settings"]'); // Phase 9A.1: from the bell (no longer in your menu)
   await page.waitForSelector("#sheet .rem-switches");
   assert.deepEqual(await page.$$eval("#sheet [data-pref]:checked", els => els.map(e => e.dataset.pref)), ["review", "sink_behind"]);
   assert.equal(await page.inputValue('#sheet [data-pref-n="review_day"]'), "15");
