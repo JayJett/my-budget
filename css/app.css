@@ -2436,3 +2436,45 @@ input[type="date"].bs-in{ min-height:46px; line-height:1.3; }
 /* "Compact" spacing (Appearance) used to win over these screens' own "no gap above each section",
    leaving big gaps above Home's greeting and Wealth's cards. These screens space their own sections. */
 body.compact :is(.home, .budget, .sp-page, .nw-page, .gl-page, .iv-page, .pg-page) section{ margin-top:0; }
+
+/* ============ Phase 9B: budget intelligence ============ */
+.b-check h2, .sp-ess h2{ margin:0 0 10px; font:650 1.05rem var(--display); }
+.sp-ess .b-row h2{ margin:0; }
+.ib{ margin-bottom:12px; }
+.ib-bar{ display:flex; height:12px; border-radius:99px; overflow:hidden; background:var(--surface-3); gap:2px; margin:6px 0 10px; }
+.ib-bar span{ display:block; height:100%; min-width:3px; transition:width .5s var(--ease-out, var(--ease)); }
+.ib-key{ list-style:none; margin:0; padding:0; display:grid; gap:6px; }
+.ib-key li{ display:grid; grid-template-columns:auto 1fr auto auto; align-items:center; gap:8px; font-size:var(--fs-sm); }
+.ib-key i{ width:10px; height:10px; border-radius:3px; }
+.ib-key b{ font-variant-numeric:tabular-nums; font-weight:650; white-space:nowrap; }
+.ib-key small{ color:var(--muted); font-size:var(--fs-xs); min-width:3ch; text-align:right; }
+.in-list{ list-style:none; margin:8px -6px 4px; padding:0; display:grid; gap:2px; }
+.in-btn{ display:flex; align-items:center; gap:10px; width:100%; min-height:52px; padding:8px 6px; border:0; background:none; border-radius:12px; text-align:left; font:inherit; color:var(--ink); cursor:pointer;
+  transition:transform var(--m-spring) var(--ease-spring), background-color var(--dur); }
+.in-btn:active{ transform:scale(.985); transition-duration:var(--m-fast); background:var(--surface-2); }
+@media (hover:hover){ .in-btn:hover{ background:var(--surface-2); } }
+.in-ic{ width:26px; height:26px; flex:none; border-radius:50%; display:grid; place-items:center; font-weight:800; font-size:.85rem; }
+.in-row.attention .in-ic{ background:var(--bad-soft); color:var(--bad); }
+.in-row.review .in-ic{ background:var(--warn-soft); color:var(--warn); }
+.in-row.good .in-ic{ background:var(--ok-soft); color:var(--ok); }
+.in-t{ flex:1; min-width:0; display:grid; } .in-t b{ font-weight:650; font-size:.93rem; } .in-t small{ color:var(--muted); font-size:var(--fs-xs); }
+.room{ margin-top:8px; padding:12px 14px; border-radius:var(--r); background:var(--surface-2); }
+.room-h{ display:flex; justify-content:space-between; gap:10px; align-items:baseline; font-weight:650; }
+.room-h b{ font:700 1.05rem var(--display); white-space:nowrap; }
+.room-rows{ list-style:none; margin:8px 0 0; padding:0; display:grid; gap:4px; }
+.room-rows li{ display:flex; justify-content:space-between; gap:10px; font-size:var(--fs-sm); color:var(--muted); }
+.room-rows b{ color:var(--ink); font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.in-note{ margin:8px 0 0; color:var(--muted); font-size:var(--fs-xs); }
+.in-note.warn{ color:var(--warn); }
+.in-note .linkish{ display:inline-flex; align-items:center; min-height:44px; padding:0 4px; }
+.a-cov{ display:block; font-size:var(--fs-xs); font-weight:600; margin-top:2px; }
+.a-cov.ok{ color:var(--ok); } .a-cov.bad{ color:var(--bad); } .a-cov:empty{ display:none; }
+.sp-ess{ margin-top:0; }
+.ho-lines{ display:grid; gap:4px; margin-top:10px; padding-top:10px; border-top:1px solid var(--line); }
+.ho-line{ display:flex; justify-content:space-between; gap:10px; font-size:var(--fs-xs); color:var(--muted); }
+.ho-line b{ color:var(--ink); font-weight:650; white-space:nowrap; }
+.ho-line.bad b{ color:var(--bad); }
+/* Home's columns never grow wider than the screen, whatever is inside them */
+.ho-grid{ grid-template-columns:minmax(0, 1fr); } @media (min-width:900px){ .ho-grid{ grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); } }
+.ho-col, .ho-col > *{ min-width:0; }
+.ho-line span{ min-width:0; } .ho-line b{ text-align:right; }

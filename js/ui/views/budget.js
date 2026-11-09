@@ -19,6 +19,8 @@ import { money, m0, pct, listNames } from "../../model/format.js";
 import { drawDonuts, drawFlow, drawSplit, personVar } from "../charts.js";
 import { spendLabel } from "./labels.js";
 import { budgetUI } from "../budget-sheets.js";
+import { planCheckHTML, refreshPlanCheck } from "../insight-view.js";
+import { coverage } from "../../model/intelligence.js";
 
 const CHEV = `<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5L10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 const TYPE_WORD = { Joint: "Joint", Personal: "Personal", Investment: "Investment" };
@@ -65,6 +67,7 @@ export function view() {
         <span class="a-ic" data-k="acc.${esc(a.id)}.ic" aria-hidden="true">${accIcon(a)}</span>
         <span class="a-main"><span class="a-name">${esc(a.name || "Unnamed")}</span>
           <span class="a-meta">${esc(typeLine(a, P, S))}${multi ? "" : ` · ${K(`acc.${a.id}.pct.${P[0].id}`)}`}</span>
+          ${a.role === "spending" ? `<span data-k="acc.${esc(a.id)}.cov" data-base="a-cov"></span>` : ""}
           ${multi ? `<span class="a-parts">${P.map(p => `<span data-k="acc.${esc(a.id)}.part.${esc(p.id)}" data-base="a-part ${pc(p)}" class="a-part ${pc(p)}"></span>`).join("")}</span>` : ""}</span>
         <span class="a-amt">${K(`acc.${a.id}.t`)}<small>${esc(w.short)}</small></span>${ui.reorder ? "" : CHEV}</button>
       ${ui.reorder ? `<span class="mv-row"><button class="mv-btn" type="button" data-move="up" data-l="acc" data-i="${esc(a.id)}" aria-label="Move ${esc(a.name || "this")} up"${i === 0 ? " disabled" : ""}>↑</button><button class="mv-btn" type="button" data-move="down" data-l="acc" data-i="${esc(a.id)}" aria-label="Move ${esc(a.name || "this")} down"${i === S.accounts.length - 1 ? " disabled" : ""}>↓</button></span>` : ""}
@@ -83,6 +86,7 @@ export function view() {
   </section>`;
 
   const open = k => ui.open.has(k) ? " open" : "";
+  const check = planCheckHTML(S, app.C);
   const insights = `<section class="card b-insights">
     <details data-ins="where"${open("where")}><summary><span>Where it goes</span><small>${K("ins.where")}</small></summary>
       <ul class="dest">
@@ -107,7 +111,7 @@ export function view() {
   const note = `<div class="b-note"><input class="note-input" ${attrs("root", "", "note", "text")} value="${esc(S.note)}" placeholder="Add a note" aria-label="Budget note">${S.note && !ro ? '<button class="note-x" type="button" id="noteX" aria-label="Remove note">×</button>' : ""}</div>`;
 
   // Phones: one column in this order. Wide screens: income, status and fair split on the left; allocations on the right.
-  return `<div class="budget"><div class="b-col">${income}${status}${multi ? fair : `<div id="fairSec" hidden></div>`}</div><div class="b-col">${allocs}${insights}${note}</div></div>`;
+  return `<div class="budget"><div class="b-col">${income}${status}${multi ? fair : `<div id="fairSec" hidden></div>`}</div><div class="b-col">${allocs}${check}${insights}${note}</div></div>`;
 }
 
 /** Other periods, for the line under each pay: "≈ $2,000 a fortnight, $4,333 a month, $52,000 a year". */
@@ -169,6 +173,11 @@ export function fill(D, C) {
   D["sum.personal"] = money(v(C.personal)); D["sum.personal.y"] = `${w.per}, ${yr(C.personal)}`;
   D["sum.investment"] = money(v(C.investment)); D["sum.investment.y"] = `${w.per}, ${yr(C.investment)}`;
   D["sum.own"] = money(v(C.joint + C.personal)); D["sum.own.y"] = `${w.per}, ${yr(C.joint + C.personal)}`;
+  // Phase 9B: does the bills allocation cover the entered expenses?
+  const cv = coverage(app.state, C);
+  if (cv.allocation) D[`acc.${cv.allocation.id}.cov`] = cv.state === "short" ? { t: `Short of expenses by ${money(v(cv.short))}${w.short}`, c: "bad" }
+    : cv.state === "covered" || cv.state === "even" ? { t: "✓ Covers your entered expenses", c: "ok" } : cv.state === "nobudget" ? { t: "No budget for your expenses yet", c: "bad" } : { t: "", c: "" };
+  refreshPlanCheck();
   D["ins.where"] = isShared(app.state) ? `Joint ${m0(v(C.joint))} · Personal ${m0(v(C.personal))} · Invest ${m0(v(C.investment))}`
     : `Spend & save ${m0(v(C.joint + C.personal))} · Invest ${m0(v(C.investment))}`;
   const ivc = C.investment + C.cash;

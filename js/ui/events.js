@@ -62,7 +62,7 @@ export function addRow(l) {
 }
 
 /** Which fields need the whole tab redrawn when they change (they add or remove columns or labels). */
-const REDRAW_ON_CHANGE = new Set(["type", "period", "note", "freq", "owner"]);
+const REDRAW_ON_CHANGE = new Set(["type", "period", "note", "freq", "owner", "need", "adjustable"]);
 
 export function initEvents() {
   document.addEventListener("input", e => {

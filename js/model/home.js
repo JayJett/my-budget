@@ -7,6 +7,7 @@
    each person entered and how often they're paid. Nobody's pay is ever added to anyone else's. With
    no payday entered there's no date: Home asks for one instead of guessing. */
 import { n, blank, parseDate, addDays, daysBetween, ymd } from "./util.js";
+import { insights } from "./intelligence.js";
 
 const DAYS = { weekly: 7, fortnightly: 14 };
 
@@ -48,23 +49,12 @@ export function planStatus(C) {
   return { k: all ? "ok" : over > 0.5 ? "over" : "left", left, over, pct: C.incTotal ? C.tot.t / C.incTotal : 0 };
 }
 
-const size = x => Array.isArray(x) ? x.length : Object.keys(x || {}).length;
-/** Suggestions, most useful first, only for things that are really missing. At most `max`.
-    ctx.snapshots: the household's snapshots, or null while they're unknown (then nothing is said about them). */
+/** Suggestions for Home, most useful first, only for things that are really missing or wrong. At most
+    `max`. Phase 9B: these are the same facts every screen uses (model/intelligence.js insights), so
+    Home, Budget and Expenses never disagree. ctx.snapshots: null while unknown (then nothing is said). */
 export function homeActions(S, C, { snapshots = null, max = 3 } = {}) {
-  const out = [], earners = C.people.filter(p => p.annual > 0);
-  if (!earners.length) out.push({ key: "pay", to: "person", id: (C.people[0] || {}).id });
-  const noDay = earners.find(p => blank(p.payday));
-  if (noDay) out.push({ key: "payday", to: "person", id: noDay.id, name: noDay.name || "" });
-  const st = planStatus(C);
-  if (st.k === "over") out.push({ key: "over", to: "budget", amount: st.over });
-  else if (st.k === "left") out.push({ key: "left", to: "budget", amount: st.left });
-  if (!S.nw.accounts.length) out.push({ key: "accounts", to: "networth" });
-  else if (C.reviewDue) out.push({ key: "review", to: "networth" });
-  if (!size(S.goals.joint) && !Object.values(S.goals.personal || {}).some(L => size(L))) out.push({ key: "goal", to: "goals" });
-  if (!S.spend.length && earners.length) out.push({ key: "bills", to: "spending" });
-  if (Array.isArray(snapshots) && !snapshots.length && S.nw.accounts.length) out.push({ key: "snapshot", to: "progress" });
-  return out.slice(0, max);
+  const L = insights(S, C, { snapshots }).filter(x => x.level !== "good");
+  return [...L.filter(x => x.level === "attention"), ...L.filter(x => x.level !== "attention")].map(x => ({ ...x, key: x.id })).slice(0, max);
 }
 
 /** The few figures Home shows, all per year from compute() (shown per period by the page), labelled

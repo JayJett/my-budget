@@ -40,7 +40,7 @@ test("over budget: the shortfall leads, the bar shows where the budget ends, no 
 });
 
 test("under budget, exactly on budget, no budget, and no expenses each read clearly (and never show NaN)", { skip }, async () => {
-  for (const [name, head, lab] of [["rich", "$177.31", "remaining"], ["exact", "On budget", /matches the budget/], ["nopool", "$550", "planned"], ["empty", "$600", "remaining"]]) {
+  for (const [name, head, lab] of [["rich", "$177.31", "not yet assigned to an expense"], ["exact", "On budget", /matches the budget/], ["nopool", "$550", "planned"], ["empty", "$600", "not yet assigned to an expense"]]) {
     const { page, errors, ctx } = await spendTab(CASES[name]);
     assert.equal(await text(page, "sp.head"), head, name);
     assert.match(await text(page, "sp.head.lab"), lab instanceof RegExp ? lab : new RegExp(`^${lab}$`), name);
@@ -125,7 +125,7 @@ test("the budget comes from the Budget tab: changing that allocation updates Spe
   await closeSheet(page);
   await goTab(page, "spending");
   assert.equal(await text(page, "sp.pool"), "$800");
-  assert.equal(await text(page, "sp.head"), "$42.69"); assert.equal(await text(page, "sp.head.lab"), "remaining");
+  assert.equal(await text(page, "sp.head"), "$42.69"); assert.equal(await text(page, "sp.head.lab"), "not yet assigned to an expense");
   assert.deepEqual(errors, []); await ctx.close();
 });
 

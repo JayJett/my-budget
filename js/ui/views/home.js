@@ -12,6 +12,7 @@ import { parseDate } from "../../model/util.js";
 import { isShared } from "../../model/schema.js";
 import { paydays, planStatus, homeActions, homeFigures } from "../../model/home.js";
 import { myName } from "../profile.js";
+import { insightCopy, homePlanLines } from "../insight-view.js";
 
 const I = d => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
 const IC = {
@@ -62,10 +63,13 @@ function planCard(S, C, w) {
   const v = x => money(C.v(x)) + w.short;
   const line = st.k === "ok" ? `${shareWord(S)} has a plan` : st.k === "over" ? `Your plan is over by ${v(st.over)}` : `${v(st.left)} still to plan`;
   const sub = st.k === "ok" ? `${m0(C.v(C.incTotal))} ${w.per}, every dollar given a job.` : st.k === "over" ? "More is planned than comes in. Trim an allocation on Budget." : "Give the rest a job on Budget.";
+  // Phase 9B: a few plain facts under it (essentials, whether expenses fit their budget, room to adjust)
+  const lines = homePlanLines(S, C);
   return `<button class="card ho-plan ho-tap ${st.k}" type="button" data-home-go="budget">
     <span class="ho-ic" aria-hidden="true">${IC.plan}</span>
     <span class="ho-plan-t"><b>${esc(line)}</b><small>${esc(sub)}</small>
-      <span class="ho-bar" aria-hidden="true"><span style="width:${Math.min(100, Math.max(0, st.pct * 100)).toFixed(1)}%"></span></span></span>${IC.chev}</button>`;
+      <span class="ho-bar" aria-hidden="true"><span style="width:${Math.min(100, Math.max(0, st.pct * 100)).toFixed(1)}%"></span></span>
+      ${lines.length ? `<span class="ho-lines">${lines.map(([k, v, c]) => `<span class="ho-line${c ? " " + c : ""}"><span>${esc(k)}</span><b>${esc(v)}</b></span>`).join("")}</span>` : ""}</span>${IC.chev}</button>`;
 }
 const shareWord = S => isShared(S) && S.people.length > 1 ? "All of your pay" : "100% of your pay";
 
@@ -84,17 +88,9 @@ function figures(S, C, w) {
   return `<div class="ho-figs" role="list">${T.map(t => `<div role="listitem">${t}</div>`).join("")}</div>`;
 }
 
-const ACT = {
-  pay: a => ({ icon: IC.pay, t: "Add your pay", s: "So your plan has something to work with", go: "budget", person: a.id }),
-  payday: a => ({ icon: IC.cal, t: a.name && app.state.people.length > 1 ? `Set ${a.name}’s payday` : "Set your payday", s: "See when your next pay is due", go: "budget", person: a.id }),
-  left: a => ({ icon: IC.plan, t: "You have money left to plan", s: `${money(app.C.v(a.amount))}${WORDS[app.state.viewAs].short} without a job yet`, go: "budget" }),
-  over: a => ({ icon: IC.plan, t: "Your plan is over-allocated", s: `By ${money(app.C.v(a.amount))}${WORDS[app.state.viewAs].short}`, go: "budget" }),
-  accounts: () => ({ icon: IC.acct, t: "Add an account", s: "To see your net worth", go: "networth", click: "[data-nw-new]" }),
-  review: () => ({ icon: IC.review, t: "Review your account balances", s: "It’s been over a month since they were checked", go: "networth" }),
-  goal: () => ({ icon: IC.goal, t: "Create a savings goal", s: "A trip, a car, a house deposit…", go: "goals", click: ".gl-first-btn, [data-goal-new]" }),
-  bills: () => ({ icon: IC.bills, t: "Add your regular bills", s: "Rent, power, groceries and the like", go: "spending", click: "[data-sp-new]" }),
-  snapshot: () => ({ icon: IC.snap, t: "Save your first snapshot", s: "Start tracking your progress over time", go: "progress" }),
-};
+/* Phase 9B: the words come from ui/insight-view.js (the same as Budget and Expenses); Home adds icons. */
+const ICON_OF = { pay: IC.pay, payday: IC.cal, left: IC.plan, over: IC.plan, short: IC.bills, nobudget: IC.bills, accounts: IC.acct, review: IC.review, goal: IC.goal, bills: IC.bills, unmarked: IC.bills, snapshot: IC.snap };
+const ACT = new Proxy({}, { get: (_, k) => a => ({ icon: ICON_OF[k] || IC.plan, ...insightCopy(a) }) });
 function actions(S, C) {
   if (readOnly()) return "";
   const L = homeActions(S, C, { snapshots: app.snapshots });
