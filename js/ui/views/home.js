@@ -104,9 +104,8 @@ function actions(S, C) {
 
 function homeHTML() {
   const S = app.state, C = app.C, w = WORDS[S.viewAs], name = (myName() || "").split(/\s+/)[0];
-  const sub = !C.incTotal ? "Let’s get your payday plan started." : isShared(S) && S.people.length > 1 ? `Your household’s plan, shown ${w.per}.` : `Your plan, shown ${w.per}.`;
   return `<div class="home" id="homeRoot">
-    <section class="ho-greet"><h2>${esc(name ? `${hello()}, ${name}` : "Your money at a glance")}</h2><p>${esc(sub)}</p></section>
+    <section class="ho-greet"><h2>${esc(name ? `${hello()}, ${name}` : "Your money at a glance")}</h2></section>
     <div class="ho-grid"><div class="ho-col">${payCard(S, C, w)}${planCard(S, C, w)}</div>
     <div class="ho-col">${figures(S, C, w)}${actions(S, C)}</div></div>
   </div>`;

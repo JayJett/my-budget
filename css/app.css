@@ -2478,3 +2478,41 @@ body.compact :is(.home, .budget, .sp-page, .nw-page, .gl-page, .iv-page, .pg-pag
 .ho-grid{ grid-template-columns:minmax(0, 1fr); } @media (min-width:900px){ .ho-grid{ grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); } }
 .ho-col, .ho-col > *{ min-width:0; }
 .ho-line span{ min-width:0; } .ho-line b{ text-align:right; }
+
+/* ============ Phase 9B.1: calmer Budget, flat cards ============ */
+/* Budget order: the income card first, the expense check right under it, then the rest */
+.b-check{ order:2; } .b-status{ order:3; } .b-allocs{ order:4; } .b-fair{ order:5; } .b-insights{ order:6; } .b-note{ order:7; }
+/* the expense check: one finding, one action, details on request */
+.b-check{ padding:18px 18px 12px; }
+.pc-main{ display:flex; align-items:flex-start; gap:12px; }
+.pc-ic{ width:30px; height:30px; flex:none; border-radius:50%; display:grid; place-items:center; font-weight:800; font-size:.9rem; margin-top:1px; }
+.pc-main.attention .pc-ic{ background:var(--bad-soft); color:var(--bad); }
+.pc-main.review .pc-ic{ background:var(--surface-2); color:var(--muted); }
+.pc-main.good .pc-ic{ background:var(--ok-soft); color:var(--ok); }
+.pc-t{ min-width:0; } .pc-h{ margin:0; font:650 1.02rem/1.3 var(--display); color:var(--ink); }
+.pc-s{ margin:3px 0 0; color:var(--muted); font-size:var(--fs-sm); font-variant-numeric:tabular-nums; }
+.pc-main.attention .pc-s{ color:var(--bad); font-weight:600; }
+.pc-acts{ display:flex; flex-wrap:wrap; align-items:center; gap:4px 18px; margin:8px 0 0 42px; }
+.pc-act, .pc-more{ display:inline-flex; align-items:center; gap:4px; min-height:44px; padding:0; border:0; background:none; font:inherit; font-size:var(--fs-sm); font-weight:650; color:var(--accent); cursor:pointer; }
+.pc-more{ color:var(--muted); }
+.pc-more svg{ width:14px; height:14px; transition:transform var(--m-sel, .2s) var(--ease); }
+.pc-more[aria-expanded="true"] svg{ transform:rotate(180deg); }
+.pc-act:focus-visible, .pc-more:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; border-radius:6px; }
+.pc-body{ margin-top:6px; padding-top:14px; border-top:1px solid var(--line); display:grid; gap:16px; animation:pc-in .22s var(--ease-out, ease) both; }
+.pc-body[hidden]{ display:none; }
+@keyframes pc-in{ from{ opacity:0; transform:translateY(-4px); } to{ opacity:1; transform:none; } }
+@media (prefers-reduced-motion: reduce){ .pc-body{ animation:none; } .pc-more svg{ transition:none; } }
+.pc-sub{ margin:0 0 4px; font-size:var(--fs-xs); font-weight:650; color:var(--muted); text-transform:none; }
+.pc-body .ib{ margin:0; } .pc-body .ib-key{ gap:8px; }
+.pc-body .room{ margin:0; padding:0; background:none; }
+.pc-body .room-h{ font-size:var(--fs-xs); color:var(--muted); } .pc-body .room-h b{ font-size:.98rem; color:var(--ink); }
+.pc-body .room-rows{ gap:8px; } .pc-body .room-rows li span{ min-width:0; }
+.room-rows li.neg b{ color:var(--bad); }
+.pc-body .in-list{ margin:0 -6px; }
+.pc-body .in-note{ margin-top:8px; }
+
+/* Flat cards: ordinary cards are told apart by surface, border and spacing, not shadows.
+   Floating things (menus, the household dropdown, sheets, tooltips, tours, the update bar) keep theirs. */
+:root{ --shadow:none; }
+.card{ border-color:var(--line); }
+:is(.b-income, .nw-hero, .sp-sum, .gl-sum, .iv-hero, .pg-hero).card{ box-shadow:none; }

@@ -1,5 +1,5 @@
 /* Phase 9B: budget intelligence on screen. Marking expenses essential or flexible, marking allocations
-   adjustable, Plan check on Budget, Essentials on Expenses, the facts on Home, and that looking never
+   adjustable, the expense check on Budget (Phase 9B.1: one finding, details on request), Essentials on Expenses, the facts on Home, and that looking never
    changes anything. Uses the fake Supabase (no real accounts or data). */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -52,39 +52,60 @@ test("Expenses: mark an expense essential; the Essentials card and Home follow; 
   assert.deepEqual(errors, []); await ctx.close();
 });
 
-test("Budget: Plan check (where pay goes, findings, room to adjust); 'adjustable' only when you say so", { skip }, async () => {
+const expand = async page => { await page.click("#planCheck [data-pc-toggle]"); await page.waitForSelector("#pcBody:not([hidden])"); };
+
+test("Budget: one finding about expenses; where pay goes and room to adjust behind 'View breakdown'; 'adjustable' only when you say so", { skip }, async () => {
   const { page, errors, ctx } = await open(solo([["Rent", "Fixed", 900, "Fortnight", "essential"]]), { ...phone(), storage: ALL_DONE, hash: "budget", waitFor: "#planCheck" });
   const pc = () => page.textContent("#planCheck");
-  assert.match(await pc(), /\$300\/fn of pay has no plan yet/);
+  // Phase 9B.1: income card first, the expense check right under it, no visible "Plan check" title
+  const order = await page.$$eval(".budget > .b-col > *, .budget > *:not(.b-col)", els => els.filter(e => e.offsetParent).sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top).map(e => e.className.split(" ").find(c => c.startsWith("b-")) || e.id));
+  assert.deepEqual(order.slice(0, 3), ["b-income", "b-check", "b-status"]);
+  assert.doesNotMatch(await pc(), /Plan check/);
+  assert.equal(await page.getAttribute("#planCheck", "aria-label"), "Expense check");
+  assert.match(await page.textContent("#planCheck .pc-main"), /Your expenses are covered\s*\$100\/fn not yet assigned to an expense/);
+  assert.equal(await page.isVisible("#pcBody"), false, "details start closed");
+  assert.equal(await page.getAttribute("[data-pc-toggle]", "aria-expanded"), "false");
+  assert.doesNotMatch(await pc(), /Every dollar of pay has a plan|not money in your account|right for you/, "no repeated or explanatory lines");
+  await shot(page, "check-covered");
+  await expand(page);
+  assert.equal(await page.getAttribute("[data-pc-toggle]", "aria-expanded"), "true");
+  assert.match(await pc(), /Pay with no plan yet\s*\$300\/fn/);
   assert.match(await pc(), /Room to adjust\s*up to \$400\/fn/, "300 unplanned + 100 of bills not assigned");
-  assert.doesNotMatch(await pc(), /marked adjustable/, "nothing is assumed adjustable, not even investing");
+  assert.doesNotMatch(await pc(), /Marked adjustable/, "nothing is assumed adjustable, not even investing");
   assert.match(await page.textContent('[data-k="acc.js.cov"]'), /Covers your entered expenses/);
   const keys = await page.$$eval("#planCheck .ib-key li span", e => e.map(x => x.textContent));
   assert.deepEqual(keys, ["Essential expenses", "Bills budget not yet assigned", "Saving & investing", "No plan yet"]);
-  // mark Investments adjustable
+  await page.$eval("#planCheck", e => e.scrollIntoView()); await shot(page, "check-open");
+  // mark Investments adjustable; the breakdown stays open across the redraw
   await page.click('[data-edit-acc="ji"]'); await page.waitForSelector('#sheet [data-f="adjustable"]');
   await page.check('#sheet input[data-f="adjustable"][value="yes"]', { force: true }); await settle(page);
   assert.equal((await budgetOf(page)).accounts.ji.adjustable, "yes");
   await page.click('#sheet .sheet-head [data-sheet="close"]'); await page.waitForSelector("#sheet", { state: "hidden" });
-  assert.match(await pc(), /Allocations you marked adjustable\s*\$200\/fn/);
+  assert.match(await pc(), /Marked adjustable: Investments\s*\$200\/fn/);
   assert.match(await pc(), /up to \$600\/fn/);
-  await page.$eval("#planCheck", e => e.scrollIntoView()); await shot(page, "plan-check");
+  assert.equal(await page.isVisible("#pcBody"), true);
+  await page.click("#planCheck [data-pc-toggle]"); assert.equal(await page.isVisible("#pcBody"), false, "collapses again");
   // the bills allocation can't be marked adjustable (its money is already planned for expenses)
   await page.click('[data-edit-acc="js"]'); await page.waitForSelector("#sheet .bsheet");
   assert.equal(await page.locator('#sheet [data-f="adjustable"]').count(), 0);
   assert.deepEqual(errors, []); await ctx.close();
 });
 
-test("a shortfall is a problem everywhere, the same words and amount; tapping it opens Expenses", { skip }, async () => {
-  const { page, errors, ctx } = await open(solo([["Rent", "Fixed", 1120, "Fortnight", "essential"]]), { ...phone(), storage: ALL_DONE, hash: "", waitFor: "#app .home" });
+test("a shortfall is a problem everywhere, the same amount; it leads the Budget card even when every dollar has a plan", { skip }, async () => {
+  const { page, errors, ctx } = await open(solo([["Rent", "Fixed", 1120, "Fortnight", "essential"]], { spending: 0.5, emergency: 0.1, goals: 0.25, invest: 0.15 }), { ...phone(), storage: ALL_DONE, hash: "", waitFor: "#app .home" });
   assert.match(await page.textContent(".ho-next"), /Planned expenses are over their budget/);
   assert.match(await page.textContent(".ho-next"), /By \$120\/fn/);
   assert.match(await page.textContent(".ho-lines"), /Over budget by \$120\/fn/);
   await tab(page, "budget"); await page.waitForSelector("#planCheck");
-  assert.match(await page.textContent("#planCheck"), /Planned expenses are over their budget[\s\S]*By \$120\/fn/);
+  assert.match(await page.textContent("#planCheck .pc-main"), /Expenses are over budget\s*\$120\/fn short/);
+  assert.equal(await page.getAttribute("#planCheck .pc-main", "data-insight"), "short");
+  assert.doesNotMatch(await page.textContent("#planCheck"), /Every dollar of pay has a plan/, "100% allocated isn't repeated here");
   assert.match(await page.textContent('[data-k="acc.js.cov"]'), /Short of expenses by \$120\/fn/);
   assert.equal(await page.locator("#planCheck .ib-bar").count(), 0, "no combined bar when the parts can't add up");
-  await page.click('#planCheck [data-insight="short"]');
+  await expand(page);
+  assert.match(await page.textContent("#planCheck"), /Less expenses over budget\s*−\$120\/fn/);
+  await page.$eval("#planCheck", e => e.scrollIntoView()); await shot(page, "check-short");
+  await page.click("#planCheck .pc-act");
   await page.waitForFunction(() => location.hash === "#expenses");
   assert.deepEqual(errors, []); await ctx.close();
 });
@@ -97,17 +118,34 @@ test("no expenses yet: no made-up coverage or essentials; one clear next step", 
   assert.equal(await page.locator("#spEss").count(), 0);
   await tab(page, "budget"); await page.waitForSelector("#planCheck");
   const pc = await page.textContent("#planCheck");
-  assert.doesNotMatch(pc, /fit their budget/, "no 'covered' without expenses");
+  assert.doesNotMatch(pc, /expenses are covered/i, "no 'covered' without expenses");
+  assert.match(await page.textContent("#planCheck .pc-main"), /Add expenses to check they’re covered/);
   assert.match(pc, /Bills budget \(no expenses entered yet\)/);
   assert.match(pc, /Room to adjust\s*—/, "the bills budget isn't counted as room when nothing's entered");
+  await page.click("#planCheck .pc-act"); await page.waitForSelector("#sheet");
   assert.deepEqual(errors, []); await ctx.close();
 });
 
-test("an unmarked-expense finding opens that very expense", { skip }, async () => {
+test("an unmarked-expense finding (in the breakdown) opens that very expense", { skip }, async () => {
   const { page, errors, ctx } = await open(solo([["Rent", "Fixed", 700, "Fortnight", "essential"], ["Gym", "Fixed", 30]]), { ...phone(), storage: ALL_DONE, hash: "budget", waitFor: "#planCheck" });
+  await expand(page);
   await page.click('#planCheck [data-insight="unmarked"]');
   await page.waitForSelector('#sheet [data-l="sp"][data-i="e1"]');
   assert.equal(await page.inputValue('#sheet [data-l="sp"][data-i="e1"][data-f="name"]'), "Gym");
+  assert.deepEqual(errors, []); await ctx.close();
+});
+
+test("Home: the greeting stands alone; ordinary cards are flat, the household menu still floats", { skip }, async () => {
+  const { page, errors, ctx } = await open(solo([["Rent", "Fixed", 700, "Fortnight", "essential"]]), { ...phone(), storage: ALL_DONE, hash: "", waitFor: "#app .home" });
+  assert.equal(await page.locator(".ho-greet p").count(), 0);
+  assert.doesNotMatch(await page.textContent("#app"), /shown per fortnight|payday plan started/);
+  for (const t of ["home", "budget", "spending", "goals", "wealth"]) {
+    await tab(page, t); await page.waitForTimeout(150);
+    const shadows = await page.$$eval("#app .card, #app .ho-fig, #app .gl-card, #app .stat, #app .panel", els => els.filter(e => getComputedStyle(e).boxShadow !== "none").map(e => e.className));
+    assert.deepEqual(shadows, [], `${t}: flat cards`);
+  }
+  await page.click("#hhBtn"); await page.waitForSelector("#hhPop:not([hidden])");
+  assert.notEqual(await page.$eval("#hhPop", e => getComputedStyle(e).boxShadow), "none", "the dropdown keeps its lift");
   assert.deepEqual(errors, []); await ctx.close();
 });
 
@@ -144,7 +182,7 @@ test("shared household with mixed pay: essentials as a share of everyone's pay; 
   });
   assert.equal(r.budget, r.pool, "only the shared bills allocation");
   assert.ok(Math.abs(r.share - r.ess / r.inc) < 1e-12); assert.ok(Math.abs(r.ess - r.committed) < 1e-9);
-  await page.$eval("#planCheck", e => e.scrollIntoView());
+  await expand(page); await page.$eval("#planCheck", e => e.scrollIntoView());
   assert.equal(await page.evaluate(() => document.scrollingElement.scrollWidth > innerWidth), false);
   assert.deepEqual(errors, []); await ctx.close();
 });
@@ -156,6 +194,7 @@ test("320–430px: Home, Plan check and Essentials fit, with big numbers too", {
     const { page, errors, ctx } = await open(S, { ...phone(w, 760), storage: ALL_DONE, hash: "", waitFor: "#app .home" });
     for (const t of ["home", "budget", "spending"]) {
       await tab(page, t); await page.waitForTimeout(150);
+      if (t === "budget") { await expand(page); await page.$eval("#planCheck", e => e.scrollIntoView()); if (w === 320) await shot(page, "check-320"); }
       assert.equal(await page.evaluate(() => document.scrollingElement.scrollWidth > innerWidth + 1), false, `${w} ${t}`);
     }
     assert.deepEqual(errors, [], `${w}`); await ctx.close();
