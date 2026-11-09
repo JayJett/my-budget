@@ -19,6 +19,8 @@ import { initBudgetSheets } from "./ui/budget-sheets.js";
 import { initHouseholdMode } from "./ui/household-mode.js";
 import { initHouseholdLook } from "./ui/household-look.js";
 import { initFeedback } from "./ui/feedback.js";
+import { initHome } from "./ui/views/home.js";
+import { initHouseholdMenu } from "./ui/household-menu.js";
 
 applyUI();
 initTooltips();
@@ -29,6 +31,8 @@ initSettings();
 initHouseholdMode();
 initHouseholdLook();
 initFeedback();
+initHome();
+initHouseholdMenu();
 initSetupEvents();
 initProgress();
 initInvest();

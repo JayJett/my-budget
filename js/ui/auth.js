@@ -4,7 +4,7 @@ import { $, esc, toast, closePop } from "./dom.js";
 import { render } from "./render.js";
 import { createStore, isNetworkError, clearDeviceCopies } from "../sync/store.js";
 import { blankBudget } from "../model/schema.js";
-import { startSetup, endSetup, obHeader, modeChoices, rememberMode } from "./onboarding.js";
+import { startSetup, endSetup, obHeader, modeChoices, rememberMode, pendingAccounts, resumeAccounts } from "./onboarding.js";
 import { HERO } from "./hero-art.js";
 import { loadSnapshots, ensureMonthly } from "./views/progress.js";
 import { rememberChange, resetUndo, updateUndo, historyNoticeRemote } from "./history.js";
@@ -323,7 +323,11 @@ async function openHH(id) {
   resetReminders();
   resetUndo(); // Undo only steps back through changes made in this household, this session
   saveOfflineProfile();
-  if (loaded.state) { app.state = loaded.state; app.hasData = true; app.store.saveCache(); }
+  if (loaded.state) {
+    app.state = loaded.state; app.hasData = true; app.store.saveCache();
+    // Phase 9A: refreshed during setup step 4 (the plan saved, accounts not yet): carry on there
+    const pend = app.canWrite ? pendingAccounts() : null; if (pend) resumeAccounts(pend);
+  }
   else {
     const me = app.members.find(m => m.user_id === app.meId);
     app.state = blankBudget({ name: (me && me.display_name) || "" }); app.hasData = false;

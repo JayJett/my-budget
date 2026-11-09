@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { RICH_V3 } from "../fixtures.js";
 import { migrate } from "../../js/model/migrate.js";
 import { toStored } from "../../js/model/schema.js";
-import { setup, skip, SHOTS, open, fake, goTab, settle } from "./helpers.js";
+import { setup, skip, SHOTS, open, fake, goTab, settle, skipAccounts, afterSetup } from "./helpers.js";
 
 setup();
 const RICH = toStored(migrate(RICH_V3));
@@ -75,10 +75,10 @@ test("every menu destination still works: profile, household, reminders, history
   const go = async (act, sel) => { await page.click("#menuBtn"); await page.waitForSelector("#drawer:not([hidden])"); await page.click(`#drawer [data-act="${act}"]`); await page.waitForSelector(sel); };
   await page.click("#menuBtn"); await page.waitForSelector("#drawer:not([hidden])");
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "no sideways scroll with a long name");
-  assert.equal(await page.locator('#drawer [data-switch]').count(), 2, "both households to switch between");
+  assert.equal(await page.locator('#drawer [data-switch]').count(), 0, "households are in the household menu now (Phase 9A)");
   await shot(page, "drawer-320-long");
   await page.keyboard.press("Escape"); await page.waitForSelector("#drawer", { state: "hidden" });
-  for (const [act, sel] of [["profile", "#sheet .prof"], ["household", "#sheet[open]"], ["reminders", "#sheet .rem-switches"], ["history", "#sheet .hist-intro, #sheet .hist-empty"], ["appearance", "#sheet .acc-picker"]]) {
+  for (const [act, sel] of [["profile", "#sheet .prof"], ["reminders", "#sheet .rem-switches"], ["history", "#sheet .hist-intro, #sheet .hist-empty"], ["appearance", "#sheet .acc-picker"]]) {
     await go(act, sel);
     await page.click('#sheet [data-sheet="close"]'); await page.waitForSelector("#sheet", { state: "hidden" });
   }
@@ -91,7 +91,7 @@ test("every menu destination still works: profile, household, reminders, history
   for (const a of ["csv", "backup", "import"]) assert.equal(await page.locator(`#drawer [data-act="${a}"]`).count(), 1, a);
   const dl = page.waitForEvent("download"); await page.click('#drawer [data-act="csv"]'); await dl;
   assert.equal(await page.isVisible("#drawer"), false, "choosing something closes the drawer");
-  await page.click("#menuBtn"); await page.click('#drawer [data-switch="hh-2"]');
+  await page.click("#hhBtn"); await page.click('#hhPop [data-switch="hh-2"]');
   await page.waitForFunction(() => /A very long household/.test(document.querySelector(".brand-t")?.textContent || ""));
   assert.deepEqual(errors, []); await ctx.close();
 });
@@ -218,8 +218,8 @@ test("before the photo storage is switched on: a clear message, nothing breaks",
 test("on your own with no goals yet: one card, one 'Add a goal', straight into the one Goals pot (Phase 8: a solo plan has one)", { skip }, async () => {
   const { page, errors, ctx } = await open({}, { waitFor: ".ob", ...phone(), storage: ALL_DONE });
   await page.fill('[data-ob="people.0.pay"]', "2000");
-  await page.click('[data-obact="next"]'); await page.click('[data-obact="next"]'); await page.waitForSelector(".ob-done"); await page.click('[data-obact="finish"]');
-  await page.waitForSelector("#app .b-income");
+  await page.click('[data-obact="next"]'); await page.click('[data-obact="next"]'); await skipAccounts(page); await page.click('[data-obact="finish"]');
+  await afterSetup(page);
   await goTab(page, "goals");
   assert.equal(await page.locator("#app [data-goal-new]").count(), 1, "one way to add the first goal");
   assert.match(await page.textContent(".gl-first h3"), /Start saving for something/);

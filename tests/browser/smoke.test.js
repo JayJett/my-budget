@@ -148,7 +148,7 @@ test("a brand-new household opens the setup guide; skipping it gives one person 
   assert.equal(await page.textContent(".m-name"), "Jarden", "named after the signed-in person");
   assert.equal(await page.isVisible("#fairSec"), false);
   assert.ok(await page.isVisible(".welcome"));
-  assert.equal(await page.locator(".tab", { hasText: "Spending" }).count(), 1);
+  assert.equal(await page.locator(".tab", { hasText: "Expenses" }).count(), 1);
   const calls = await fake(page, () => window.__fake.rpcCalls.filter(c => c.name === "apply_budget_ops"));
   assert.equal(calls.length, 0, "nothing is saved until you change something");
   await page.click("[data-edit-person]");

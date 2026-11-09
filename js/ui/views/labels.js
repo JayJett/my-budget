@@ -3,6 +3,11 @@
 import { isShared } from "../../model/schema.js";
 export const spendLabel = s => isShared(s) ? "Joint spending" : "Spending";
 export const jointGoalsLabel = s => isShared(s) ? "Joint goals" : "Goals";
-export const TABS = s => [["budget", "Budget"], ["networth", "Net worth"], ["spending", spendLabel(s)], ["goals", "Goals"], ["invest", "Investments"], ["progress", "Progress"]];
-/** Shorter names for the bottom tab bar on phones. */
-export const SHORT = { budget: "Budget", networth: "Net worth", spending: "Spending", goals: "Goals", invest: "Invest", progress: "Progress" };
+/** Every screen, with its name (tours, reminders and attention markers use these). Phase 9A: Spending is
+    shown as Expenses; Net worth, Investments and Progress live under Wealth as Accounts, Investments, History. */
+export const TABS = s => [["home", "Home"], ["budget", "Budget"], ["spending", "Expenses"], ["goals", "Goals"], ["networth", "Accounts"], ["invest", "Investments"], ["progress", "History"]];
+/** The five places in the bottom bar. "wealth" opens whichever Wealth section you were last in. */
+export const NAV = [["home", "Home"], ["budget", "Budget"], ["spending", "Expenses"], ["goals", "Goals"], ["wealth", "Wealth"]];
+export const WEALTH_TABS = [["networth", "Accounts"], ["invest", "Investments"], ["progress", "History"]];
+/** Shorter names (kept for older callers). */
+export const SHORT = { home: "Home", budget: "Budget", networth: "Accounts", spending: "Expenses", goals: "Goals", invest: "Investments", progress: "History", wealth: "Wealth" };

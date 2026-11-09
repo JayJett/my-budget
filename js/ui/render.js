@@ -1,6 +1,6 @@
 /* Drawing the page. render() rebuilds the current tab; refresh() only updates the calculated
    numbers (so typing in a box never loses focus). */
-import { app, readOnly } from "./ctx.js";
+import { app, readOnly, WEALTH } from "./ctx.js";
 import { $, $$, esc } from "./dom.js";
 import { pc } from "./inputs.js";
 import { avatarHTML, myName } from "./profile.js";
@@ -8,7 +8,8 @@ import { compute } from "../model/calc.js";
 import { WORDS, VIEWS } from "../model/periods.js";
 import { listNames } from "../model/format.js";
 import { accountColours } from "./charts.js";
-import { TABS, SHORT } from "./views/labels.js";
+import { TABS, SHORT, NAV, WEALTH_TABS } from "./views/labels.js";
+import * as home from "./views/home.js";
 import * as budget from "./views/budget.js";
 import * as networth from "./views/networth.js";
 import * as spending from "./views/spending.js";
@@ -16,10 +17,13 @@ import * as goals from "./views/goals.js";
 import * as invest from "./views/invest.js";
 import * as progress from "./views/progress.js";
 import { hhAvatarHTML } from "./household-look.js";
+import { householdMenuOpen } from "./household-menu.js";
 
-const VIEWS_BY_TAB = { budget, networth, spending, goals, invest, progress };
+const VIEWS_BY_TAB = { home, budget, networth, spending, goals, invest, progress };
 
 const ICONS = {
+  home: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.3 7.4 8 2.8l5.7 4.6"/><path d="M3.8 6.4v7.1h8.4V6.4"/><path d="M6.6 13.5v-3.4h2.8v3.4"/></svg>',
+  wealth: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 14h12M3.5 14V8.5M6.5 14V6M9.5 14V7.5M12.5 14V3.5"/></svg>',
   budget: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6.2"/><path d="M8 1.8V8h6.2"/></svg>',
   networth: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 14h12M3.5 14V8M6.5 14V5M9.5 14V7M12.5 14V3"/></svg>',
   spending: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M2.5 6h11l-1.2 7.5H3.7z"/><path d="M5.5 6l2.5-4 2.5 4"/></svg>',
@@ -56,7 +60,12 @@ export function renderBrand() {
     if (btn) btn.setAttribute("aria-label", nm ? `Open account menu (${nm})` : "Open account menu");
   }
   const brand = $("#brandNames");
-  if (brand) brand.innerHTML = `${app.household ? hhAvatarHTML(app.household, "sm") : ""}<span class="brand-tx"><span class="brand-t">${esc(title)}</span>${P.length > 1 && names.length ? `<small>${esc(listNames(names))}</small>` : ""}</span>`;
+  // Phase 9A: the household's picture and name are a button of their own: they open the household menu
+  // (switch, settings, create). Your avatar on the left still opens your own menu.
+  const tx = `<span class="brand-tx"><span class="brand-t">${esc(title)}</span>${P.length > 1 && names.length ? `<small>${esc(listNames(names))}</small>` : ""}</span>`;
+  if (brand) brand.innerHTML = app.household
+    ? `<button class="hh-trigger" id="hhBtn" type="button" aria-haspopup="menu" aria-expanded="${householdMenuOpen()}" aria-label="${esc(title)}: switch or manage households">${hhAvatarHTML(app.household, "sm")}${tx}<svg class="hh-caret" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 6.5 8 10l3.5-3.5"/></svg></button>`
+    : tx;
   document.title = `${title} · Budget`;
 }
 
@@ -64,6 +73,9 @@ const viewAsBar = () => {
   const v = app.state.viewAs;
   return `<div class="viewas"><span>Show amounts per</span><div class="seg" role="group" aria-label="Show amounts per">${VIEWS.map(k => `<button type="button" data-viewas="${k}" aria-pressed="${k === v}">${WORDS[k].noun[0].toUpperCase() + WORDS[k].noun.slice(1)}</button>`).join("")}</div><small>Applies to everyone in the household.</small></div>`;
 };
+
+/** Wealth's three sections, as a segmented switch at the top of each (Phase 9A). */
+const wealthNav = () => `<nav class="wl-nav" aria-label="Wealth"><div class="seg wl-seg" role="tablist">${WEALTH_TABS.map(([k, l]) => `<button type="button" role="tab" class="wl-t" data-tab="${k}" aria-selected="${k === app.tab}"><span>${esc(l)}</span><span class="mark" data-mark="${k}"></span></button>`).join("")}</div></nav>`;
 
 const welcomeBox = () => `<div class="welcome"><h3>Start your budget</h3><p>Nothing’s saved yet. Add your pay below, let the setup guide build a starting plan, or bring in a file you saved earlier.</p><button class="btn primary" type="button" data-act="setup">Use the setup guide</button> <button class="btn soft" type="button" data-act="import">Import a saved file</button></div>`;
 
@@ -73,10 +85,12 @@ export function render() {
   if (app.setup) { renderBrand(); app.setup.render(); if (app.afterRender) app.afterRender(); return; } // the setup guide has the page to itself
   app.C = compute(app.state, app.today);
   app.colours = accountColours(app.state);
-  $("#tabs").innerHTML = TABS(app.state).map(([k, l]) => `<button class="tab" role="tab" type="button" data-tab="${k}" aria-selected="${k === app.tab}"><span class="ti">${ICONS[k]}</span><span class="tl">${esc(l)}</span><span class="ts">${esc(SHORT[k])}</span><span class="mark" data-mark="${k}"></span></button>`).join("");
+  // Phase 9A: five places. Wealth is lit for any of its three sections.
+  const navOn = k => k === app.tab || (k === "wealth" && WEALTH.includes(app.tab));
+  $("#tabs").innerHTML = NAV.map(([k, l]) => `<button class="tab" role="tab" type="button" data-tab="${k}" aria-selected="${navOn(k)}"><span class="ti">${ICONS[k]}</span><span class="tl">${esc(l)}</span><span class="ts">${esc(SHORT[k])}</span><span class="mark" data-mark="${k}"></span></button>`).join("");
   const note = !app.canWrite && app.household ? `<div class="welcome ro-note"><h3>You’re viewing ${esc(app.household.name)}</h3><p>You can look around, but changes are switched off. An owner can make you an editor in Household settings.</p></div>` : "";
   // (Budget and Spending have their own period switch, in their top card.)
-  $("#app").innerHTML = note + (app.loaded && !app.hasData && app.canWrite && app.tab === "budget" ? welcomeBox() : "") + (["progress", "budget", "spending", "networth", "goals", "invest"].includes(app.tab) ? "" : viewAsBar()) + VIEWS_BY_TAB[app.tab].view();
+  $("#app").innerHTML = note + (app.loaded && !app.hasData && app.canWrite && app.tab === "budget" ? welcomeBox() : "") + (WEALTH.includes(app.tab) ? wealthNav() : "") + VIEWS_BY_TAB[app.tab].view();
   if (app.beforeRefresh) app.beforeRefresh(); // e.g. an open editing sheet redraws itself from the new state
   refresh();
   const ro = readOnly();
@@ -103,7 +117,9 @@ export function refresh() {
   if (mod.draw) mod.draw(C);
   renderBrand();
   // tab markers and the attention box
-  TABS(app.state).forEach(([k]) => { const m = $(`[data-mark="${k}"]`), list = C.issues[k] || [], c = list.length; if (m) { m.textContent = c || ""; m.parentElement.dataset.tip = c ? list.join(" ") : ""; } });
+  // attention markers: each screen's own, and Wealth's adds up its three sections
+  const marks = { ...C.issues, wealth: WEALTH.flatMap(k => C.issues[k] || []) };
+  [...TABS(app.state).map(t => t[0]), "wealth"].forEach(k => { const L = marks[k] || [], c = L.length; document.querySelectorAll(`[data-mark="${k}"]`).forEach(m => { m.textContent = c || ""; m.parentElement.dataset.tip = c ? L.join(" ") : ""; }); });
   const at = $("#attn"), li = C.issues[app.tab] || [];
   if (at) { at.hidden = !li.length; at.innerHTML = li.length ? `<h3>${li.length === 1 ? "One thing" : li.length + " things"} to look at</h3><ul>${li.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""; }
 }

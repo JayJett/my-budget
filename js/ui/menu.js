@@ -12,6 +12,7 @@ import { openHistory } from "./history.js";
 import { openReminderSettings } from "./reminders.js";
 import { avatarHTML, myName } from "./profile.js";
 import { hhAvatarHTML } from "./household-look.js";
+import { closeHouseholdMenu } from "./household-menu.js";
 
 const ROLE = { owner: "Owner", editor: "Editor", viewer: "View only" };
 /** One icon family: 24px grid, 1.8 stroke, round caps (like the tab bar's). */
@@ -39,13 +40,10 @@ export function mainMenu() {
   const s = app.session, hhs = app.households || [];
   const name = myName() || (s && s.user.email) || "You";
   const profile = s ? `<button class="dr-me" type="button" data-act="profile" aria-label="My profile: ${esc(name)}">${avatarHTML("lg")}<span class="dr-me-t"><b>${esc(name)}</b><small>View my profile</small></span>${MENU_ICONS.chev}</button>` : "";
-  const switcher = hhs.length > 1 ? `<div class="dr-sec"><h3 class="dr-h">Households</h3>${hhs.map(h => {
-      const on = app.household && h.id === app.household.id;
-      return `<button class="dr-hh" type="button" data-switch="${esc(h.id)}" aria-current="${on}">${hhAvatarHTML(on ? { ...h, look: app.household.look } : h, "sm")}<span class="dr-hh-t"><span class="dr-hh-n">${esc(h.name)}</span><small>${on ? "Open now" : ROLE[h.role] || ""}</small></span></button>`;
-    }).join("")}</div>` : "";
+  // (Phase 9A: switching households and Household settings moved to the household menu in the header)
+  const switcher = "";
   return `<div class="dr-top">${profile}${close}</div>${switcher}
     <nav class="dr-sec" aria-label="Menu">
-      ${row("household", "household", "Household")}
       ${row("reminders", "reminders", "Reminders")}
       ${row("history", "history", "History")}
       ${row("appearance", "appearance", "Appearance")}
@@ -66,6 +64,7 @@ function dataMenu() {
 const toursView = () => `${subHead("Guided tours")}<div class="dr-sec dr-tours">${toursMenu().replace(/<div class="pop-h">[^<]*<\/div>/, "").replace(/<hr>[\s\S]*$/, "")}</div>`;
 
 export function openMenu(trigger) {
+  closeHouseholdMenu();
   openDrawer({ html: mainMenu(), label: "Account menu", from: "left", trigger, onAction: menuAct, className: "dr-menu" });
 }
 

@@ -14,14 +14,15 @@
    Net worth and Goals. Setup only ever starts for a household whose budget is empty, so it can never
    replace a budget that exists; and if someone else in the household sets theirs up meanwhile, theirs
    is kept and opened. Answers live in memory only (never stored on the device) until they're saved. */
-import { app, changed } from "./ctx.js";
+import { app, changed, TAB_HASH } from "./ctx.js";
 import { $, esc, toast } from "./dom.js";
 import { fmtNum } from "./inputs.js";
 import { suggestSplit, buildBudget, splitTotal, householdIncome } from "../model/onboarding.js";
-import { blankBudget, MAX_PEOPLE } from "../model/schema.js";
+import { blankBudget, MAX_PEOPLE, isShared, nextPos } from "../model/schema.js";
 import { WORDS, freqToView, perYear } from "../model/periods.js";
 import { money as fmtMoney } from "../model/format.js";
-import { n, blank } from "../model/util.js";
+import { n, blank, uid, ymd } from "../model/util.js";
+import { nwType, nwIcon } from "./views/networth.js";
 import { HERO } from "./hero-art.js";
 import { setThemeColour } from "./auth.js";
 import { markTour } from "./tour.js";
@@ -30,7 +31,8 @@ import { calm } from "./motion.js";
 import { feedback } from "./feedback.js";
 import { accentSwatchesHTML, lookSeg, THEMES } from "./accent.js";
 
-export const STAGES = ["Make it yours", "Your income", "Your starting plan"];
+export const STAGES = ["Make it yours", "Your income", "Your starting plan", "Your accounts"];
+const STEPS = STAGES.length; // Phase 9A: four steps, the last one optional
 const FREQS = [["weekly", "Weekly"], ["fortnightly", "Fortnightly"], ["monthly", "Monthly"]];
 /** Colours for the starter buckets (fixed, so they never follow the personal accent). */
 const BUCKET_COL = { essentials: "var(--c-blue)", fun: "var(--c-coral)", emergency: "var(--c-slate)", goals: "var(--joint)", invest: "var(--invest)", personalGoals: "var(--c-gold)", debt: "var(--bad)" };
@@ -42,12 +44,12 @@ let ans = null, stage = 2, done = 1, split = null, dir = 1, saving = false, save
 /* ---------- the shared look: a small header with the step, and a slim progress bar ----------
    doneCount: how many of the three steps are finished (and saved where that matters). */
 export function obHeader(current, doneCount, extra = "") {
-  const label = current <= 3 ? `Step ${current} of 3` : "All set";
-  const name = current <= 3 ? STAGES[current - 1] : "Your budget is ready";
+  const label = current <= STEPS ? `Step ${current} of ${STEPS}` : "All set";
+  const name = current <= STEPS ? STAGES[current - 1] + (current === 4 ? " (optional)" : "") : "Your budget is ready";
   return `<header class="ob-top">
     <div class="ob-top-row"><span class="ob-brand"><span class="logo sm" aria-hidden="true">$</span>Moni Money</span>${extra}</div>
     <p class="ob-stage"><b>${label}</b><span>${esc(name)}</span></p>
-    <div class="ob-prog" role="progressbar" aria-label="Setup progress" aria-valuemin="0" aria-valuemax="3" aria-valuenow="${doneCount}" aria-valuetext="${doneCount} of 3 steps done"><span style="width:${(doneCount / 3) * 100}%"></span></div>
+    <div class="ob-prog" role="progressbar" aria-label="Setup progress" aria-valuemin="0" aria-valuemax="${STEPS}" aria-valuenow="${doneCount}" aria-valuetext="${doneCount} of ${STEPS} steps done"><span style="width:${(doneCount / STEPS) * 100}%"></span></div>
   </header>`;
 }
 
@@ -60,7 +62,25 @@ function savedMode() { try { return sessionStorage.getItem(MODE_KEY()); } catch 
     however many people's pay has been added so far. */
 const planOf = () => ans && ans.mode === "solo" ? { mode: "solo", purpose: "solo" } : { mode: "shared", purpose: "household" };
 
+/* ---------- Step 4: your accounts (Phase 9A) ----------
+   Optional. Accounts typed here are kept on this device (this tab only) until you press Save, so a
+   refresh brings the step back with them; each has its id from the start, so saving twice can't add
+   it twice. They're saved like the plan itself: one whole-budget save marked as the setup, so Undo
+   never offers to take them away. Skipping saves nothing and invents nothing. */
+const ACC_KEY = () => `mb-ob-accounts-${app.household ? app.household.id : "x"}`;
+let accs = [], accForm = null, accErr = "";
+const keepAccs = () => { try { sessionStorage.setItem(ACC_KEY(), JSON.stringify(accs)); } catch (_) {} };
+const dropAccs = () => { try { sessionStorage.removeItem(ACC_KEY()); } catch (_) {} };
+/** After a refresh: accounts started on step 4 but not yet saved (null when there's nothing to resume). */
+export function pendingAccounts() { try { const v = JSON.parse(sessionStorage.getItem(ACC_KEY()) || "null"); return Array.isArray(v) ? v : null; } catch (_) { return null; } }
+/** Re-open step 4 (the budget itself is already saved). */
+export function resumeAccounts(list) {
+  startSetup(); ans.people = app.state.people.map(p => ({ name: p.name, pay: p.pay, freq: p.freq, payday: p.payday }));
+  accs = list || []; stage = 4; done = 3; shownStage = 0;
+}
+
 export function startSetup() {
+  accs = []; accForm = null; accErr = "";
   const me = app.members.find(m => m.user_id === app.meId);
   const md = (app.session && app.session.user && app.session.user.user_metadata) || {};
   const myName = (me && me.display_name) || md.name || (md.full_name || "").trim().split(/\s+/)[0] || "";
@@ -71,6 +91,92 @@ export function startSetup() {
   document.body.classList.add("setting-up"); setThemeColour(true);
 }
 export function endSetup() { app.setup = null; document.body.classList.remove("setting-up"); setThemeColour(false); }
+
+function accountsStep(P) {
+  const S = app.state, shared = isShared(S) && S.people.length > 0, v = x => fmtMoney(x, true);
+  const rows = accs.map((a, k) => {
+    const t = nwType(a.type), owner = shared && a.owner ? (S.people.find(p => p.id === a.owner) || {}).name : shared ? "Shared" : "";
+    return `<li class="ob-acc"><button class="ob-acc-row" type="button" data-obact="acc-edit" data-i="${k}" aria-label="Edit ${esc(a.name)}">
+      <span class="ex-ic" style="--cat:${t.col}" aria-hidden="true">${nwIcon(a.type)}</span>
+      <span class="ob-acc-t"><b>${esc(a.name)}</b><small>${esc(t.label)}${owner ? ` · ${esc(owner)}` : ""}</small></span>
+      <span class="ob-acc-v${a.type === "Debt" ? " owed" : ""}">${a.balance === null ? "No balance" : v(a.balance)}${a.type === "Debt" && a.balance !== null ? "<small>owed</small>" : ""}</span></button>
+      <button class="ob-acc-x" type="button" data-obact="acc-rm" data-i="${k}" aria-label="Remove ${esc(a.name)}">✕</button></li>`;
+  }).join("");
+  const own = accs.filter(a => a.type !== "Debt").reduce((s, a) => s + n(a.balance), 0), owe = accs.filter(a => a.type === "Debt").reduce((s, a) => s + n(a.balance), 0);
+  const totals = accs.length ? `<div class="ob-sum ob-acc-sum"><div><small>You have</small><b>${v(own)}</b></div><div><small>You owe</small><b>${v(owe)}</b></div><div><small>Net worth</small><b>${v(own - owe)}</b></div></div>` : "";
+  const form = accForm ? accFormHTML(shared) : `<button class="add-row ob-add" type="button" data-obact="acc-add">+ Add ${accs.length ? "another" : "an"} account</button>`;
+  return `${accs.length || accForm ? "" : `<div class="ob-art" aria-hidden="true">${HERO.jar()}</div>`}<h2 id="obTitle" tabindex="-1">Let’s add your accounts</h2>
+    <p class="lead">Add what you have and what you owe. You can always do this later.</p>
+    ${rows ? `<ul class="ob-accs">${rows}</ul>` : ""}${totals}${form}
+    ${accErr ? `<p class="msg err" role="alert">${esc(accErr)}</p>` : ""}
+    ${accForm ? "" : `<div class="ob-nav">${accs.length ? `<button class="btn ob-back" type="button" data-obact="acc-skip">Skip for now</button><button class="btn primary" type="button" data-obact="next"${saving ? " disabled" : ""}>${saving ? "Saving…" : accErr ? "Try again" : `Save ${accs.length === 1 ? "account" : `${accs.length} accounts`}`}</button>`
+      : `<button class="btn primary block" type="button" data-obact="acc-skip">Skip for now</button>`}</div>`}`;
+}
+const ACC_TYPES = ["Operating", "Savings", "Investment", "Super", "Debt"];
+function accFormHTML(shared) {
+  const f = accForm, S = app.state, me = myPersonId();
+  return `<form class="ob-acc-form" data-acc-form novalidate>
+    <label class="ob-field"><span>Name</span><input type="text" data-acc="name" value="${esc(f.name)}" placeholder="e.g. Everyday account" maxlength="60" autocomplete="off"></label>
+    <fieldset class="ob-field"><legend>Type</legend><div class="seg seg-radio wrap ob-acc-types">${ACC_TYPES.map(k => `<label><input type="radio" name="obacctype" value="${k}"${f.type === k ? " checked" : ""}><span>${esc(nwType(k).label)}</span></label>`).join("")}</div></fieldset>
+    <label class="ob-field"><span>${f.type === "Debt" ? "Amount owed" : "Balance"}</span><span class="ob-amount ob-acc-amt"><span class="ob-cur" aria-hidden="true">$</span><input type="text" inputmode="decimal" data-acc="balance" value="${f.balance === null || f.balance === undefined ? "" : fmtNum(f.balance)}" placeholder="0" autocomplete="off"></span></label>
+    ${shared ? `<label class="ob-field"><span>Whose account</span><select data-acc="owner"><option value="">Shared</option>${S.people.map(p => `<option value="${esc(p.id)}"${(f.owner ?? me) === p.id ? " selected" : ""}>${esc(p.name || "Unnamed")}</option>`).join("")}</select></label>` : ""}
+    ${f.type === "Savings" ? `<p class="ob-hint">Just the account’s balance. If some of it is for your emergency fund or a goal, you can say so later on Goals; it’s never counted twice.</p>` : ""}
+    ${f.err ? `<p class="msg err" role="alert">${esc(f.err)}</p>` : ""}
+    <div class="ob-nav"><button class="btn ob-back" type="button" data-obact="acc-cancel">Cancel</button><button class="btn primary" type="button" data-obact="acc-keep">${f.k === null ? "Add" : "Done"}</button></div></form>`;
+}
+/** Which person in the budget is you (by your name), for "Whose account". */
+function myPersonId() {
+  const nm = (app.members.find(m => m.user_id === app.meId) || {}).display_name || (ans && ans.people[0] && ans.people[0].name) || "";
+  const p = app.state.people.find(x => nm && (x.name || "").trim().toLowerCase() === nm.trim().toLowerCase());
+  return p ? p.id : (isShared(app.state) ? "" : (app.state.people[0] || {}).id);
+}
+function readForm() {
+  const f = accForm, root = document.querySelector("[data-acc-form]"); if (!root) return;
+  f.name = (root.querySelector('[data-acc="name"]').value || "").trim();
+  const raw = (root.querySelector('[data-acc="balance"]').value || "").replace(/[,$\s]/g, "");
+  f.balance = raw === "" ? null : Number(raw);
+  const o = root.querySelector('[data-acc="owner"]'); if (o) f.owner = o.value;
+  const t = root.querySelector('input[name="obacctype"]:checked'); if (t) f.type = t.value;
+}
+function accountAct(act, i) {
+  if (saving) return;
+  accErr = "";
+  if (act === "acc-add") { accForm = { k: null, name: "", type: "Operating", balance: null, owner: undefined }; draw(); focusName(); return; }
+  if (act === "acc-edit") { const a = accs[i]; if (!a) return; accForm = { k: i, ...a }; draw(); focusName(); return; }
+  if (act === "acc-rm") { accs.splice(i, 1); keepAccs(); draw(); return; }
+  if (act === "acc-cancel") { accForm = null; draw(); return; }
+  if (act === "acc-keep") {
+    readForm(); const f = accForm;
+    if (!f.name) { f.err = "Give the account a name."; draw(); focusName(); return; }
+    if (f.balance !== null && (!Number.isFinite(f.balance) || f.balance < 0)) { f.err = f.type === "Debt" ? "Enter what you owe as a positive number." : "Enter the balance as a number (0 or more)."; draw(); return; }
+    if (accs.some((a, k) => k !== f.k && a.name.trim().toLowerCase() === f.name.toLowerCase()) || app.state.nw.accounts.some(a => (a.name || "").trim().toLowerCase() === f.name.toLowerCase())) { f.err = "You already have an account with that name. Goals find accounts by name, so give each a different one."; draw(); focusName(); return; }
+    const shared = isShared(app.state);
+    const a = { id: f.k === null ? uid() : accs[f.k].id, name: f.name, type: f.type, balance: f.balance, ...(shared ? { owner: f.owner === undefined ? myPersonId() || null : f.owner || null } : {}) };
+    if (f.k === null) accs.push(a); else accs[f.k] = a;
+    accForm = null; keepAccs(); draw(); return;
+  }
+  if (act === "acc-skip") { dropAccs(); accs = []; done = 4; stage = 5; dir = 1; draw(); return; }
+}
+const focusName = () => setTimeout(() => { const el = document.querySelector('[data-acc="name"]'); if (el) el.focus(); }, 30);
+async function saveAccounts() {
+  if (saving) return;
+  if (!accs.length) return accountAct("acc-skip");
+  saving = true; accErr = ""; draw();
+  const L = app.state.nw.accounts, have = new Set(L.map(a => a.id));
+  accs.forEach(a => { if (!have.has(a.id)) L.push({ id: a.id, name: a.name, type: a.type, balance: a.balance, ...("owner" in a ? { owner: a.owner } : {}), pos: nextPos(L) }); });
+  if (accs.some(a => a.balance !== null)) app.state.nw.reviewed = ymd(app.today); // balances just entered: as good as reviewed today
+  holdUndoForSetup(); // part of setting up: not something Undo takes back
+  changed({ full: false });
+  try { await app.store.flushNow(); } catch (_) {}
+  saving = false;
+  if (app.saveStatus === "saved" || app.saveStatus === "offline") {
+    dropAccs(); done = 4; stage = 5; dir = 1; draw(); feedback("success");
+    if (app.saveStatus === "offline") toast("Saved on this device. It’ll sync when you’re back online.");
+    return;
+  }
+  accErr = "We couldn’t save your accounts yet. They’re still here: check your connection and try again.";
+  draw();
+}
 
 /** "Set up later": an empty budget in memory (nothing saved, nothing invented), straight into the app. */
 function skip() {
@@ -179,13 +285,15 @@ function body() {
     <p class="ob-skip"><button class="linkish" type="button" data-obact="skip">Start with a blank budget instead</button></p>`;
   }
 
-  // Step 4: saved. The picture and words sit in the middle; the two choices sit where "Continue" was.
-  const first = (P[0].name || "").trim();
+  if (stage === 4) return accountsStep(P);
+
+  // Done. The picture and words sit in the middle; the two choices sit where "Continue" was.
+  const first = (P[0].name || "").trim(), withAccs = (app.state.nw.accounts || []).length > 0;
   return `<div class="ob-done"><div class="ob-done-mid">
       <div class="ob-done-art" aria-hidden="true">${HERO.grow()}<span class="ob-done-ic"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5l3 3 6-7"/></svg></span></div>
       <h2 id="obTitle" tabindex="-1">Your budget is ready${first ? `, ${esc(first)}` : ""}!</h2>
-      <p class="lead">It’s saved. You can adjust everything whenever you like, and add your accounts and goals when you’re ready.</p></div>
-    <div class="ob-done-acts"><button class="btn primary block" type="button" data-obact="finish">Open my budget</button>
+      <p class="lead">${withAccs ? "Your plan and accounts are saved. You can change anything whenever you like." : "Your plan is saved. Add your accounts any time in Wealth, and your goals when you’re ready."}</p></div>
+    <div class="ob-done-acts"><button class="btn primary block" type="button" data-obact="finish">Open Moni Money</button>
     <button class="btn ghost block" type="button" data-obact="tour">Show me around</button></div></div>`;
 }
 
@@ -250,8 +358,8 @@ async function finishBudget() {
   changed({ full: false });
   try { await app.store.flushNow(); } catch (_) {}
   saving = false;
-  if (app.saveStatus === "saved") { done = 3; stage = 4; dir = 1; draw(); feedback("success"); return; }
-  if (app.saveStatus === "offline") { done = 3; stage = 4; draw(); toast("Saved on this device. It’ll sync when you’re back online."); return; }
+  if (app.saveStatus === "saved") { done = 3; stage = 4; dir = 1; keepAccs(); draw(); feedback("success"); return; }
+  if (app.saveStatus === "offline") { done = 3; stage = 4; keepAccs(); draw(); toast("Saved on this device. It’ll sync when you’re back online."); return; }
   saveErr = "We couldn’t save your budget yet. Check your connection and try again.";
   draw();
 }
@@ -281,9 +389,10 @@ export function initSetupEvents() {
   document.addEventListener("focusout", e => { const el = e.target; if (app.setup && el.dataset && el.dataset.obt === "num") el.value = blank(num(el.value)) ? "" : fmtNum(num(el.value)); });
   document.addEventListener("keydown", e => {
     if (!app.setup || e.key !== "Enter" || !e.target.matches || !e.target.matches(".ob-card input:not([type=radio])")) return;
-    e.preventDefault(); const nx = $('[data-obact="next"]'); if (nx && !nx.disabled) nx.click();
+    e.preventDefault(); const nx = $(accForm ? '[data-obact="acc-keep"]' : '[data-obact="next"]'); if (nx && !nx.disabled) nx.click();
   });
   document.addEventListener("change", e => {
+    if (app.setup && e.target.name === "obacctype" && accForm) { readForm(); draw(); const r = document.querySelector(`input[name="obacctype"][value="${accForm.type}"]`); if (r) r.focus(); return; }
     if (!app.setup || e.target.name !== "obmode") return;
     if (ans.mode !== e.target.value) split = null; // a different plan for a different choice
     ans.mode = e.target.value; rememberMode(ans.mode);
@@ -299,7 +408,8 @@ export function initSetupEvents() {
       const card = b.closest(".ob-card"); if (card) card.classList.toggle("look-open", lookOpen);
       return;
     }
-    if (act === "back") return go(Math.max(1, stage - 1));
+    if (act === "back") { if (stage === 4) return; return go(Math.max(1, stage - 1)); } // the plan is saved: step 4 doesn't go back into it
+    if (act && act.startsWith("acc-")) return accountAct(act, i);
     if (act === "next") {
       if (stage === 1) { if (ans.mode === "solo") { ans.people = ans.people.slice(0, 1); split = null; } return go(2); }
       if (stage === 2) {
@@ -307,6 +417,7 @@ export function initSetupEvents() {
         done = Math.max(done, 2); return go(3);
       }
       if (stage === 3) return finishBudget();
+      if (stage === 4) return saveAccounts();
     }
     if (act === "addperson") {
       if (ans.people.length < MAX_PEOPLE) ans.people.push({ name: "", pay: null, freq: ans.people[0].freq, payday: "" });
@@ -316,9 +427,11 @@ export function initSetupEvents() {
     }
     if (act === "rmperson") { ans.people.splice(i, 1); split = null; return draw(); }
     if (act === "finish" || act === "tour") {
-      // "Show me around" is the Budget tour; "Open my budget" counts as having been offered it
+      // "Show me around" is the Budget tour; "Open Moni Money" (Phase 9A: to Home) counts as having been offered it
       if (act === "finish") markTour("budget", "offered");
-      endSetup(); app.render(); window.scrollTo({ top: 0 });
+      dropAccs(); endSetup();
+      const to = act === "tour" ? "budget" : "home"; app.tab = to; history.replaceState(null, "", "#" + TAB_HASH[to]);
+      app.render(); window.scrollTo({ top: 0 });
       if (act === "tour") app.startTour("budget");
     }
   });

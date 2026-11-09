@@ -16,7 +16,7 @@ const friendly = e => app.friendly ? app.friendly(e) : (e && e.message) || "Some
 
 function open(title, html) {
   const d = $("#sheet");
-  d.innerHTML = `<div class="sheet-head"><h3>${esc(title)}</h3><button class="btn icon" type="button" data-sheet="close" aria-label="Close">✕</button></div><div class="sheet-body">${html}</div>`;
+  d.innerHTML = `<div class="sheet-head"><h3 tabindex="-1" autofocus>${esc(title)}</h3><button class="btn icon" type="button" data-sheet="close" aria-label="Close">✕</button></div><div class="sheet-body">${html}</div>`;
   if (!d.open) d.showModal();
 }
 const msg = (id, text, kind = "err") => { const m = $("#" + id); if (m) { m.className = "msg " + kind; m.textContent = text; } };
@@ -140,6 +140,14 @@ async function downloadAll() {
   msg("mDl", "", "info");
 }
 
+/* ---------- create a household (Phase 9A: from the household menu) ----------
+   The same form and database function as in Household settings (create_household), nothing new. */
+export function openCreateHousehold() {
+  open("Create a household", `<section class="set"><p class="set-note">A separate budget with its own people, for example if you help someone with theirs. Your other households stay exactly as they are.</p>
+    <form id="setNewHH" class="set-row"><input type="text" name="name" placeholder="e.g. Mum’s budget" required aria-label="New household name" maxlength="60"><button class="btn primary" type="submit">Create</button></form><div class="msg" id="mNew"></div></section>`);
+  const i = document.querySelector('#setNewHH input'); if (i) setTimeout(() => i.focus(), 50);
+}
+
 /* ---------- household ---------- */
 export async function openHouseholdSettings() {
   const hh = app.household, role = app.role, isOwner = role === "owner", canInvite = role === "owner" || role === "editor";
@@ -160,7 +168,7 @@ export async function openHouseholdSettings() {
       <select class="cell" name="role" aria-label="Their role"><option value="editor">Editor</option><option value="viewer">Viewer</option></select><button class="btn primary" type="submit">Invite</button></form><div class="msg" id="mInv"></div>
       <p class="set-note">They create an account with that exact email, confirm it, and join as soon as they sign in.</p>
       <ul class="hh-list" ${(inv || []).length ? "" : "hidden"}>${(inv || []).map(i => `<li><span>${esc(i.email)}<small>Invited as ${ROLE_LABEL[i.role] || "Editor"}. Waiting for them to sign up</small></span><button class="btn small" type="button" data-uninvite="${esc(i.id)}">Cancel</button></li>`).join("")}</ul></section>` : ""}
-    <section class="set"><h4>Other households</h4><p class="set-note">One login can be in several households, for example if you help someone with theirs. Switch between them from the ⋯ menu.</p>
+    <section class="set"><h4>Other households</h4><p class="set-note">One login can be in several households, for example if you help someone with theirs. Switch between them by tapping the household’s name at the top.</p>
       <form id="setNewHH" class="set-row"><input type="text" name="name" placeholder="e.g. Mum’s budget" required aria-label="New household name"><button class="btn" type="submit">Create a household</button></form><div class="msg" id="mNew"></div></section>
     <section class="set danger-zone"><h4>Leave this household</h4><p class="set-note">${leaveText()}</p><button class="btn danger" type="button" data-sheet="leave">Leave ${esc(hh.name)}</button><div class="msg" id="mLeave"></div></section>`);
 }

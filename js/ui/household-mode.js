@@ -56,7 +56,7 @@ export function openCombineReview() {
   const per = WORDS[S.viewAs].per, v = x => money(x / perYear(S.viewAs));
   const d = $("#sheet");
   const rows = P.rows.map(r => `<li><span>${esc(r.name)}</span><b>${v(r.before)} → ${v(r.after)}</b></li>`).join("");
-  d.innerHTML = `<div class="sheet-head"><h3>Combine your goal pots</h3><button class="btn icon" type="button" data-sheet="close" aria-label="Close">✕</button></div>
+  d.innerHTML = `<div class="sheet-head"><h3 tabindex="-1" autofocus>Combine your goal pots</h3><button class="btn icon" type="button" data-sheet="close" aria-label="Close">✕</button></div>
     <div class="sheet-body hm-review">
       <p>Your goals pot (“${esc(P.goals.name || "Goals")}”) gets ${pct(P.a, 2)} of your pay and your personal goals pot gets ${pct(P.b, 2)}. After combining, one Goals allocation gets <b>${pct(P.a + P.b, 2)}</b>.</p>
       <h4>What each goal gets ${esc(per)}</h4>

@@ -124,14 +124,16 @@ export function buildBudget(answers, split, today = new Date()) {
   const have = answers.have || {}, nw = [];
   const addNW = (name, type, balance) => nw.push({ id: uid(), name, type, balance: blank(balance) ? null : n(balance), pos: nw.length + 1 });
   if (!blank(have.savings) || (purpose === "saving" && answers.goal && !blank(answers.goal.name))) addNW("Savings", "Savings", have.savings);
-  addNW("Emergency Fund", "Savings", have.emergency);
+  // (Phase 9A) only an account someone actually told us about: no empty "Emergency Fund" placeholder.
+  // The emergency fund is a goal; which account holds its money is chosen later, so nothing is counted twice.
+  if (!blank(have.emergency)) addNW("Emergency Fund", "Savings", have.emergency);
   if (!blank(have.kiwisaver)) addNW("KiwiSaver", "Super", have.kiwisaver);
   if (!blank(have.investments)) addNW("Investments", "Investment", have.investments);
   (have.debts || []).filter(d => !blank(d.name) || n(d.balance) > 0).forEach(d => addNW(d.name || "Debt", "Debt", d.balance));
 
   // Goals
   const efTarget = emergencyTarget(people, purpose);
-  const ef = { id: "ef", name: "Emergency Fund", target: efTarget || null, saved: blank(have.emergency) ? null : n(have.emergency), account: "Emergency Fund", deadline: "" };
+  const ef = { id: "ef", name: "Emergency Fund", target: efTarget || null, saved: blank(have.emergency) ? null : n(have.emergency), account: blank(have.emergency) ? "" : "Emergency Fund", deadline: "" };
   const joint = [];
   const g = answers.goal;
   if (purpose === "saving" && g && !blank(g.name)) {

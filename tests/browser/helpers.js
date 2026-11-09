@@ -45,21 +45,22 @@ after(async () => { if (browser) await browser.close(); if (server) server.close
 
 /** Open the app with a given saved budget (or a full fake setup via opts.init).
     Returns the page and a list of errors seen. waitFor: what to wait for before returning. */
-export async function open(budget, { width = 1280, seq = 0, init = null, waitFor = "#app .viewas", storage = null, device = null, welcome = false, motion = "reduce", initScript = null } = {}) {
+export async function open(budget, { width = 1280, seq = 0, init = null, waitFor = "#app .viewas", storage = null, device = null, welcome = false, motion = "reduce", initScript = null, hash = "budget" } = {}) {
   // Phase 7C redesign: someone new sees the welcome slides first. Older tests start as someone who has
   // already been past them on this device (pass welcome: true to see them).
   if (!welcome) storage = { "mb-welcome-seen": "1", ...(storage || {}) };
   // Reduced motion: sheets appear in place, so tests can measure them straight away (and the setting is exercised).
   const ctx = await browser.newContext({ ...(device ? { ...device } : { viewport: { width, height: 900 } }), reducedMotion: motion });
   const page = await ctx.newPage();
-  if (initScript) await page.addInitScript(initScript);
+  if (initScript) await (Array.isArray(initScript) ? page.addInitScript(initScript[0], initScript[1]) : page.addInitScript(initScript));
   const errors = [];
   page.on("pageerror", e => errors.push(String(e)));
   page.on("console", m => { if (m.type() === "error") errors.push(m.text()); });
   page.on("response", r => { if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`); });
   await page.route(/fonts\.(googleapis|gstatic)\.com/, r => r.fulfill({ contentType: "text/css", body: "" }));
   await page.addInitScript(([i, st]) => { window.__FAKE_INIT = i; if (st) for (const [k, v] of Object.entries(st)) localStorage.setItem(k, v); }, [init || { budget, seq }, storage]);
-  await page.goto(base);
+  // Phase 9A: the app now opens on Home; older tests start on Budget, through its address (hash: "" for none)
+  await page.goto(base + (hash ? "#" + hash : ""));
   try { await page.waitForSelector(waitFor, { timeout: 10000 }); }
   catch (e) {
     await page.screenshot({ path: join(SHOTS, "failed-to-load.png") });
@@ -71,6 +72,10 @@ export const settle = page => page.waitForFunction(() => document.querySelector(
 export const fake = (page, expr) => page.evaluate(expr);
 /** Click a tab and wait until it's showing. */
 export async function goTab(page, tab) {
+  // Phase 9A: Net worth, Investments and Progress live under Wealth (Accounts, Investments, History)
+  if (["networth", "invest", "progress"].includes(tab) && !(await page.locator(`.wl-nav [data-tab="${tab}"]`).count())) {
+    await page.click('#tabs [data-tab="wealth"]'); await page.waitForSelector(".wl-nav");
+  }
   await page.click(`[data-tab="${tab}"]`);
   await page.waitForSelector(`[data-tab="${tab}"][aria-selected="true"]`);
 }
@@ -118,4 +123,17 @@ export async function editNetWorth(page, id) {
 export async function editGoal(page, key, id) {
   await page.click(`[data-edit-goal="${key}"][data-i="${id}"]`);
   await page.waitForSelector(`#sheet .bsheet [data-l="${key}"][data-i="${id}"][data-f="target"]`);
+}
+/** Phase 9A: after the plan is saved, setup has an optional step 4 (accounts). Skip it, like a person
+    who has nothing to add, and wait for the "ready" screen. */
+export async function skipAccounts(page) {
+  await page.waitForSelector('.ob-done, [data-obact="acc-skip"]');
+  if (await page.locator('[data-obact="acc-skip"]').count()) await page.click('[data-obact="acc-skip"]');
+  return page.waitForSelector(".ob-done");
+}
+/** Phase 9A: finishing setup opens Home. Tests that carry on in Budget go there. */
+export async function afterSetup(page) {
+  await page.waitForSelector("#app .home, #app .b-income");
+  if (await page.locator("#app .home").count()) { await page.click('#tabs [data-tab="budget"]'); }
+  return page.waitForSelector("#app .b-income");
 }

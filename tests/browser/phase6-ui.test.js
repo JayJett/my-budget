@@ -73,7 +73,7 @@ test("switching household: Progress shows the new household's history, never the
   await page.waitForSelector(".pg-hl .pg-list li");
   assert.equal(await page.locator(".pg-hl .pg-list li").count(), 2);
   await page.selectOption("#pgCmpSel", "2");
-  await page.click("#menuBtn"); await page.click('[data-switch="hh-2"]');
+  await page.click("#hhBtn"); await page.click('#hhPop [data-switch="hh-2"]');
   await page.waitForFunction(() => /Mum/.test(document.querySelector("#brandNames").textContent));
   await page.waitForSelector(".pg-hero");
   assert.equal(await page.locator(".pg-hl .pg-list li").count(), 1, "just this household's one snapshot");

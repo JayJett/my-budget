@@ -36,8 +36,8 @@ export const TOURS = {
       { sel: ["#app .b-income"], title: "Income", text: "Everyone’s take-home pay, added up. Tap a person to change their pay, how often it arrives, or their colour." },
       { sel: ["#allocStatus"], title: "Every dollar has a job", text: "How much of each person’s pay is planned. Aim for 100%, and use Fill to top up the last bit." },
       { sel: ["#app .b-allocs", "#app .alloc-list"], title: "Your allocations", text: "Where the pay goes, account by account. Tap one to change its share of each person’s pay." },
-      { sel: ["#tabs"], title: "The other tabs", text: "Net worth is what you own and owe. Spending is where the bills money goes. Goals and Investments show what your saving adds up to." },
-      { sel: ["#menuBtn"], title: "Tap your initial for settings", text: "Your account, household members and roles, switching households, appearance, downloads, and a guided tour for every tab." },
+      { sel: ["#tabs"], title: "Getting around", text: "Home is your overview. Expenses is where the bills money goes, Goals is what you’re saving for, and Wealth has your accounts, investments and history." },
+      { sel: ["#menuBtn"], title: "Tap your initial for settings", text: "Your profile, appearance, reminders, downloads and a guided tour for every tab. Tap the household’s name to switch households or manage it." },
     ],
   },
   networth: {
@@ -72,7 +72,7 @@ export const TOURS = {
   invest: {
     invite: "See how the forecast is worked out.",
     stops: [
-      { sel: ['#app .iv-src-i[data-tab="networth"]'], title: "Starting balance", text: "Comes from your Investment accounts on the Net worth tab." },
+      { sel: ['#app .iv-src-i[data-tab="networth"]'], title: "Starting balance", text: "Comes from your Investment accounts in Wealth → Accounts." },
       { sel: ['#app .iv-src-i[data-tab="budget"]'], title: "What goes in", text: "Your Investment allocations on the Budget tab. Change them there and this updates." },
       { sel: ["#app .iv-as"], title: "Your assumptions", text: "The yearly return, how much contributions grow, and fees. They’re your own estimates, not a recommendation. Tap Adjust to change them." },
       { sel: ["#ivChart", "#app .iv-hero"], title: "The forecast", text: "An illustration of how it could grow over 5 to 30 years. Real returns go up and down, so it’s not a guarantee or advice." },

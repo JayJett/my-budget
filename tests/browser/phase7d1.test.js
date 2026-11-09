@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { RICH_V3 } from "../fixtures.js";
 import { migrate } from "../../js/model/migrate.js";
 import { toStored } from "../../js/model/schema.js";
-import { setup, skip, SHOTS, open, fake, goTab, settle } from "./helpers.js";
+import { setup, skip, SHOTS, open, fake, goTab, settle, skipAccounts, afterSetup } from "./helpers.js";
 
 setup();
 const RICH = toStored(migrate(RICH_V3));
@@ -24,9 +24,9 @@ async function finishSetup(page, { partner = false } = {}) {
   await page.click('.ob-freq label:has(input[value="fortnightly"])');
   if (partner) { await page.click('[data-obact="addperson"]'); await page.fill('[data-ob="people.1.name"]', "Sam"); await page.fill('[data-ob="people.1.pay"]', "1500"); }
   await page.click('[data-obact="next"]'); await page.click('[data-obact="next"]');
-  await page.waitForSelector(".ob-done");
+  await skipAccounts(page);
   await page.click('[data-obact="finish"]');
-  await page.waitForSelector("#app .b-income");
+  await afterSetup(page);
 }
 
 /* ---------------- Undo ---------------- */
@@ -103,7 +103,7 @@ test("a save that fails adds nothing to Undo; switching household or signing out
   await page.waitForFunction(() => document.querySelector("#saveText")?.textContent === "Saved", null, { timeout: 20000 });
   assert.equal(await undoShown(page), true, "once it really saves, it can be undone");
   // another household: its Undo starts empty (never reaches back into the first)
-  await page.click("#menuBtn"); await page.click('#drawer [data-switch="hh-2"]');
+  await page.click("#hhBtn"); await page.click('#hhPop [data-switch="hh-2"]');
   await page.waitForFunction(() => document.querySelector(".brand-t")?.textContent === "Holiday house");
   assert.equal(await undoShown(page), false);
   assert.deepEqual(errors.filter(e => !/Failed to fetch/.test(e)), []); await ctx.close();
@@ -125,9 +125,9 @@ test("header: your avatar opens the account menu (the ⋯ button is gone); long 
     assert.ok(r.av.right <= r.name.left + 1 && r.name.right <= r.right.left + 1, `w=${w}: header pieces overlap`);
     await btn.click();
     await page.waitForSelector("#drawer:not([hidden])");
-    for (const a of ["profile", "reminders", "history", "household", "appearance", "tours", "data", "signout"])
+    for (const a of ["profile", "reminders", "history", "appearance", "tours", "data", "signout"])
       assert.equal(await page.locator(`#drawer [data-act="${a}"]`).count(), 1, `menu still has ${a}`);
-    assert.equal(await page.locator('#drawer [data-switch="hh-2"]').count(), 1, "switching household is still there");
+    assert.equal(await page.locator('#drawer [data-switch], #drawer [data-act="household"]').count(), 0, "households now live in the household menu (Phase 9A)");
     if (w === 390) await page.screenshot({ path: join(SHOTS, "p7d1-header-menu.png") });
     await page.keyboard.press("Escape");
     await page.waitForSelector("#drawer", { state: "hidden" });
@@ -173,7 +173,7 @@ for (const [w, h] of [[320, 568], [375, 667], [390, 664], [430, 932]]) test(`set
   assert.ok(last.bottom <= foot.top + 0.5, `the last row (${Math.round(last.bottom)}) is under the footer (${Math.round(foot.top)})`);
   assert.deepEqual(await tappable(page), [], "step 3 buttons and % boxes' rows");
   if (w === 390) await page.screenshot({ path: join(SHOTS, "p7d1-step3-end.png") });
-  await page.click('[data-obact="next"]'); await page.waitForSelector(".ob-done");
+  await page.click('[data-obact="next"]'); await skipAccounts(page);
   await artClear(page, "done");
   assert.deepEqual(await tappable(page), [], "done buttons");
   assert.deepEqual(errors, []); await ctx.close();

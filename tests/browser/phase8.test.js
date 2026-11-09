@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import { blankBudget, toStored } from "../../js/model/schema.js";
-import { setup, skip, SHOTS, open, fake, goTab, settle } from "./helpers.js";
+import { setup, skip, SHOTS, open, fake, goTab, settle, skipAccounts, afterSetup } from "./helpers.js";
 
 setup();
 const ALL_DONE = { "mb-tours-u-me": JSON.stringify({ tabs: Object.fromEntries(["budget", "networth", "spending", "goals", "invest", "progress"].map(t => [t, "done"])) }) };
@@ -23,8 +23,8 @@ async function setUp(page, mode, pay = "2000") {
   await page.waitForSelector(".ob-buckets");
 }
 async function openHousehold(page) {
-  await page.click("#menuBtn"); await page.waitForSelector("#drawer:not([hidden])");
-  await page.click('#drawer [data-act="household"]');
+  await page.click("#hhBtn"); await page.waitForSelector("#hhPop");
+  await page.click('#hhPop [data-hp="settings"]');
   await page.waitForSelector("#hhModeSec");
 }
 
@@ -37,8 +37,8 @@ test("Just me: a solo plan with one Goals allocation, nothing labelled Joint, an
   assert.match(await page.textContent('[data-obk="tot"]'), /^100%$/);
   assert.doesNotMatch(await page.textContent(".ob-card"), /Joint|Personal Goals|each person/i);
   await shot(page, "solo-plan");
-  await page.click('[data-obact="next"]'); await page.waitForSelector(".ob-done"); await page.click('[data-obact="finish"]');
-  await page.waitForSelector("#app .b-income"); await settle(page);
+  await page.click('[data-obact="next"]'); await skipAccounts(page); await page.click('[data-obact="finish"]');
+  await afterSetup(page); await settle(page);
   const b = await budgetOf(page), acc = vals(b.accounts), me = vals(b.people)[0].id;
   assert.equal(b.mode, "solo");
   assert.equal(acc.filter(a => a.type === "Joint").length, 0, "nothing shared");
@@ -68,8 +68,8 @@ test("With someone, before they've joined: a shared plan that stays shared", { s
   const names = await page.$$eval(".ob-b-name b", e => e.map(x => x.textContent));
   assert.deepEqual(names, ["Bills & essentials", "Spending money", "Emergency Fund", "Joint Goals", "Joint Investments", "Personal Goals"]);
   assert.match(await page.textContent(".ob-shared-hint"), /ready for whoever joins you/);
-  await page.click('[data-obact="next"]'); await page.waitForSelector(".ob-done"); await page.click('[data-obact="finish"]');
-  await page.waitForSelector("#app .b-income"); await settle(page);
+  await page.click('[data-obact="next"]'); await skipAccounts(page); await page.click('[data-obact="finish"]');
+  await afterSetup(page); await settle(page);
   const b = await budgetOf(page), acc = vals(b.accounts);
   assert.equal(b.mode, "shared");
   assert.equal(acc.find(a => a.role === "spending").type, "Joint");
@@ -91,7 +91,7 @@ test("Household settings: switching between Just me and With others changes word
   assert.equal((await budgetOf(page)).mode, "shared");
   assert.equal(JSON.stringify((await budgetOf(page)).accounts), before, "no allocation changed");
   await page.click('#sheet [data-sheet="close"]');
-  assert.match(await page.textContent('[data-tab="spending"]'), /Spending/);
+  assert.match(await page.textContent('[data-tab="spending"]'), /Expenses/);
   assert.match((await page.$$eval(".alloc .a-meta", e => e.map(x => x.textContent)))[0], /^Joint/);
   await openHousehold(page);
   await page.click('[data-hh-mode="solo"]'); await settle(page);
@@ -150,8 +150,8 @@ test("'Not now' hides the offer on this device; it's still in Household settings
 test("solo → shared: adding a person keeps every allocation as it was, and explains how to share", { skip }, async () => {
   const { page, errors, ctx } = await open({}, { waitFor: ".ob", ...phone(), storage: ALL_DONE });
   await setUp(page, "solo");
-  await page.click('[data-obact="next"]'); await page.waitForSelector(".ob-done"); await page.click('[data-obact="finish"]');
-  await page.waitForSelector("#app .b-income"); await settle(page);
+  await page.click('[data-obact="next"]'); await skipAccounts(page); await page.click('[data-obact="finish"]');
+  await afterSetup(page); await settle(page);
   const before = vals((await budgetOf(page)).accounts);
   await page.click("[data-person-new]"); await page.waitForSelector('#sheet .bsheet [data-l="pp"][data-f="name"]');
   await page.keyboard.type("Madi"); await settle(page);
@@ -169,8 +169,8 @@ test("solo → shared: adding a person keeps every allocation as it was, and exp
 test("allocations: pick an icon and a colour; it shows in the list, the sheet and the chart legend; no money changes", { skip }, async () => {
   const { page, errors, ctx } = await open({}, { waitFor: ".ob", ...phone(), storage: ALL_DONE });
   await setUp(page, "solo");
-  await page.click('[data-obact="next"]'); await page.waitForSelector(".ob-done"); await page.click('[data-obact="finish"]');
-  await page.waitForSelector("#app .b-income"); await settle(page);
+  await page.click('[data-obact="next"]'); await skipAccounts(page); await page.click('[data-obact="finish"]');
+  await afterSetup(page); await settle(page);
   await shot(page, "alloc-list");
   const before = await budgetOf(page);
   await page.click('[data-edit-acc="jg"]'); await page.waitForSelector("#sheet .bsheet");
@@ -188,8 +188,8 @@ test("allocations: pick an icon and a colour; it shows in the list, the sheet an
   assert.deepEqual(Object.keys(b.accounts).filter(k => k !== "jg").map(k => b.accounts[k]), Object.keys(before.accounts).filter(k => k !== "jg").map(k => before.accounts[k]));
   await page.click('#sheet .sheet-head [data-sheet="close"]');
   await page.waitForSelector("#sheet", { state: "hidden" });
-  await page.waitForFunction(() => /^rgb/.test(getComputedStyle(document.querySelector('[data-k="acc.jg.ic"]')).color));
-  const tile = await page.$eval('[data-k="acc.jg.ic"]', e => [getComputedStyle(e).color, e.innerHTML.includes("M6.8 9.2")]);
+  // read the tile in the same moment it's checked (the list may redraw as the sheet closes)
+  const tile = await (await page.waitForFunction(() => { const e = document.querySelector('[data-k="acc.jg.ic"]'); const c = e && getComputedStyle(e).color; return c && /^rgb/.test(c) ? [c, e.innerHTML.includes("M6.8 9.2")] : null; })).jsonValue();
   const lav = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--o-lavender").trim());
   assert.equal(tile[1], true, "the plane shows in the list");
   const hex = c => "#" + c.match(/\d+/g).slice(0, 3).map(x => (+x).toString(16).padStart(2, "0")).join("").toUpperCase();
@@ -264,9 +264,9 @@ test("household look: colour and icon show in the header, the switcher and setti
   assert.equal(await page.getAttribute("#brandNames .hh-av", "data-oc"), "purple");
   assert.equal(await page.locator("#brandNames .hh-av svg").count(), 1, "the icon, in the header");
   assert.equal(await page.locator("#meSlot .av").count(), 1, "your own avatar still opens the menu");
-  await page.click("#menuBtn"); await page.waitForSelector("#drawer:not([hidden])");
-  assert.equal(await page.getAttribute('#drawer [data-switch="hh-1"] .hh-av', "data-oc"), "purple");
-  assert.equal(await page.getAttribute('#drawer [data-switch="hh-2"] .hh-av', "data-oc"), "rose", "other households show their own look");
+  await page.click("#hhBtn"); await page.waitForSelector("#hhPop");
+  assert.equal(await page.getAttribute('#hhPop [data-switch="hh-1"] .hh-av', "data-oc"), "purple");
+  assert.equal(await page.getAttribute('#hhPop [data-switch="hh-2"] .hh-av', "data-oc"), "rose", "other households show their own look");
   await shot(page, "household-switcher");
   // the household's look isn't in the budget, and didn't change any money
   assert.equal(JSON.stringify(await fake(page, () => window.__fake.hh("hh-1").budget)).includes("purple"), false);
@@ -339,8 +339,8 @@ test("setup step 1: 'Make it look like yours' is folded away, opens in place, sa
   await page.waitForFunction(() => window.__fake.authCalls.some(c => c.name === "updateUser"), null, { timeout: 3000 });
   await page.check('input[name="obmode"][value="solo"]', { force: true });
   await page.click('[data-obact="next"]'); await page.fill('[data-ob="people.0.pay"]', "1500"); await page.click('[data-obact="next"]');
-  await page.click('[data-obact="next"]'); await page.waitForSelector(".ob-done"); await page.click('[data-obact="finish"]');
-  await page.waitForSelector("#app .b-income"); await settle(page);
+  await page.click('[data-obact="next"]'); await skipAccounts(page); await page.click('[data-obact="finish"]');
+  await afterSetup(page); await settle(page);
   const m = await meta(page);
   assert.equal(m.accent, "purple"); assert.equal(m.theme, "dark");
   assert.equal(JSON.stringify(await budgetOf(page)).includes("purple"), false, "not in the household's budget");

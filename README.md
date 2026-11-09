@@ -293,6 +293,29 @@ The closing audit's findings, fixes and remaining items are in `docs/phase6-audi
   - The switch only appears on devices that can vibrate.
 - Tests: `tests/phase8.test.js`, `tests/palette.test.js`, `tests/browser/phase8.test.js`, `tests/sql/household-identity.test.js`.
 
+### Home, five tabs, the household menu and an optional accounts step (Phase 9A)
+
+- **Five places at the bottom:** Home, Budget, Expenses (was Spending), Goals and Wealth.
+  - Wealth has three sections, **Accounts | Investments | History**: the old Net worth, Invest and Progress screens, unchanged inside.
+  - Wealth reopens on the section you were last in.
+- **Addresses:** `#home`, `#budget`, `#expenses`, `#goals`, `#wealth/accounts`, `#wealth/investments`, `#wealth/history`.
+  - Old ones (`#net-worth`, `#investments`, `#progress`, `#joint-spending`) still open the right place, and the address is tidied (`js/ui/ctx.js` `OLD_HASH`).
+  - Internally each screen keeps its name, so tours, reminders and saved tour progress carry on.
+- **Home** (`js/ui/views/home.js`, choices in `js/model/home.js`): where the app opens.
+  - It shows a greeting, then each person's own next payday (worked out from their "recent payday" and how often they're paid; with no payday entered it asks for one instead of guessing).
+  - Then whether every dollar of pay has a plan, net worth, money planned for saving, investing and expenses, and up to three next steps.
+  - Every figure comes from `compute()`, so it matches the other screens. Nothing is shown that wasn't entered.
+- **Household menu:** tap the household's picture or name in the header for a small dropdown with your households (tap to switch), Household settings and Create a household (the existing `create_household` flow).
+  - Your own avatar on the left still opens your personal menu. Household items have moved out of that menu.
+- **Sheets open with focus on their title**, so the ✕ shows no ring until someone moves to it with a keyboard.
+- **Setup is now four steps.** Step 4, "Your accounts", is optional: add everyday, savings, investment, KiwiSaver/super and debt balances, or skip.
+  - Accounts are saved once, as part of setup, so Undo never offers to remove them.
+  - A refresh comes back to step 4 with what you typed, and each account has a fixed id so it can't be added twice.
+  - In shared households each account can be yours or shared (a label only; it changes no totals).
+  - Setup finishes on Home.
+  - New plans no longer create an empty "Emergency Fund" account: the emergency fund is a goal, and its money is the balance of whichever account you choose for it.
+- Tests: `tests/home.test.js`, `tests/browser/phase9a.test.js`.
+
 ## How saving works
 
 The whole budget lives in one row (`budgets.state`), but the app never overwrites it. Each edit is
