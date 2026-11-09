@@ -58,8 +58,10 @@ test("Budget: one finding about expenses; where pay goes and room to adjust behi
   const { page, errors, ctx } = await open(solo([["Rent", "Fixed", 900, "Fortnight", "essential"]]), { ...phone(), storage: ALL_DONE, hash: "budget", waitFor: "#planCheck" });
   const pc = () => page.textContent("#planCheck");
   // Phase 9B.1: income card first, the expense check right under it, no visible "Plan check" title
+  // (Phase 10A: the check is now inside the status card, which comes straight after income)
   const order = await page.$$eval(".budget > .b-col > *, .budget > *:not(.b-col)", els => els.filter(e => e.offsetParent).sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top).map(e => e.className.split(" ").find(c => c.startsWith("b-")) || e.id));
-  assert.deepEqual(order.slice(0, 3), ["b-income", "b-check", "b-status"]);
+  assert.deepEqual(order.slice(0, 2), ["b-income", "b-status"]);
+  assert.equal(await page.locator("#allocStatus #planCheck").count(), 1);
   assert.doesNotMatch(await pc(), /Plan check/);
   assert.equal(await page.getAttribute("#planCheck", "aria-label"), "Expense check");
   assert.match(await page.textContent("#planCheck .pc-main"), /Your expenses are covered\s*\$100\/fn not yet assigned to an expense/);

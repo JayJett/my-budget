@@ -19,7 +19,8 @@ import { goalSheet, goalGroups } from "./views/goals.js";
 import { investSheet } from "./views/invest.js";
 import { itemIcon, iconPickerHTML, appearanceHTML, pickerOpen } from "./icons.js";
 import { OBJECT_COLOURS, isObjectColour } from "./palette.js";
-import { accIcon } from "./views/budget.js";
+import { accIcon, toggleIncMore } from "./views/budget.js";
+import { openRebalance } from "./rebalance.js";
 import { list } from "./render.js";
 import { openPop, closePop } from "./dom.js";
 import { money } from "../model/format.js";
@@ -245,6 +246,16 @@ export function initBudgetSheets() {
       if (ic.dataset.icon) it.icon = ic.dataset.icon; else delete it.icon;
       changed({ full: true }); return;
     }
+    // Phase 10A: Budget's "Manage" menu (Rebalance, Reorder), and "Pay details" under the income
+    const mg = t.closest("[data-b-manage]");
+    if (mg) {
+      const canRb = app.state.accounts.length > 1 && app.C && app.C.incTotal > 0;
+      openPop(mg, `<div class="pop-h">Manage allocations</div>${canRb ? `<button class="item" type="button" data-mg="rebalance"><span>Rebalance</span><small>Move money from one allocation to another</small></button>` : ""}<button class="item" type="button" data-mg="reorder"><span>Reorder</span><small>Change the order they’re listed in</small></button>`,
+        b => { closePop(); if (b.dataset.mg === "rebalance") openRebalance(); else { UI.reorder = true; UI.reorderTab = app.tab; app.render(); } }, { label: "Manage allocations" });
+      return;
+    }
+    const im = t.closest("[data-inc-more]");
+    if (im) { toggleIncMore(im); return; }
     if (t.closest("[data-reorder]")) { const on = !(UI.reorder && UI.reorderTab === app.tab); UI.reorder = on; UI.reorderTab = app.tab; app.render(); return; }
     if (t.closest("[data-acc-new]")) { const id = addRow("acc"); UI.fresh = { id }; changed({ full: true }); openAccountSheet(id, { focusName: true }); return; }
     const sn = t.closest("[data-sp-new]");

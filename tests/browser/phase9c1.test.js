@@ -115,8 +115,9 @@ test("doughnuts: honest parts with a text equivalent; Home is calmer; payday car
   assert.doesNotMatch(await page.textContent("#app .home"), /every dollar given a job|From the balances you’ve entered|Planned each pay/);
   const pad = await page.$eval(".ho-pay", e => parseFloat(getComputedStyle(e).paddingLeft)); assert.ok(pad >= 22, `padding ${pad}`);
   await shot(page, "home");
-  await tab(page, "budget"); await page.waitForSelector("#incDonut svg");
-  const inc = await page.getAttribute("#incDonut svg", "aria-label");
+  // Phase 10A: the doughnut became a slim bar, with the same words for screen readers
+  await tab(page, "budget"); await page.waitForSelector("#incBar span");
+  const inc = await page.getAttribute("#incBar", "aria-label");
   assert.match(inc, /^Share of household pay: Jarden \d+%, Madi \d+%$/);
   assert.equal([...inc.matchAll(/(\d+)%/g)].reduce((s, m) => s + Number(m[1]), 0), 100);
   assert.equal(await page.locator(".alloc .a-part").first().evaluate(e => getComputedStyle(e, "::before").display), "none", "no member dots on allocation rows");

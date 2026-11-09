@@ -110,19 +110,21 @@ export function planCheckHTML(S = app.state, C = app.C) {
   const deep = known ? `${breakdownHTML(S, C)}${roomHTML(S, C)}` : "";
   const body = known ? `<ul class="pc-sum"><li><span>Entered expenses</span><b>${per(C, cv.planned)}</b></li><li><span>Budget for them</span><b>${per(C, cv.budget)}</b></li></ul>
     ${insightRows(unmarked, S, C)}${deep ? `<details class="pc-deep"><summary>More detail</summary><div class="pc-deep-b">${deep}</div></details>` : ""}` : "";
-  return `<section class="card b-check" id="planCheck" aria-label="Expense check">
+  // Phase 10A: part of the Budget status card now (no card of its own)
+  return `<div class="b-check" id="planCheck" role="group" aria-label="Expense check">
     <div class="pc-main ${F.level}" data-insight="${F.id}"><span class="pc-ic" aria-hidden="true">${ICON[F.level]}</span>
-      <div class="pc-t"><p class="pc-h">${esc(F.t)}</p>${F.s ? `<p class="pc-s">${esc(F.s)}</p>` : ""}</div></div>
-    ${F.act || F.fix || body ? `<div class="pc-acts">${F.act ? `<button type="button" class="pc-act" ${ACT_ATTRS(F.act)}>${esc(F.act.label)}</button>` : ""}${F.fix ? `<button type="button" class="pc-act" data-rb-open="fix">${esc(F.fix.label)}</button>` : ""}
-      ${body ? `<button type="button" class="pc-more" data-pc-toggle aria-expanded="${pcOpen}" aria-controls="pcBody">${pcOpen ? "Hide breakdown" : "View breakdown"}<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>` : ""}</div>` : ""}
-    ${body ? `<div class="pc-body" id="pcBody"${pcOpen ? "" : " hidden"}>${body}</div>` : ""}</section>`;
+      <div class="pc-t"><p class="pc-h">${esc(F.t)}</p>${F.s ? `<p class="pc-s">${esc(F.s)}</p>` : ""}</div>
+      ${body ? `<button type="button" class="pc-more" data-pc-toggle aria-expanded="${pcOpen}" aria-controls="pcBody" aria-label="Expense details"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>` : ""}</div>
+    ${F.act || F.fix ? `<div class="pc-acts">${F.act ? `<button type="button" class="pc-act" ${ACT_ATTRS(F.act)}>${esc(F.act.label)}</button>` : ""}${F.fix ? `<button type="button" class="pc-act" data-rb-open="fix">${esc(F.fix.label)}</button>` : ""}
+      </div>` : ""}
+    ${body ? `<div class="pc-body" id="pcBody"${pcOpen ? "" : " hidden"}>${body}</div>` : ""}</div>`;
 }
 export function refreshPlanCheck() { const el = document.getElementById("planCheck"); if (el && app.C) el.outerHTML = planCheckHTML(); }
 if (typeof document !== "undefined") document.addEventListener("click", e => {
   const b = e.target.closest && e.target.closest("[data-pc-toggle]"); if (!b) return;
   pcOpen = b.getAttribute("aria-expanded") !== "true";
   const body = document.getElementById("pcBody"); if (!body) return;
-  b.setAttribute("aria-expanded", String(pcOpen)); b.firstChild.textContent = pcOpen ? "Hide breakdown" : "View breakdown";
+  b.setAttribute("aria-expanded", String(pcOpen));
   body.hidden = !pcOpen;
 });
 

@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import { blankBudget, toStored } from "../../js/model/schema.js";
-import { setup, skip, SHOTS, open, fake, goTab, settle, skipAccounts, afterSetup } from "./helpers.js";
+import { setup, skip, SHOTS, open, fake, goTab, settle, skipAccounts, afterSetup, addPersonBtn } from "./helpers.js";
 
 setup();
 const ALL_DONE = { "mb-tours-u-me": JSON.stringify({ tabs: Object.fromEntries(["budget", "networth", "spending", "goals", "invest", "progress"].map(t => [t, "done"])) }) };
@@ -153,7 +153,7 @@ test("solo → shared: adding a person keeps every allocation as it was, and exp
   await page.click('[data-obact="next"]'); await skipAccounts(page); await page.click('[data-obact="finish"]');
   await afterSetup(page); await settle(page);
   const before = vals((await budgetOf(page)).accounts);
-  await page.click("[data-person-new]"); await page.waitForSelector('#sheet .bsheet [data-l="pp"][data-f="name"]');
+  await addPersonBtn(page); await page.waitForSelector('#sheet .bsheet [data-l="pp"][data-f="name"]');
   await page.keyboard.type("Madi"); await settle(page);
   await page.click('#sheet .sheet-head [data-sheet="close"]');
   await page.waitForSelector("#sheet", { state: "hidden" }); await settle(page);

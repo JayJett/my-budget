@@ -9,7 +9,7 @@ import { createRequire } from "node:module";
 import { RICH_V3, LIVE_V3 } from "../fixtures.js";
 import { migrate } from "../../js/model/migrate.js";
 import { toStored } from "../../js/model/schema.js";
-import { setup, skip, SHOTS, open, settle, fake, goTab, setField, editPerson, editAccount, closeSheet } from "./helpers.js";
+import { setup, skip, SHOTS, open, settle, fake, goTab, setField, editPerson, editAccount, closeSheet, budgetManage } from "./helpers.js";
 import { budgetFigures } from "./budget-figures.mjs";
 
 setup();
@@ -44,7 +44,9 @@ test("allocation sheet: changing a share saves just that change, and status and 
   assert.equal(await page.textContent('#sheet [data-k="tot.p.m"]'), "95%", "Madi's total, live in the sheet");
   await closeSheet(page);
   assert.match(await page.textContent('[data-k="st.m.t"]'), /^5% left · \$95$/);
-  assert.equal(await page.textContent('[data-k="st.summary"]'), "Some left to allocate");
+  assert.equal(await page.textContent('[data-k="st.summary"]'), "$95 left to allocate");
+  assert.equal(await page.isVisible('[data-st="m"]'), true, "Madi is listed while she has pay left");
+  assert.equal(await page.isVisible('[data-st="j"]'), false, "Jarden, who's done, isn't");
   assert.equal(await page.isVisible('[data-fill="m"]'), true, "Fill is offered");
   assert.equal(await page.textContent('[data-k="acc.js.t"]'), "$1,720");
   // the Spending tab's pool comes from the same allocation
@@ -67,7 +69,7 @@ test("allocation sheet: type and owner, add, delete, reorder", { skip }, async (
   assert.equal(b.accounts.ji.type, "Personal"); assert.equal(b.accounts.ji.owner, "m");
   assert.equal(await page.locator("#sheet [data-del]").count(), 0, "built-in accounts can't be deleted");
   await closeSheet(page);
-  assert.match(await page.textContent('[data-edit-acc="ji"] .a-meta'), /Personal · Madi/);
+  assert.match(await page.textContent('[data-edit-acc="ji"] .a-meta'), /^Madi · Personal$/);
   // Add: a new allocation opens with the name box ready
   await page.click("[data-acc-new]");
   await page.waitForSelector('#sheet .bsheet [data-f="name"]:focus');
@@ -80,7 +82,7 @@ test("allocation sheet: type and owner, add, delete, reorder", { skip }, async (
   assert.equal(b.accounts[id].name, "Car fund"); assert.equal(b.accounts[id].split.j, 0.05); assert.equal(b.accounts[id].type, "Personal");
   assert.equal(await page.textContent(`[data-edit-acc="${id}"] .a-name`), "Car fund");
   // Reorder: up/down buttons, then Done
-  await page.click("[data-reorder]");
+  await budgetManage(page, "reorder");
   await page.click(`[data-move="up"][data-i="${id}"]`);
   await settle(page);
   const order = Object.values(await saved(page)).length && Object.values((await saved(page)).accounts).sort((x, y) => x.pos - y.pos).map(a => a.id);
@@ -123,7 +125,8 @@ test("one person: no partner fields, no fair split, plain wording", { skip }, as
   assert.equal(await page.locator("[data-edit-person]").count(), 1);
   assert.equal(await page.isVisible("#fairSec"), false);
   assert.equal(await page.locator(".st-name, .a-parts, #ribbon").count(), 0, "no per-person labels when there's one person");
-  assert.equal(await page.textContent('[data-k="st.summary"]'), "✓ All allocated");
+  assert.equal(await page.textContent('[data-k="st.summary"]'), "All $2,400 allocated");
+  assert.equal(await page.isVisible("#allocStatus .st-list"), false, "no bars once everything's allocated");
   assert.equal(await page.locator("#brandNames small").count(), 0);
   await editAccount(page, "js");
   assert.equal(await page.locator('#sheet [data-f^="split."]').count(), 1);
@@ -185,7 +188,7 @@ test("accent colour: per person, instant, saved to your login once, kept after r
   await page.click('[data-sheet="close"]');
   await page.screenshot({ path: join(SHOTS, "accent-lavender.png") });
   // the accent is on the button colour, but a person's chart colour isn't
-  const colours = await page.evaluate(() => ({ accent: getComputedStyle(document.documentElement).getPropertyValue("--accent").trim(), madi: getComputedStyle(document.querySelector(".member-row.pc-gold .av")).backgroundColor }));
+  const colours = await page.evaluate(() => ({ accent: getComputedStyle(document.documentElement).getPropertyValue("--accent").trim(), madi: getComputedStyle(document.querySelector(".bi-p.pc-gold .bi-name")).color }));
   assert.notEqual(colours.accent, ""); assert.match(colours.madi, /rgb/);
   await page.reload(); await settle(page);
   assert.equal(await page.evaluate(() => document.documentElement.dataset.accent), "lavender", "kept after reload");
