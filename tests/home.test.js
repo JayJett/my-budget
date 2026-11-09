@@ -65,7 +65,7 @@ describe("suggestions only for what's really missing", () => {
     const a = { mode: "solo", people: [{ name: "Sam", pay: 2000, freq: "fortnightly", payday: "2026-11-05" }], have: {} }, S = buildBudget(a, suggestSplit(a), T);
     S.nw.accounts.push({ id: "n1", name: "Savings", type: "Savings", balance: 100, pos: 1 }); S.nw.reviewed = "2026-11-01";
     S.goals.joint.push({ id: "g", name: "Trip", target: 1, saved: 0, account: "", split: {}, deadline: "", pos: 1 });
-    S.spend.push({ id: "s", name: "Rent", type: "Fixed", amount: 1, period: "Week", pos: 1 });
+    S.spend.push({ id: "s", name: "Rent", type: "Fixed", amount: 1, period: "Week", pos: 1, need: "essential" });
     assert.deepEqual(homeActions(S, compute(S, T), { snapshots: [{ id: 1 }] }), []);
     assert.deepEqual(homeActions(S, compute(S, T), { snapshots: [] }).map(x => x.key), ["snapshot"]);
     assert.deepEqual(homeActions(S, compute(S, T), { snapshots: null }), [], "snapshots not loaded yet: says nothing");

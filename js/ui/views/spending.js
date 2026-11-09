@@ -16,6 +16,7 @@ import { spendLabel } from "./labels.js";
 import { budgetUI } from "../budget-sheets.js";
 import { itemIcon } from "../icons.js";
 import { isObjectColour } from "../palette.js";
+import { essentialsHTML, refreshEssentials } from "../insight-view.js";
 
 /** The three expense types, with their (fixed) colours and small icons. Colours never follow the accent. */
 export const SP_TYPES = [
@@ -86,7 +87,7 @@ export function view() {
       ${ro ? "" : `<button class="add-row" type="button" data-sp-new="Flexible">+ Add expense</button>`}
     </section>`;
   }
-  return `<div class="sp-page">${summary}${list}</div>`;
+  return `<div class="sp-page">${summary}${essentialsHTML(S, app.C)}${list}</div>`;
 }
 
 /** "over", "under", "even" (matches to the cent shown) or "nopool". */
@@ -99,7 +100,7 @@ export function fill(D, C) {
   const v = C.v, w = WORDS[C.view];
   D["sp.pool"] = money(v(C.pool.spending)); D["sp.pool.y"] = `From the budget, ${m0(C.pool.spending)} a year`;
   D["sp.com"] = money(v(C.committed)); D["sp.com.y"] = `Across categories, ${m0(C.committed)} a year`;
-  D["sp.buf"] = money(v(C.spBuffer)); D["sp.buf.s"] = C.spBuffer >= 0 ? "Room to spare" : "Over budget";
+  D["sp.buf"] = money(v(C.spBuffer)); D["sp.buf.s"] = C.spBuffer >= 0 ? "Not yet assigned to an expense" : "Over budget"; // (Phase 9B: a plan, not spare cash)
   C.sp.forEach(s => {
     D[`sp.${s.id}.v`] = s.annual === null ? "" : money(v(s.annual));
     D[`sp.${s.id}.p`] = s.annual === null || !C.pool.spending ? "" : pct(s.annual / C.pool.spending, 1);
@@ -130,7 +131,8 @@ export function fill(D, C) {
   const buf = v(C.spBuffer), noPool = !(C.pool.spending > 0.004);
   const state = spState(C);
   D["sp.head"] = state === "over" ? money(-buf) : state === "under" ? money(buf) : state === "even" ? "On budget" : money(v(C.committed));
-  D["sp.head.lab"] = { over: "over budget", under: "remaining", even: "✓ planned spending matches the budget", nopool: "planned" }[state];
+  D["sp.head.lab"] = { over: "over budget", under: "not yet assigned to an expense", even: "✓ planned spending matches the budget", nopool: "planned" }[state];
+  refreshEssentials();
   D["sp.used"] = D["sp.totp"] || "—";
   D["sp.nopool"] = { t: noPool ? "There’s no spending budget yet. Give this budget’s spending account a share of pay on the Budget tab." : "", c: noPool ? "on" : "" };
 }

@@ -326,6 +326,32 @@ The closing audit's findings, fixes and remaining items are in `docs/phase6-audi
 - **Compact spacing** no longer adds big gaps above Home's greeting or Wealth's cards.
 - Tests: `tests/browser/phase9a1.test.js`.
 
+### Budget intelligence (Phase 9B)
+
+- **One set of rules** (`js/model/intelligence.js`, tested in `tests/intelligence.test.js`) built on `compute()`, so every figure matches the other screens. Nothing here changes the budget.
+  - **Planned expenses:** what's on Expenses, as yearly amounts (yearly bills counted once).
+  - **Essential / flexible:** the person's own mark on each expense (`need`). Unmarked stays "not marked"; nothing is guessed.
+  - **Coverage:** the allocation that "Feeds the Spending tab" against the planned expenses. That's the app's one real link between Budget and Expenses (no name matching).
+    - Positive: "not yet assigned to an expense", not "spare".
+    - Negative: a shortfall.
+    - No expenses: unknown.
+  - **Room to adjust:** four parts that never overlap:
+    - pay with no plan yet
+    - the bills budget not assigned to an expense
+    - allocations you marked **adjustable**
+    - expenses you marked **flexible**
+    - Nothing is assumed adjustable, not even savings or investing.
+  - **`extraCost()`:** what a new recurring cost needs per period, against the room. Pure arithmetic for the later what-if planner; it saves nothing.
+  - **`insights()`:** plain facts with an id, a level (needs attention / worth a look / done) and where to go. There's no score or grade.
+- **On screen** (`js/ui/insight-view.js`, one set of words for every screen):
+  - **Budget:** a **Plan check** card shows where pay goes (a bar drawn only when the parts truly add up to pay), the findings (each opens the right item) and room to adjust. The bills allocation shows whether it covers your entered expenses.
+  - **Expenses:** an **Essentials** card (essential / flexible / not marked, and essentials as a share of pay) with "Mark them" to open the first unmarked expense. "Is this essential?" is in each expense's sheet.
+  - **Allocations:** "Could this change if needed?" in each allocation's sheet (not the bills one).
+  - **Home:** a few lines in the plan card (essentials, whether expenses fit their budget, room to adjust). Next steps come from the same rules.
+- These are plans, not balances. Averages over the year don't promise the cash is there on a particular day.
+- No database changes: `need` and `adjustable` are optional fields in the budget.
+- Tests: `tests/intelligence.test.js`, `tests/browser/phase9b.test.js`.
+
 ## How saving works
 
 The whole budget lives in one row (`budgets.state`), but the app never overwrites it. Each edit is
