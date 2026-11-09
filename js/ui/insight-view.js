@@ -11,6 +11,7 @@ import { WORDS } from "../model/periods.js";
 import { isShared } from "../model/schema.js";
 import { commitments, coverage, essentialShare, breathingRoom, incomeBreakdown, insights } from "../model/intelligence.js";
 import { shortfallFix } from "../model/rebalance.js";
+import { miniDonut } from "./mini-donut.js";
 
 const per = (C, x) => `${money(C.v(x))}${WORDS[app.state.viewAs].short}`;
 const allocName = S => { const a = S.accounts.find(x => x.role === "spending"); return (a && a.name) || "your bills allocation"; };
@@ -30,6 +31,7 @@ export function insightCopy(x, S = app.state, C = app.C) {
     case "goal": return { t: "Create a savings goal", s: "A trip, a car, a house deposit…", go: "goals", click: ".gl-first-btn, [data-goal-new]" };
     case "bills": return { t: "Add your regular expenses", s: "To see what your plan commits to", go: "spending", click: "[data-sp-new]" };
     case "unmarked": return { t: `${x.count === 1 ? "1 expense isn’t" : `${x.count} expenses aren’t`} marked essential or flexible`, s: "Mark them to see your essentials", go: "spending", click: x.item ? `[data-edit-sp="${x.item}"]` : "" };
+    case "amounts": return { t: `${x.count === 1 ? "1 expense needs" : `${x.count} expenses need`} an amount`, s: "Until then they aren’t counted", go: "spending", click: x.item ? `[data-edit-sp="${x.item}"]` : "" };
     case "snapshot": return { t: "Save your first snapshot", s: "Start tracking your progress over time", go: "progress" };
     case "planned": return { t: "Every dollar of pay has a plan", s: "", go: "budget" };
     case "covered": return { t: "Your entered expenses fit their budget", s: x.amount > 0.004 ? `${per(C, x.amount)} of it isn’t assigned to an expense yet` : "Exactly, to the cent", go: "spending" };
@@ -120,10 +122,9 @@ if (typeof document !== "undefined") document.addEventListener("click", e => {
 export function essentialsHTML(S = app.state, C = app.C) {
   const cm = commitments(S, C); if (!cm.count) return "";
   const share = essentialShare(C, cm), seg = [["Essential", cm.essential, "var(--cat-fixed)"], ["Flexible", cm.flexible, "var(--cat-flex)"], ["Not marked", cm.unmarked, "var(--unalloc)"]].filter(x => Math.abs(x[1]) > 0.004);
-  const tot = Math.max(cm.total, 0.0001);
-  return `<section class="card sp-ess" id="spEss" aria-labelledby="essT"><div class="b-row"><h2 id="essT">Essentials</h2>${share !== null && cm.essential > 0 ? `<span class="chip">${pct(share)} of pay</span>` : ""}</div>
-    <div class="ib-bar" role="img" aria-label="${esc(seg.map(x => `${x[0]} ${money(C.v(x[1]))}`).join(", "))}">${seg.map(x => `<span style="width:${Math.max(0, x[1] / tot * 100).toFixed(2)}%;background:${x[2]}"></span>`).join("")}</div>
-    <ul class="ib-key">${seg.map(x => `<li><i style="background:${x[2]}" aria-hidden="true"></i><span>${x[0]}</span><b>${per(C, x[1])}</b></li>`).join("")}</ul>
+    return `<section class="card sp-ess" id="spEss" aria-labelledby="essT"><div class="b-row"><h2 id="essT">Essentials</h2>${share !== null && cm.essential > 0 ? `<span class="chip">${pct(share)} of pay</span>` : ""}</div>
+    <div class="ess-mix">${miniDonut(seg.map(x => ({ label: x[0], v: x[1], col: x[2] })), "Planned expenses", { size: 64 })}
+    <ul class="ib-key">${seg.map(x => `<li><i style="background:${x[2]}" aria-hidden="true"></i><span>${x[0]}</span><b>${per(C, x[1])}</b></li>`).join("")}</ul></div>
     ${cm.unmarkedCount ? `<p class="in-note">${cm.unmarkedCount === 1 ? "1 expense isn’t" : `${cm.unmarkedCount} expenses aren’t`} marked yet, so essentials ${cm.essential > 0 ? "may be higher" : "aren’t known yet"}.${readOnly() ? "" : ` <button class="linkish" type="button" data-home-go="spending" data-home-click="[data-edit-sp=&quot;${esc(cm.unmarkedIds[0])}&quot;]">Mark ${cm.unmarkedCount === 1 ? "it" : "them"}</button>`}</p>` : ""}</section>`;
 }
 export function refreshEssentials() { const el = document.getElementById("spEss"); if (el && app.C) el.outerHTML = essentialsHTML(); }

@@ -7,7 +7,7 @@
    each person entered and how often they're paid. Nobody's pay is ever added to anyone else's. With
    no payday entered there's no date: Home asks for one instead of guessing. */
 import { n, blank, parseDate, addDays, daysBetween, ymd } from "./util.js";
-import { insights } from "./intelligence.js";
+import { insights, incomplete } from "./intelligence.js";
 
 const DAYS = { weekly: 7, fortnightly: 14 };
 
@@ -68,7 +68,7 @@ export function homeFigures(S, C) {
     saving: C.pool.emergency + C.pool.goals.t + pg,          // planned each period to the emergency fund and goals
     investing: C.pool.invest,                                 // planned each period to investments
     committed: C.committed, spendingBudget: C.pool.spending,  // planned expenses vs the money set aside for them
-    hasSpend: S.spend.length > 0,
+    hasSpend: C.sp.some(s => s.annual !== null && !incomplete(s)), // (Phase 9C.1: an expense still waiting for its amount doesn't count)
     ef: blank(ef.target) || !n(ef.target) ? null : { saved: n(ef.saved), target: n(ef.target) },
   };
 }

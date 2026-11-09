@@ -27,13 +27,18 @@ import { planStatus } from "./home.js";
 
 export const NEEDS = ["essential", "flexible"];
 const need = s => NEEDS.includes(s.need) ? s.need : "";
+/** A named expense still waiting for its amount (blank, not $0). */
+export const incomplete = s => !blank(s.name) && blank(s.amount);
 const SAVING_ROLES = ["emergency", "goals", "personalGoals", "invest"];
 
 /** Planned expenses, per year: in total, and split by essential / flexible / not marked. */
 export function commitments(S, C) {
-  const out = { total: 0, essential: 0, flexible: 0, unmarked: 0, count: 0, unmarkedCount: 0, unmarkedIds: [] };
+  const out = { total: 0, essential: 0, flexible: 0, unmarked: 0, count: 0, unmarkedCount: 0, unmarkedIds: [], incompleteIds: [] };
   C.sp.forEach(s => {
     if (s.annual === null) return; // an unnamed row isn't counted anywhere in the app
+    // Phase 9C.1: a named expense with no amount yet (e.g. picked from the suggestions) is a to-do,
+    // not a $0 commitment: it doesn't count towards expenses, coverage or essentials.
+    if (incomplete(s)) { out.incompleteIds.push(s.id); return; }
     const a = n(s.annual), k = need(s);
     out.total += a; out.count++;
     if (k === "essential") out.essential += a; else if (k === "flexible") out.flexible += a;
@@ -47,7 +52,7 @@ export function commitments(S, C) {
 export function coverage(S, C) {
   const alloc = S.accounts.find(a => a.role === "spending") || null;
   const budget = C.pool.spending, planned = C.committed, diff = budget - planned;
-  const count = C.sp.filter(s => s.annual !== null).length;
+  const count = C.sp.filter(s => s.annual !== null && !incomplete(s)).length;
   const state = !count ? "none" : !(budget > 0.004) ? "nobudget" : Math.abs(diff) < 0.005 ? "even" : diff < 0 ? "short" : "covered";
   return { state, budget, planned, diff, short: diff < 0 ? -diff : 0, unassigned: diff > 0 ? diff : 0, allocation: alloc ? { id: alloc.id, name: alloc.name || "" } : null, sinking: C.spType("Sinking") };
 }
@@ -121,7 +126,8 @@ export function insights(S, C, { snapshots = null } = {}) {
   if (!S.nw.accounts.length) add("accounts", "review", { to: "networth" });
   else if (C.reviewDue) add("review", "review", { to: "networth" });
   if (!size(S.goals.joint) && !Object.values(S.goals.personal || {}).some(L => size(L))) add("goal", "review", { to: "goals" });
-  if (!cm.count && earners.length) add("bills", "review", { to: "spending" });
+  if (!cm.count && !cm.incompleteIds.length && earners.length) add("bills", "review", { to: "spending" });
+  if (cm.incompleteIds.length) add("amounts", "review", { count: cm.incompleteIds.length, to: "spending", item: cm.incompleteIds[0] });
   if (cm.unmarkedCount) add("unmarked", "review", { count: cm.unmarkedCount, amount: cm.unmarked, to: "spending", item: cm.unmarkedIds[0] });
   if (Array.isArray(snapshots) && !snapshots.length && S.nw.accounts.length) add("snapshot", "review", { to: "progress" });
   if (st.k === "ok") add("planned", "good", { to: "budget" });

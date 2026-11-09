@@ -46,7 +46,7 @@ function payCard(S, C, w) {
   // day (or with no payday yet) are listed underneath with their own date. Nobody's pay is added up.
   const first = L[0], day = first.date, same = L.filter(p => p.date && p.date === day), rest = L.filter(p => !same.includes(p));
   const amt = p => `<b class="ho-amt">${money(p.pay)}</b>`;
-  const who = p => shared ? `<span class="ho-who"><i class="ho-dot" aria-hidden="true"></i>${esc(p.name || "Someone")}</span>` : `<span class="ho-who">Your pay</span>`;
+  const who = p => shared ? `<span class="ho-who">${esc(p.name || "Someone")}</span>` : `<span class="ho-who">Your pay</span>`;
   const row = (p, when = "") => `<li class="person pc-${esc(p.colour)}">${who(p)}${when ? `<small class="ho-on">${esc(when)}</small>` : ""}${amt(p)}</li>`;
   const short = s => { const d = parseDate(s); return `${DAYNAMES[d.getDay()].slice(0, 3)} ${d.getDate()} ${MON[d.getMonth()]}`; };
   if (!day) return `<section class="card ho-pay ho-hero"><span class="eyebrow">Your pay</span>
@@ -62,7 +62,7 @@ function planCard(S, C, w) {
   if (st.k === "none") return "";
   const v = x => money(C.v(x)) + w.short;
   const line = st.k === "ok" ? `${shareWord(S)} has a plan` : st.k === "over" ? `Your plan is over by ${v(st.over)}` : `${v(st.left)} still to plan`;
-  const sub = st.k === "ok" ? `${m0(C.v(C.incTotal))} ${w.per}, every dollar given a job.` : st.k === "over" ? "More is planned than comes in. Trim an allocation on Budget." : "Give the rest a job on Budget.";
+  const sub = st.k === "ok" ? `${m0(C.v(C.incTotal))} ${w.per}` : st.k === "over" ? "More is planned than comes in. Trim an allocation on Budget." : "Give the rest a job on Budget.";
   // Phase 9B: a few plain facts under it (essentials, whether expenses fit their budget, room to adjust)
   const lines = homePlanLines(S, C);
   return `<button class="card ho-plan ho-tap ${st.k}" type="button" data-home-go="budget">
@@ -77,11 +77,11 @@ function figures(S, C, w) {
   const F = homeFigures(S, C), v = x => m0(C.v(x));
   const tile = (go, icon, label, value, sub, cls = "") => `<button class="ho-fig ${cls}" type="button" data-home-go="${go}"><span class="ho-ic" aria-hidden="true">${icon}</span><small>${esc(label)}</small><b>${value}</b><span class="ho-fig-sub">${esc(sub)}</span></button>`;
   const T = [];
-  T.push(F.hasAccounts ? tile("networth", IC.acct, "Net worth", m0(F.netWorth), "From the balances you’ve entered", F.netWorth < 0 ? "neg" : "")
+  T.push(F.hasAccounts ? tile("networth", IC.acct, "Net worth", m0(F.netWorth), "", F.netWorth < 0 ? "neg" : "")
                        : tile("networth", IC.acct, "Net worth", "—", "Add an account to see it", "empty"));
   if (C.incTotal > 0) {
-    T.push(tile("goals", IC.save, "Saving", v(F.saving) + `<i>${esc(w.short)}</i>`, F.ef ? `Emergency fund ${pct(Math.min(1, F.ef.saved / F.ef.target))} of target` : "Planned for goals and your safety net"));
-    T.push(tile("invest", IC.invest, "Investing", v(F.investing) + `<i>${esc(w.short)}</i>`, "Planned each pay"));
+    T.push(tile("goals", IC.save, "Saving", v(F.saving) + `<i>${esc(w.short)}</i>`, F.ef ? `Emergency fund ${pct(Math.min(1, F.ef.saved / F.ef.target))} of target` : ""));
+    T.push(tile("invest", IC.invest, "Investing", v(F.investing) + `<i>${esc(w.short)}</i>`, ""));
     T.push(F.hasSpend ? tile("spending", IC.bills, "Expenses", v(F.committed) + `<i>${esc(w.short)}</i>`, `Of ${v(F.spendingBudget)}${w.short} set aside`, F.committed > F.spendingBudget + 0.5 ? "warn" : "")
                       : tile("spending", IC.bills, "Expenses", "—", "Add your regular bills", "empty"));
   }
@@ -89,7 +89,7 @@ function figures(S, C, w) {
 }
 
 /* Phase 9B: the words come from ui/insight-view.js (the same as Budget and Expenses); Home adds icons. */
-const ICON_OF = { pay: IC.pay, payday: IC.cal, left: IC.plan, over: IC.plan, short: IC.bills, nobudget: IC.bills, accounts: IC.acct, review: IC.review, goal: IC.goal, bills: IC.bills, unmarked: IC.bills, snapshot: IC.snap };
+const ICON_OF = { pay: IC.pay, payday: IC.cal, left: IC.plan, over: IC.plan, short: IC.bills, nobudget: IC.bills, accounts: IC.acct, review: IC.review, goal: IC.goal, bills: IC.bills, unmarked: IC.bills, amounts: IC.bills, snapshot: IC.snap };
 const ACT = new Proxy({}, { get: (_, k) => a => ({ icon: ICON_OF[k] || IC.plan, ...insightCopy(a) }) });
 function actions(S, C) {
   if (readOnly()) return "";

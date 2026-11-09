@@ -30,7 +30,9 @@ test("the hero leads with net worth; accounts are grouped, tappable rows with no
   const { page, errors, ctx } = await nwTab(CASES.mixed, { width: 390 });
   assert.equal(await text(page, "nw.net"), "$29,650.25");
   assert.equal(await text(page, "nw.assets"), "$35,850.50"); assert.equal(await text(page, "nw.debt"), "$6,200.25");
-  assert.match(await page.getAttribute("#nwBar", "aria-label"), /^What you own: Everyday \$2,450\.50, Savings \$10,600, Investments \$300, Super \$22,500$/);
+  // Phase 9C.1: a small doughnut (its text equivalent in percentages) with the amounts listed beside it
+  assert.match(await page.getAttribute("#nwBar svg", "aria-label"), /^What you own: Everyday 7%, Savings 29%, Investments 1%, Super 63%$/);
+  assert.equal((await page.textContent("#nwKey")).replace(/\s+/g, " ").trim(), "Everyday$2,450.50Savings$10,600Investments$300Super$22,500");
   assert.deepEqual(await page.$$eval(".ex-gh h3", els => els.map(e => e.textContent)), ["Cash", "Investments and super", "Debt"]);
   assert.equal(await text(page, "nw.grp.cash"), "$13,050.50"); assert.equal(await text(page, "nw.grp.long"), "$22,800");
   assert.equal(await page.locator("#app .nw-main input, #app .nw-main select").count(), 0, "no form fields in the account list");

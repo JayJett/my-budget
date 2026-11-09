@@ -7,6 +7,7 @@
 
    Goal money: a goal's Saved amount is money that already sits in one of these accounts, so it's
    shown as a slice of that account's balance ("earmarked"), never added on top of it. */
+import { miniDonut } from "../mini-donut.js";
 import { app, readOnly } from "../ctx.js";
 import { esc } from "../dom.js";
 import { K, tipq, attrs } from "../inputs.js";
@@ -68,9 +69,8 @@ export function view() {
   const hero = `<section class="card nw-hero" aria-live="polite">
     <span class="eyebrow">Net worth ${tipq("Everything you own (cash, savings, investments, super) minus everything you owe. It isn’t all spending money: super and investments are long-term.")}</span>
     <div class="nw-head" id="nwHead"><span class="amt">${K("nw.net")}</span></div>
-    <p class="nw-ad"><span><i class="dot" style="background:var(--ok)"></i>Assets <b>${K("nw.assets")}</b></span><span><i class="dot" style="background:var(--nw-debt)"></i>Owed <b>${K("nw.debt")}</b></span></p>
-    <div class="split nw-bar" id="nwBar" role="img" aria-label=""></div>
-    <div class="split-key" id="nwKey"></div>
+    <p class="nw-ad"><span>Assets <b>${K("nw.assets")}</b></span><span>Owed <b>${K("nw.debt")}</b></span></p>
+    <div class="nw-mix" id="nwMix"><span class="nw-donut" id="nwBar"></span><ul class="nw-key" id="nwKey"></ul></div>
     ${savings.length ? `<div class="nw-gm">
       <div class="b-row"><span class="eyebrow">Goal money in savings ${tipq("Goals on the Goals tab say which savings account their Saved money sits in. That money is part of the balance, not extra: it’s just spoken for.")}</span></div>
       <div class="sp-figs"><div><small>In savings</small><b>${K("nw.gm.sav")}</b></div><div><small>For goals</small><b>${K("nw.gm.em")}</b></div><div><small>Not earmarked</small><b>${K("nw.gm.free")}</b></div></div>
@@ -165,11 +165,11 @@ export function fill(D, C) {
 
 export function draw(C) {
   const el = document.querySelector("#nwBar"); if (!el) return;
-  const parts = NW_TYPES.filter(t => t.key !== "Debt").map(t => ({ name: t.label, v: { Operating: C.nw.op, Savings: C.nw.sav, Investment: C.nw.inv, Super: C.nw.sup }[t.key], col: t.col }));
-  const shown = parts.filter(p => p.v > 0);
-  drawSplit(el, parts, C.nw.assets);
-  el.hidden = !shown.length;
-  el.setAttribute("aria-label", shown.length ? `What you own: ${shown.map(p => `${p.name} ${money(p.v)}`).join(", ")}` : "");
-  document.querySelector("#nwKey").innerHTML = shown.map(p => `<span><i style="background:${p.col}"></i>${p.name} ${money(p.v)}</span>`).join("");
+  // Phase 9C.1: what you own, by kind, as a small doughnut. Only assets: what's owed is never a slice.
+  const parts = NW_TYPES.filter(t => t.key !== "Debt").map(t => ({ name: t.label, label: t.label, v: { Operating: C.nw.op, Savings: C.nw.sav, Investment: C.nw.inv, Super: C.nw.sup }[t.key], col: t.col }));
+  const shown = parts.filter(p => p.v > 0.004), chart = miniDonut(parts, "What you own", { size: 72 });
+  el.innerHTML = chart;
+  document.querySelector("#nwMix").hidden = !shown.length;
+  document.querySelector("#nwKey").innerHTML = shown.map(p => `<li><i style="background:${p.col}" aria-hidden="true"></i><span>${p.name}</span><b>${money(p.v)}</b></li>`).join("");
   const head = document.querySelector("#nwHead"); if (head) head.classList.toggle("neg", C.nw.net < -0.004);
 }

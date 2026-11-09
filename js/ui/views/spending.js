@@ -68,7 +68,7 @@ export function view() {
 
   let list;
   if (!L.length) list = `<section class="card sp-empty"><div class="sp-empty-ic" aria-hidden="true">${typeIcon("Flexible")}</div><h2>No expenses yet</h2>
-    <p class="dim">Add what this budget pays for: rent, groceries, the yearly car rego.</p>${ro ? "" : `<button class="btn primary" type="button" data-sp-new="Flexible">+ Add expense</button>`}</section>`;
+    <p class="dim">Add what this budget pays for: rent, groceries, the yearly car rego.</p>${ro ? "" : `<button class="btn primary" type="button" data-xp-open>Choose from common expenses</button><button class="linkish sp-own" type="button" data-sp-new="Flexible">+ Add your own</button>`}</section>`;
   else if (ui.reorder) list = `<section class="sp-list">
     <div class="b-row sec"><h2>Expenses</h2><button class="btn small ghost" type="button" data-reorder aria-pressed="true">Done</button></div>
     <p class="dim small-note">Move expenses up or down. The order is kept within each type.</p>
@@ -84,7 +84,7 @@ export function view() {
           <span class="ex-gt">${key ? K(key) : ""}</span>${ro ? "" : `<button class="icon-add" type="button" data-sp-new="${esc(g)}" aria-label="Add a ${esc(g.toLowerCase())} expense">+</button>`}</div>
           <ul class="card ex-list">${items.map(s => row(s, ui, L.indexOf(s), L)).join("")}</ul></div>`;
       }).join("")}
-      ${ro ? "" : `<button class="add-row" type="button" data-sp-new="Flexible">+ Add expense</button>`}
+      ${ro ? "" : `<button class="add-row" type="button" data-sp-new="Flexible">+ Add expense</button><p class="sp-more"><button class="linkish" type="button" data-xp-open>Add from suggestions</button></p>`}
     </section>`;
   }
   return `<div class="sp-page">${summary}${essentialsHTML(S, app.C)}${list}</div>`;
@@ -102,7 +102,8 @@ export function fill(D, C) {
   D["sp.com"] = money(v(C.committed)); D["sp.com.y"] = `Across categories, ${m0(C.committed)} a year`;
   D["sp.buf"] = money(v(C.spBuffer)); D["sp.buf.s"] = C.spBuffer >= 0 ? "Not yet assigned to an expense" : "Over budget"; // (Phase 9B: a plan, not spare cash)
   C.sp.forEach(s => {
-    D[`sp.${s.id}.v`] = s.annual === null ? "" : money(v(s.annual));
+    const todo = s.annual !== null && blank(s.amount); // Phase 9C.1: named, amount still to come (not $0)
+    D[`sp.${s.id}.v`] = s.annual === null || todo ? "" : money(v(s.annual));
     D[`sp.${s.id}.p`] = s.annual === null || !C.pool.spending ? "" : pct(s.annual / C.pool.spending, 1);
     if (s.type === "Sinking" && s.period === "Year") {
       const k = s.sink;
@@ -116,8 +117,8 @@ export function fill(D, C) {
     D[`sp.${s.id}.about`] = s.annual === null ? (blank(s.name) ? "Add a name to count this expense." : "") : `About ${money(v(s.annual))} ${w.per}`;
     if (s.type === "Sinking" && s.period === "Year") D[`sp.${s.id}.saved`] = `${money(n(s.aside))} set aside of ${money(n(s.amount))}`;
     // new: the small line under each expense, and "/fn" next to its amount
-    D[`sp.${s.id}.per`] = s.annual === null ? "" : w.short;
-    D[`sp.${s.id}.sub`] = s.annual === null ? "Add a name to count it"
+    D[`sp.${s.id}.per`] = s.annual === null || todo ? "" : w.short;
+    D[`sp.${s.id}.sub`] = s.annual === null ? "Add a name to count it" : todo ? "Needs an amount"
       : s.type === "Sinking" && s.period === "Year" ? (s.sink ? `${money(n(s.amount))} · due ${monthYear(s.sink.next)}` : `${money(n(s.amount))} a year`)
       : s.period && s.period.toLowerCase() !== C.view ? `${money(n(s.amount))} ${PERIOD_WORD[s.period] || ""}`.trim()
       : (s.notes || "").trim().slice(0, 60);
