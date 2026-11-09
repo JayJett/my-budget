@@ -10,6 +10,7 @@ import { money, m0, pct } from "../model/format.js";
 import { WORDS } from "../model/periods.js";
 import { isShared } from "../model/schema.js";
 import { commitments, coverage, essentialShare, breathingRoom, incomeBreakdown, insights } from "../model/intelligence.js";
+import { shortfallFix } from "../model/rebalance.js";
 
 const per = (C, x) => `${money(C.v(x))}${WORDS[app.state.viewAs].short}`;
 const allocName = S => { const a = S.accounts.find(x => x.role === "spending"); return (a && a.name) || "your bills allocation"; };
@@ -19,7 +20,7 @@ export function insightCopy(x, S = app.state, C = app.C) {
   const many = S.people.length > 1;
   switch (x.id) {
     case "over": return { t: "Your plan is over-allocated", s: `${per(C, x.amount)} more is planned than comes in`, go: "budget" };
-    case "short": return { t: "Planned expenses are over their budget", s: `By ${per(C, x.amount)}. Raise ${allocName(S)} or trim expenses`, go: "spending" };
+    case "short": return { t: "Planned expenses are over their budget", s: `By ${per(C, x.amount)}. Adjust your plan or trim expenses`, go: "budget", click: shortfallFix(S, C) ? '[data-rb-open="fix"]' : "" };
     case "nobudget": return { t: "Your expenses have no budget yet", s: `Give ${allocName(S)} a share of pay`, go: "budget", click: x.id2 ? `[data-edit-acc="${x.id2}"]` : "" };
     case "pay": return { t: "Add your pay", s: "So your plan has something to work with", go: "budget", person: x.person };
     case "payday": return { t: x.name && many ? `Set ${x.name}’s payday` : "Set your payday", s: "See when your next pay is due", go: "budget", person: x.person };
@@ -84,7 +85,9 @@ export function breakdownHTML(S = app.state, C = app.C) {
 export function primaryFinding(S = app.state, C = app.C) {
   const cv = coverage(S, C);
   if (!(C.incTotal > 0)) return { id: "pay", level: "review", t: "Add your pay to check your expenses", s: "", act: { label: "Add pay", go: "budget", person: (C.people[0] || {}).id } };
-  if (cv.state === "short") return { id: "short", level: "attention", t: "Expenses are over budget", s: `${per(C, cv.short)} short`, act: { label: "Review expenses", go: "spending" } };
+  if (cv.state === "short") return { id: "short", level: "attention", t: "Expenses are over budget", s: `${per(C, cv.short)} short`, act: { label: "Review expenses", go: "spending" },
+    // Phase 9C: or give the expenses more of the pay (only when the allocation that pays for them is known)
+    fix: shortfallFix(S, C) && !readOnly() ? { label: "Adjust budget" } : null };
   if (cv.state === "nobudget") return { id: "nobudget", level: "attention", t: "Your expenses have no budget yet", s: `Give ${allocName(S)} a share of pay`, act: { label: "Set a budget", go: "budget", click: cv.allocation ? `[data-edit-acc="${cv.allocation.id}"]` : "" } };
   if (cv.state === "covered") return { id: "covered", level: "good", t: "Your expenses are covered", s: `${per(C, cv.unassigned)} not yet assigned to an expense`, act: null };
   if (cv.state === "even") return { id: "covered", level: "good", t: "Your expenses are covered", s: "Exactly, to the cent", act: null };
@@ -100,7 +103,7 @@ export function planCheckHTML(S = app.state, C = app.C) {
   return `<section class="card b-check" id="planCheck" aria-label="Expense check">
     <div class="pc-main ${F.level}" data-insight="${F.id}"><span class="pc-ic" aria-hidden="true">${ICON[F.level]}</span>
       <div class="pc-t"><p class="pc-h">${esc(F.t)}</p>${F.s ? `<p class="pc-s">${esc(F.s)}</p>` : ""}</div></div>
-    ${F.act || body ? `<div class="pc-acts">${F.act ? `<button type="button" class="pc-act" ${ACT_ATTRS(F.act)}>${esc(F.act.label)}</button>` : ""}
+    ${F.act || F.fix || body ? `<div class="pc-acts">${F.act ? `<button type="button" class="pc-act" ${ACT_ATTRS(F.act)}>${esc(F.act.label)}</button>` : ""}${F.fix ? `<button type="button" class="pc-act" data-rb-open="fix">${esc(F.fix.label)}</button>` : ""}
       ${body ? `<button type="button" class="pc-more" data-pc-toggle aria-expanded="${pcOpen}" aria-controls="pcBody">${pcOpen ? "Hide breakdown" : "View breakdown"}<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>` : ""}</div>` : ""}
     ${body ? `<div class="pc-body" id="pcBody"${pcOpen ? "" : " hidden"}>${body}</div>` : ""}</section>`;
 }

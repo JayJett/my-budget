@@ -151,8 +151,32 @@ export function createStore({ sb, householdId, getState, setState, onStatus, onR
     if (channel) { sb.removeChannel(channel); channel = null; }
   }
 
+  /** Phase 9C: save a ready-made set of changes as ONE step (one database call, so all or nothing,
+      and one history entry, so one Undo), but only if the budget in the database still passes
+      `stillValid(budget)`. Any edits waiting to save go first. Returns { ok, data } or { stale: true }
+      (nothing saved; the newer budget is now on screen). Throws if it couldn't save; nothing changes. */
+  async function commit(ops, stillValid) {
+    if (timer) { clearTimeout(timer); timer = null; }
+    for (let i = 0; i < 40 && (writing || dirty()); i++) { if (!writing) await flush(); else await new Promise(r => setTimeout(r, 100)); }
+    if (writing || dirty()) throw new Error("Your other changes haven’t saved yet");
+    const { data: row, error: e1 } = await sb.from("budgets").select("state, seq, updated_by, updated_at").eq("household_id", householdId).maybeSingle();
+    if (e1) throw e1;
+    if (!row) throw new Error("This household has no budget yet");
+    const fresh = migrate(row.state || {});
+    if (!fresh || !stillValid(fresh)) { receive(row); return { stale: true }; }
+    writing = true;
+    const { data, error } = await sb.rpc("apply_budget_ops", { p_household: householdId, p_ops: ops });
+    writing = false;
+    if (error) { processQueued(); throw error; }
+    adopt(data.state, Number(data.seq), [], { by: data.updated_by, at: data.updated_at, self: true });
+    onSaved(data);
+    processQueued();
+    onStatus("saved", { by: data.updated_by, at: data.updated_at });
+    return { ok: true, data };
+  }
+
   return {
-    load, schedule, subscribe, stop, receive,
+    load, schedule, subscribe, stop, receive, commit,
     flushNow: () => { if (timer) { clearTimeout(timer); timer = null; } return flush(); },
     busy: () => !!(timer || writing),
     hasUnsaved: () => !!(timer || writing) || dirty(),

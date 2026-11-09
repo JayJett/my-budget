@@ -61,7 +61,7 @@ export function view() {
   </section>`;
 
   const allocs = `${transitionNote()}<section class="b-allocs">
-    <div class="b-row sec"><h2>Your allocations</h2>${ro ? "" : `<button class="btn small ghost" type="button" data-reorder aria-pressed="${ui.reorder}">${ui.reorder ? "Done" : "Reorder"}</button>`}</div>
+    <div class="b-row sec"><h2>Your allocations</h2>${ro ? "" : `<span class="b-acts">${!ui.reorder && S.accounts.length > 1 && app.C.incTotal > 0 ? `<button class="btn small ghost" type="button" data-rb-open>Rebalance</button>` : ""}<button class="btn small ghost" type="button" data-reorder aria-pressed="${ui.reorder}">${ui.reorder ? "Done" : "Reorder"}</button></span>`}</div>
     <ul class="card alloc-list${ui.reorder ? " reordering" : ""}">${S.accounts.map((a, i) => `<li class="alloc">
       <button class="alloc-row" type="button" data-edit-acc="${esc(a.id)}"${ui.reorder ? " disabled" : ""} aria-label="${esc(a.name || "Unnamed")}: edit">
         <span class="a-ic" data-k="acc.${esc(a.id)}.ic" aria-hidden="true">${accIcon(a)}</span>
