@@ -250,14 +250,15 @@ test("shared households keep joint and each person's goals apart, by name", { sk
 test("hero cards: the switch sits on its own above; the label sits right on its number; changing the period never changes pay", { skip }, async () => {
   for (const w of [320, 390, 430]) {
     const { page, errors, ctx } = await open(RICH, { ...phone(w), storage: ALL_DONE });
-    for (const [tab, card, num] of [["budget", ".b-income", ".hero-amt"], ["spending", ".sp-sum", ".sp-head"], ["goals", ".gl-sum", ".gl-hero-top"], ["invest", ".iv-hero", ".sp-head"]]) {
+    for (const [tab, card, num] of [["budget", ".b-income", ".bi-amt"], ["spending", ".sp-sum", ".sp-head"], ["goals", ".gl-sum", ".gl-hero-top"], ["invest", ".iv-hero", ".sp-head"]]) {
       if (tab !== "budget") await goTab(page, tab);
       const g = await page.evaluate(([card, num]) => {
-        const c = document.querySelector(card), seg = c.querySelector(".b-row .seg").getBoundingClientRect(), lab = c.querySelector(".b-row .eyebrow").getBoundingClientRect(), n = c.querySelector(num).getBoundingClientRect();
-        return { segAbove: seg.bottom <= lab.top, gap: n.top - lab.bottom, segInside: seg.left >= c.getBoundingClientRect().left && seg.right <= c.getBoundingClientRect().right };
+        // Phase 10A: on Budget the switch is a compact one beside the label (it drops below it on the narrowest phones)
+        const c = document.querySelector(card), seg = c.querySelector(".b-row .seg, .bi-top .seg").getBoundingClientRect(), lab = c.querySelector(".b-row .eyebrow, .bi-top .eyebrow").getBoundingClientRect(), n = c.querySelector(num).getBoundingClientRect();
+        return { segAbove: card === ".b-income" ? seg.bottom <= n.top : seg.bottom <= lab.top, gap: n.top - lab.bottom, segInside: seg.left >= c.getBoundingClientRect().left && seg.right <= c.getBoundingClientRect().right };
       }, [card, num]);
       assert.ok(g.segAbove && g.segInside, `${tab} @${w}: switch above the label, inside the card`);
-      assert.ok(g.gap >= -1 && g.gap < 14, `${tab} @${w}: label sits on its number (gap ${g.gap})`);
+      if (tab !== "budget") assert.ok(g.gap >= -1 && g.gap < 14, `${tab} @${w}: label sits on its number (gap ${g.gap})`);
     }
     if (w === 390) { await goTab(page, "budget"); await shot(page, "hero-budget"); await goTab(page, "goals"); await shot(page, "hero-goals"); }
     await goTab(page, "budget");

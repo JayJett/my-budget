@@ -34,8 +34,8 @@ export const TOURS = {
     stops: [
       { sel: ["#app .viewas"], title: "Pick your period", text: "Every amount can be shown per week, fortnight or month. It doesn’t change the plan, just how you see it." },
       { sel: ["#app .b-income"], title: "Income", text: "Everyone’s take-home pay, added up. Tap a person to change their pay, how often it arrives, or their colour." },
-      { sel: ["#allocStatus"], title: "Every dollar has a job", text: "How much of each person’s pay is planned. Aim for 100%, and use Fill to top up the last bit." },
-      { sel: ["#app .b-allocs", "#app .alloc-list"], title: "Your allocations", text: "Where the pay goes, account by account. Tap one to change its share of each person’s pay." },
+      { sel: ["#allocStatus"], title: "Where things stand", text: "Whether all your pay has a job, whether your expenses are covered, and your next payday. If something needs doing, it shows here." },
+      { sel: ["#app .b-allocs", "#app .alloc-list"], title: "Your allocations", text: "Where the pay goes, account by account. Tap one to change its share of pay. Add one with + Add; Manage has Rebalance and Reorder." },
       { sel: ["#tabs"], title: "Getting around", text: "Home is your overview. Expenses is where the bills money goes, Goals is what you’re saving for, and Wealth has your accounts, investments and history." },
       { sel: ["#menuBtn"], title: "Your settings", text: "Tap your initial for your profile, appearance, reminders and tours. Tap the household’s name to switch or manage households." },
     ],

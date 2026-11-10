@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import { LIVE_V3, RICH_V3 } from "../fixtures.js";
-import { setup, skip, SHOTS, open, settle, fake, goTab, setField, editPerson, editAccount, closeSheet } from "./helpers.js";
+import { setup, skip, SHOTS, open, settle, fake, goTab, setField, editPerson, editAccount, closeSheet, addPersonBtn } from "./helpers.js";
 
 setup();
 
@@ -92,7 +92,7 @@ test("'show amounts per' switches every figure between week, fortnight and month
 test("people: add, set pay frequency, recolour, remove", { skip }, async () => {
   const { page, errors, ctx } = await open(RICH_V3);
   await settle(page);
-  await page.click("[data-person-new]");
+  await addPersonBtn(page);
   await page.waitForSelector('#sheet .bsheet [data-l="pp"][data-f="name"]');
   await page.keyboard.type("Sam");                                   // the name box has the cursor
   const sam = await page.getAttribute('#sheet [data-l="pp"][data-f="name"]', "data-i");

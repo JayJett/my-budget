@@ -89,6 +89,17 @@ export async function setField(page, sel, v) {
 }
 
 
+/* Phase 10A: Budget's Rebalance and Reorder live in its "Manage" menu; adding a person is under "Pay details". */
+export async function budgetManage(page, which) {
+  await page.click("[data-b-manage]");
+  await page.click(`#pop [data-mg="${which}"]`);
+  if (which === "reorder") await page.waitForSelector(".alloc-list.reordering");
+}
+export async function addPersonBtn(page) {
+  if (!(await page.isVisible("[data-person-new]"))) await page.click("[data-inc-more]");
+  await page.click("[data-person-new]");
+}
+
 /* Budget tab (UI phase 1): pay and allocations are edited in a sheet. */
 export async function editPerson(page, id) {
   await page.click(`[data-edit-person="${id}"]`);

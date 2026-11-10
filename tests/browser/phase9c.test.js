@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import { toStored, blankBudget, addPerson } from "../../js/model/schema.js";
-import { setup, skip, SHOTS, open, fake } from "./helpers.js";
+import { setup, skip, SHOTS, open, fake, budgetManage } from "./helpers.js";
 
 setup();
 const ALL_DONE = { "mb-tours-u-me": JSON.stringify({ tabs: Object.fromEntries(["budget", "networth", "spending", "goals", "invest", "progress"].map(t => [t, "done"])) }) };
@@ -66,7 +66,7 @@ test("the expense shortfall: Adjust budget opens a preset proposal; preview, the
 test("preview and cancel: nothing saved; closing with changes asks first", { skip }, async () => {
   const { page, errors, ctx } = await open(solo(1000), { ...phone(), storage: ALL_DONE, hash: "budget", waitFor: "#planCheck" });
   const before = await budgetOf(page), saves = () => fake(page, () => window.__fake.rpcCalls.filter(c => c.name === "apply_budget_ops").length), saves0 = await saves();
-  await page.click("[data-rb-open]"); await page.waitForSelector("#sheet .rb");
+  await budgetManage(page, "rebalance"); await page.waitForSelector("#sheet .rb");
   await page.selectOption("#sheet [data-rb-target]", "ji");
   await amt(page, "250");
   await page.check('#sheet [data-rb-from="fun"]'); await page.check('#sheet [data-rb-from="jg"]');
@@ -87,7 +87,7 @@ test("preview and cancel: nothing saved; closing with changes asks first", { ski
   assert.deepEqual(await budgetOf(page), before);
   assert.equal(await saves(), saves0, "no save was sent");
   // closing without any change: no question
-  await page.click("[data-rb-open]"); await page.waitForSelector("#sheet .rb");
+  await budgetManage(page, "rebalance"); await page.waitForSelector("#sheet .rb");
   await page.click('#sheet .sheet-head [data-rb="close"]'); await page.waitForSelector("#sheet .rb", { state: "hidden" });
   assert.equal(await page.isVisible("#dlg"), false);
   assert.deepEqual(errors, []); await ctx.close();
@@ -165,7 +165,7 @@ test("shared household: a joint increase is split as they pay in now; each perso
   S.accounts.push({ id: "pj", name: "Jarden spending", type: "Personal", owner: j.id, role: null, split: { [j.id]: 0.2 }, pos: 20 });
   S.accounts.push({ id: "pm", name: "Madi spending", type: "Personal", owner: m.id, role: null, split: { [m.id]: 0.2 }, pos: 21 });
   const { page, errors, ctx } = await open(toStored(S), { ...phone(), storage: ALL_DONE, hash: "budget", waitFor: "#planCheck" });
-  await page.click("[data-rb-open]"); await page.waitForSelector("#sheet .rb");
+  await budgetManage(page, "rebalance"); await page.waitForSelector("#sheet .rb");
   // Spending is $1,160 + $960 = $2,120 a fortnight; +$212 shared as now (Jarden 1160:960 Madi)
   await amt(page, "2332");
   assert.equal(await page.locator("#sheet [data-rb-who]").count(), 5, "As now, By pay, Equally, Jarden only, Madi only");

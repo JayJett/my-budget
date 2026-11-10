@@ -2725,3 +2725,133 @@ details.help{ margin-top:20px; border-top:0; padding-top:0; }
 .pd-each summary{ cursor:pointer; min-height:40px; display:inline-flex; align-items:center; font-size:var(--fs-sm); color:var(--muted); font-weight:650; }
 .pd-person{ margin:6px 0 !important; }
 .pb-hero .pb-date, .pb-hero .pb-pay b{ color:#F3F7F5; }
+
+/* ============ Phase 10A: Budget tab, calmer and more compact ============
+   Order on phones: income → status → allocations → fair split → breakdowns. Spacing: 12px between
+   sections, 16px inside cards, rows sized by their content. Only presentation lives here. */
+.budget{ gap:var(--sp-3); }
+.b-income.card, .b-status.card, .b-fair.card{ padding:16px; }
+
+/* 1. income */
+.b-income .bi-top{ display:flex; align-items:center; justify-content:space-between; gap:8px 12px; flex-wrap:wrap; }
+.b-income .bi-seg{ margin:0; display:block; }
+.b-income .bi-seg .seg{ display:inline-flex; gap:2px; padding:2px; border:0; border-radius:99px; background:rgba(255,255,255,.08); }
+.b-income .bi-seg .seg button{ min-height:40px; padding:0 9px; border-radius:99px; font-size:var(--fs-xs); font-weight:650; color:var(--muted); }
+.b-income .bi-seg .seg button[aria-pressed="true"]{ background:rgba(255,255,255,.16); color:var(--ink); }
+.b-income .bi-top .eyebrow{ font-size:var(--fs-sm); white-space:nowrap; color:var(--muted); font-weight:600; letter-spacing:0; }
+.bi-amt{ display:flex; align-items:baseline; flex-wrap:wrap; gap:2px 8px; margin:8px 0 0; }
+.bi-amt .amt{ font:700 2.15rem/1.05 var(--display); letter-spacing:-.03em; font-variant-numeric:tabular-nums; }
+.bi-amt .per{ color:var(--muted); font-size:var(--fs-sm); }
+.bi-bar.split{ height:6px; margin:12px 0 2px; background:var(--unalloc); gap:2px; }
+.bi-bar.split span{ border-radius:99px; }
+.bi-people{ list-style:none; margin:10px 0 0; padding:0; display:grid; gap:6px; }
+.bi-people.multi{ grid-template-columns:repeat(auto-fit, minmax(132px, 1fr)); }
+.bi-p{ width:100%; display:grid; grid-template-columns:auto minmax(0,1fr) auto; grid-template-areas:"n n c" "v s c"; align-items:center; gap:1px 8px;
+  min-height:52px; padding:7px 8px 7px 12px; border:0; border-radius:12px; background:rgba(255,255,255,.06); color:var(--ink); text-align:left; cursor:pointer; font:inherit; }
+.bi-people:not(.multi) .bi-p{ grid-template-columns:minmax(0,1fr) auto; grid-template-areas:"n c" "l c"; }
+.bi-p:hover{ background:rgba(255,255,255,.1); } .bi-p:active{ background:rgba(255,255,255,.14); }
+.bi-p:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+.bi-name{ grid-area:n; font-weight:650; font-size:var(--fs-sm); color:var(--pc, var(--ink)); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.bi-v{ grid-area:v; font-weight:700; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.bi-sh{ grid-area:s; font-size:var(--fs-xs); color:var(--muted); font-variant-numeric:tabular-nums; white-space:nowrap; }
+.bi-line{ grid-area:l; font-size:var(--fs-xs); color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.bi-p .chev{ grid-area:c; }
+.b-income .b-inc-acts{ display:flex; margin:2px -8px 0; }
+.bi-more-btn{ display:inline-flex; align-items:center; gap:4px; color:var(--muted); }
+.bi-more-btn .dn, .b-manage .dn, .fs-more summary .dn{ width:14px; height:14px; flex:none; transition:transform var(--m-sel, .2s) var(--ease); }
+.bi-more-btn[aria-expanded="true"] .dn, .fs-more[open] summary .dn{ transform:rotate(180deg); }
+.bi-more{ border-top:1px solid var(--line); padding:10px 0 4px; }
+.bi-more[hidden]{ display:none; }
+.bi-pays{ list-style:none; margin:0; padding:0; display:grid; gap:10px; }
+.bi-pays li{ display:grid; grid-template-columns:auto minmax(0,1fr); gap:0 8px; font-size:var(--fs-sm); }
+.bi-pays li b{ color:var(--pc, var(--ink)); font-weight:650; }
+.bi-pays li span{ color:var(--ink); }
+.bi-pays li small{ grid-column:1 / -1; color:var(--muted); font-size:var(--fs-xs); }
+.bi-add{ margin:4px -8px 0; }
+
+/* 2. status */
+.bs-top{ display:flex; align-items:center; gap:12px; }
+.bs-ic{ width:28px; height:28px; flex:none; border-radius:50%; display:grid; place-items:center; font-weight:800; font-size:.85rem; background:var(--surface-2); color:var(--muted); }
+.bs-ic.ok{ background:var(--ok-soft); color:var(--ok); } .bs-ic.warn{ background:var(--warn-soft); color:var(--warn); } .bs-ic.bad{ background:var(--bad-soft); color:var(--bad); }
+.bs-t{ min-width:0; flex:1; }
+.bs-h{ margin:0; font:650 1.02rem/1.3 var(--display); font-variant-numeric:tabular-nums; }
+.bs-s{ margin:2px 0 0; color:var(--muted); font-size:var(--fs-sm); } .bs-s:empty{ display:none; }
+.b-status .st-list{ margin:12px 0 0; gap:8px; }
+.b-status .st-list[hidden], .b-status .st-list li[hidden]{ display:none; }
+.b-status .b-check{ padding:12px 0 0; margin-top:12px; border-top:1px solid var(--line); box-shadow:none; background:none; }
+.b-status .pc-main{ align-items:center; gap:12px; }
+.b-status .pc-ic{ width:28px; height:28px; margin:0; font-size:.85rem; }
+.b-status .pc-h{ font:600 var(--fs-md)/1.3 var(--body); }
+.b-status .pc-s{ margin-top:1px; }
+.b-status .pc-acts{ margin:2px 0 0 40px; gap:0 18px; }
+.bs-pay{ width:100%; display:flex; align-items:center; gap:12px; margin-top:12px; padding:10px 0 0; min-height:52px; border:0; border-top:1px solid var(--line); background:none; color:var(--ink); text-align:left; cursor:pointer; font:inherit; }
+.bs-pay-ic{ width:28px; height:28px; flex:none; border-radius:50%; display:grid; place-items:center; background:var(--accent-soft); color:var(--accent); }
+.bs-pay-ic svg{ width:16px; height:16px; }
+.bs-pay-t{ flex:1; min-width:0; display:flex; flex-direction:column; }
+.bs-pay-t b{ font-weight:600; font-size:var(--fs-md); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.bs-pay-t small{ color:var(--muted); font-size:var(--fs-xs); } .bs-pay-t small:empty{ display:none; }
+.bs-pay:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; border-radius:8px; }
+.bs-pay-t small{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.bs-pay .chev{ color:var(--faint); }
+/* the expense check: an old, general ".review" rule (Net worth's review row) also matched its "review" state */
+.b-check .pc-main{ flex-wrap:nowrap; margin-top:0; font-size:inherit; }
+/* someone still to finish: name and what's left on one line, the bar under it, Fill beside both */
+.b-status .st-list li{ display:grid; grid-template-columns:minmax(0,auto) minmax(0,1fr) auto; grid-template-areas:"n v f" "b b f"; align-items:center; gap:4px 10px; }
+.b-status .st-list li .st-name{ grid-area:n; max-width:none; min-width:0; }
+.b-status .st-list li .st-v{ grid-area:v; text-align:right; min-width:0; overflow:hidden; text-overflow:ellipsis; }
+.b-status .st-list li .st-bar{ grid-area:b; flex:none; height:6px; }
+.b-status .st-list li > [data-k^="fill."]{ grid-area:f; }
+.b-status .st-list li > [data-k^="fill."]:empty{ display:none; }
+.b-status .st-list li:not(:has(.st-name)){ grid-template-areas:"v v f" "b b f"; }
+.b-status .fill-btn{ margin:0; }
+
+/* 3. allocations */
+.b-allocs .b-row.sec{ margin:4px 2px 8px; flex-wrap:nowrap; }
+.b-allocs .b-h2{ display:flex; flex-direction:column; gap:0; margin:0; min-width:0; }
+.b-per{ font:500 var(--fs-xs)/1.3 var(--body); color:var(--muted); letter-spacing:0; }
+.b-allocs .b-acts{ display:flex; gap:4px; margin-left:auto; }
+.b-allocs .b-acts .btn{ display:inline-flex; align-items:center; gap:4px; }
+.b-add span{ font-size:1.1em; line-height:1; }
+.alloc-list{ padding:2px 6px; }
+.alloc-row{ min-height:58px; padding:9px 6px; gap:12px; }
+.a-main{ gap:1px; }
+.a-name{ font-weight:600; font-size:var(--fs-md); }
+.a-meta{ font-size:var(--fs-xs); color:var(--muted); }
+.a-who, .a-part{ color:color-mix(in srgb, var(--pc) 70%, var(--ink)); font-weight:600; }
+.a-amt{ font:650 .98rem/1.2 var(--display); font-variant-numeric:tabular-nums; align-self:center; }
+.a-cov.quiet{ display:none; }
+
+/* 4. fair split */
+.b-fair .fair-verdict{ margin:6px 0 10px; font:650 var(--fs-md)/1.35 var(--body); }
+.fs-rows{ list-style:none; margin:0; padding:0; display:grid; gap:6px; }
+.fs-rows li{ display:flex; align-items:baseline; justify-content:space-between; gap:4px 12px; flex-wrap:wrap; font-size:var(--fs-sm); }
+.fs-rows li:has(.fs-v:empty){ display:none; }
+.fs-name{ font-weight:650; color:color-mix(in srgb, var(--pc) 70%, var(--ink)); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.fs-v{ color:var(--muted); font-variant-numeric:tabular-nums; }
+.fs-more{ margin-top:4px; }
+.fs-more summary{ gap:4px; }
+.fs-more[open] summary{ margin-bottom:6px; }
+.b-fair .fbar{ height:10px; }
+.b-fair .fbar .half{ top:0; bottom:0; width:2px; margin-left:-1px; background:var(--surface); opacity:1; }
+.b-fair .split-key{ margin:0 0 10px; }
+
+/* 5. breakdowns */
+.b-insights{ padding:0; }
+.b-insights summary{ min-height:56px; padding:9px 16px; gap:12px; box-sizing:border-box; }
+.b-insights .ins-t{ flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
+.b-insights .ins-t > span{ font-weight:650; font-size:var(--fs-md); }
+.b-insights .ins-t small{ flex:none; text-align:left; white-space:normal; overflow:visible; color:var(--muted); font-weight:500; font-size:var(--fs-xs); }
+.b-insights .ins-t small:empty{ display:none; }
+.b-status .pc-t{ flex:1; }
+.b-status .pc-more{ flex:none; align-self:center; min-height:40px; min-width:40px; padding:0 2px 0 8px; justify-content:flex-end; font-size:var(--fs-sm); }
+.b-status .pc-acts:empty{ display:none; }
+/* joint rows: "Jarden $960 · Madi $855" (the dot used to be clipped by the part's own overflow) */
+.a-parts{ gap:1px 6px; }
+.a-parts .a-part + .a-part::before{ margin:0 6px 0 0; }
+.b-income .bi-top{ gap:8px; }
+.b-income .bi-seg .seg button{ padding:0 7px; }
+.b-status .pc-more{ width:40px; padding:0; justify-content:center; border-radius:50%; }
+.b-status .pc-more:active{ background:var(--surface-2); }
+.fs-name{ max-width:100%; }
+.fs-rows{ grid-template-columns:minmax(0,1fr); } .fs-rows li{ min-width:0; }
+.a-none:empty{ display:none; } .a-none{ color:var(--muted); }

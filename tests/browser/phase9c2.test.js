@@ -105,7 +105,8 @@ test("Expenses empty state: the main button full width, 'Add your own' under it"
 });
 
 test("doughnuts: the whole ring fits inside its box", { skip }, async () => {
-  const { page, errors, ctx } = await open(rich(), { ...phone(), storage: ALL_DONE, hash: "budget", waitFor: "#incDonut svg" });
+  // (Phase 10A: Budget's income doughnut became a bar; the doughnuts left are on Wealth and Expenses)
+  const { page, errors, ctx } = await open(rich(), { ...phone(), storage: ALL_DONE, hash: "wealth/accounts", waitFor: "#nwBar svg" });
   const r = await page.evaluate(() => [...document.querySelectorAll(".mini-donut circle")].map(c => Number(c.getAttribute("r")) + Number(c.getAttribute("stroke-width")) / 2));
   assert.ok(r.length && r.every(x => x <= 18), "ring outer edge within the 36-unit box");
   assert.deepEqual(errors, []); await ctx.close();
