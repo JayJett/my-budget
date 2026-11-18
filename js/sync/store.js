@@ -129,7 +129,7 @@ export function createStore({ sb, userId, householdId, canWrite, isCurrent, setS
     const cached = read(device, cacheKey);
     const { data, error } = await readBudget();
     if (!active()) throw cancelled();
-    if (!error && !data) throw { message: "You no longer have access to this household" };
+    if (!error && !data) throw new Error("You no longer have access to this household");
     const offline = !!error && isNetworkError(error) && !denied(error);
     if (error && (!offline || (!cached && !pending))) throw error;
     const source = offline ? cached || pending : data;

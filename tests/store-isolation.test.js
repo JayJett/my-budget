@@ -267,3 +267,18 @@ test("two tabs keep independent pending drafts for the same signed-in editor", a
   fromOne.store.stop();
 });
 
+
+test("a confirmed membership loss never falls back to an online browser copy", async () => {
+  const f = fixture(), a = f.open("alpha");
+  const state = (await a.store.load()).state;
+  a.store.schedule({ ...state, note: "local only" });
+  a.store.stop();
+  f.budgets.alpha = null;
+  const revoked = f.open("alpha");
+  await assert.rejects(revoked.store.load(), /no longer have access/);
+  assert.deepEqual(revoked.updates, []);
+  assert.deepEqual(f.writes, []);
+  assert.equal(hasDeviceBudgetDrafts("editor", "alpha"), true);
+  revoked.store.stop();
+});
+

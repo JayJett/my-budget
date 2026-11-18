@@ -156,7 +156,7 @@ function applyRemoteView(meta) {
 
 /* ---------- sign-in screens ---------- */
 let recovering = false, entering = null;
-let householdOpen = 0, authEpoch = 0, observedUser = null;
+let householdOpen = 0, authEpoch = 0, appliedAuthEpoch = 0, observedUser = null;
 export function showAuth(mode, msg, kind) {
   document.body.classList.add("signed-out"); const el = $("#auth"); el.hidden = false; el.classList.add("im");
   setThemeColour(true);
@@ -747,8 +747,9 @@ export function initAuth(sb) {
         teardown(); clearSignedOutDevice(); resetAccent(); showAuth("signin");
         return;
       }
-      const differentUser = !!app.session && app.session.user.id !== next && !!s;
-      if (differentUser) { teardown(); clearSignedOutDevice(); }
+      const replacedSession = !!app.session && !!s && appliedAuthEpoch !== epoch;
+      if (replacedSession) { teardown(); clearSignedOutDevice(); }
+      appliedAuthEpoch = epoch;
       if (event === "PASSWORD_RECOVERY") { recovering = true; app.session = s; showAuth("newpass"); return; }
       if (!s) {
         if (event !== "INITIAL_SESSION") return;
@@ -758,7 +759,7 @@ export function initAuth(sb) {
         if (pending()) { showAuth("verify"); return; } // refreshed (or came back) while waiting for the email code
         showAuth("signin"); return;
       }
-      const wasSignedIn = !!app.session && !differentUser; app.session = s;
+      const wasSignedIn = !!app.session && !replacedSession; app.session = s;
       useAccentOf(s.user); // your own colour (or the default), never the last person's
       if (event === "USER_UPDATED") rememberMe();
       if (!recovering && !wasSignedIn) enterApp();
