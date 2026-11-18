@@ -104,7 +104,7 @@ test("offline: Progress shows the copy saved on this device", { skip }, async ()
   const { page, errors, ctx } = await open(null, { init: withHistory(), device: devices["iPhone 13"] });
   await settle(page);
   await page.waitForFunction(() => navigator.serviceWorker && navigator.serviceWorker.controller, null, { timeout: 10000 });
-  await page.waitForFunction(() => Object.keys(localStorage).some(k => k.startsWith("mb-snaps-v1-")));
+  await page.waitForFunction(() => Object.keys(localStorage).some(k => k.startsWith("mb-snaps-v2-u-me:")));
   await ctx.setOffline(true);
   await page.reload();
   await page.waitForSelector("#app .viewas");
