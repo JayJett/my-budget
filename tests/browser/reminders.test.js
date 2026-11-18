@@ -135,10 +135,10 @@ test("offline: the inbox shows the copy on this device; settings need a connecti
   await page.waitForSelector("#sheet >> text=needs a connection");
   await page.click('#sheet [data-sheet="close"]');
   await ctx.setOffline(false);
-  assert.ok(await page.evaluate(() => Object.keys(localStorage).some(k => k.startsWith("mb-rem-v1-"))));
+  assert.ok(await page.evaluate(() => Object.keys(localStorage).some(k => k.startsWith("mb-rem-v2-u-me:"))));
   await page.click("#menuBtn"); await page.click('[data-act="signout"]');
   await page.waitForSelector("#fSignin");
-  assert.deepEqual(await page.evaluate(() => Object.keys(localStorage).filter(k => /^mb-(rem|snaps|cache)-v1-/.test(k))), [], "no household data left on the device");
+  assert.deepEqual(await page.evaluate(() => Object.keys(localStorage).filter(k => /^mb-(rem|snaps|cache)-v[12]-/.test(k))), [], "no household data left on the device");
   assert.equal(await page.isVisible("#bellBtn"), false);
   assert.deepEqual(errors.filter(e => !/ERR_INTERNET_DISCONNECTED|Failed to fetch/.test(e)), []);
   await ctx.close();

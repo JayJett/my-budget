@@ -54,7 +54,7 @@ initPayday(); // after the budget sheets and rebalance: it chains their redraw h
 document.addEventListener("keydown", e => {
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
     e.preventDefault();
-    if (app.store && app.store.busy()) app.store.flushNow(); else if (app.household) toast("Everything’s already saved. Changes save as you go.");
+    if (app.store?.hasUnsaved() || app.store?.busy()) app.store.flushNow(); else if (app.household) toast("Everything’s already saved. Changes save as you go.");
   }
 });
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden" && app.store && app.store.busy()) app.store.flushNow(); });
@@ -62,7 +62,7 @@ document.addEventListener("visibilitychange", () => { if (document.visibilitySta
 // "Offline" is the app's own view too (it loaded from this device, or its last save attempt found no
 // connection): navigator.onLine alone can say "online" when there's no internet (common on iPhones).
 const offlineNow = () => navigator.onLine === false || app.offline || app.saveStatus === "offline";
-window.addEventListener("beforeunload", e => { if (!offlineNow() && app.store && app.store.hasUnsaved()) { e.preventDefault(); e.returnValue = ""; } });
+window.addEventListener("beforeunload", e => { if (app.store?.hasUnsaved() && (!offlineNow() || !app.store.keepPending())) { e.preventDefault(); e.returnValue = ""; } });
 
 const configured = /^https:\/\/[a-z0-9-]+\.supabase\.(co|in)\/?$/i.test(SUPABASE_URL.trim()) && SUPABASE_ANON_KEY.trim().length > 30;
 if (!configured || !window.supabase) showAuth("setup");
@@ -75,8 +75,14 @@ function offerUpdate(worker) {
   bar.id = "update"; bar.className = "update-bar"; bar.setAttribute("role", "status");
   bar.innerHTML = `<span>A new version is ready.</span><button class="btn small primary" type="button">Tap to refresh</button>`;
   bar.querySelector("button").addEventListener("click", async () => {
-    bar.querySelector("button").disabled = true;
-    if (app.store) await app.store.flushNow();   // don't lose an edit that's on its way
+    const button = bar.querySelector("button"), store = app.store;
+    button.disabled = true;
+    if (store) await store.flushNow();
+    if (store !== app.store || (store?.hasUnsaved() && !store.keepPending())) {
+      button.disabled = false;
+      if (store === app.store) toast("Try again after your edits have saved.");
+      return;
+    }
     updating = true;
     worker.postMessage({ type: "SKIP_WAITING" }); // the page reloads once the new version takes over
   });

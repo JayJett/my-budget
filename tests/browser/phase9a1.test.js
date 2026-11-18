@@ -10,13 +10,14 @@ import { setup, skip, SHOTS, open, fake, goTab, settle } from "./helpers.js";
 
 setup();
 const RICH = toStored(migrate(RICH_V3));
+const PAYDAY_CLOCK = new Date("2026-11-04T00:00:00Z");
 const ALL_DONE = { "mb-tours-u-me": JSON.stringify({ tabs: Object.fromEntries(["budget", "networth", "spending", "goals", "invest", "progress"].map(t => [t, "done"])) }) };
 const phone = (w = 390, h = 844, dark = false) => ({ device: { viewport: { width: w, height: h }, hasTouch: true, isMobile: true, ...(dark ? { colorScheme: "dark" } : {}) } });
 const shot = (page, name) => page.screenshot({ path: join(SHOTS, `p9a1-${name}.png`) });
 const withPaydays = (a, b) => { const x = JSON.parse(JSON.stringify(RICH)), ids = Object.keys(x.people); x.people[ids[0]].payday = a; x.people[ids[1]].payday = b; return x; };
 
 test("payday card: one date and countdown, then each person and their pay; no 'Planned, not yet…' line; nothing added up", { skip }, async () => {
-  const { page, errors, ctx } = await open(withPaydays("2026-11-04", "2026-11-04"), { ...phone(390, 844, true), storage: ALL_DONE, hash: "", waitFor: "#app .home" });
+  const { page, errors, ctx } = await open(withPaydays("2026-11-04", "2026-11-04"), { ...phone(390, 844, true), storage: ALL_DONE, hash: "", waitFor: "#app .home", clock: PAYDAY_CLOCK });
   const card = await page.textContent(".ho-pay");
   assert.doesNotMatch(card, /Planned, not yet in your account/);
   assert.equal((card.match(/Nov/g) || []).length, 1, "the date appears once");
@@ -27,10 +28,10 @@ test("payday card: one date and countdown, then each person and their pay; no 'P
 });
 
 test("payday card: different days stay apart, each with its own date; no payday yet says so", { skip }, async () => {
-  let { page, errors, ctx } = await open(withPaydays("2026-11-04", "2026-11-06"), { ...phone(), storage: ALL_DONE, hash: "", waitFor: "#app .home" });
+  let { page, errors, ctx } = await open(withPaydays("2026-11-04", "2026-11-06"), { ...phone(), storage: ALL_DONE, hash: "", waitFor: "#app .home", clock: PAYDAY_CLOCK });
   const rows = await page.$$eval(".ho-pays li", e => e.map(x => x.textContent.replace(/\s+/g, " ").trim()));
   assert.equal(rows.length, 2);
-  assert.match(rows[1], /Fri 20 Nov|Fri 6 Nov|Fri/, "the second person's own date");
+  assert.match(rows[1], /Fri 6 Nov/, "the second person's own date");
   assert.deepEqual(errors, []); await ctx.close();
   ({ page, errors, ctx } = await open(withPaydays("", ""), { ...phone(320, 640), storage: ALL_DONE, hash: "", waitFor: "#app .home" }));
   assert.match(await page.textContent(".ho-pay"), /Your pay/);

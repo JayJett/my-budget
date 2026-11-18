@@ -101,7 +101,7 @@ test("a failed save: nothing changes, the proposal stays to try again", { skip }
   await fake(page, () => { window.__fake.failNext = 1; });
   await page.click('#sheet [data-rb="apply"]');
   await page.waitForSelector("#sheet .rb-msg.bad");
-  assert.match(await sheetText(page), /Couldn’t apply the changes, so nothing was changed/);
+  assert.match(await sheetText(page), /Couldn’t confirm the changes/);
   assert.deepEqual(await budgetOf(page), before);
   assert.doesNotMatch(await page.textContent("body"), /Budget rebalanced/);
   await page.click('#sheet [data-rb="apply"]'); await page.waitForSelector("#sheet .rb", { state: "hidden" });

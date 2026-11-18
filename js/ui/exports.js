@@ -42,7 +42,8 @@ export function exportJSON() {
 
 export function initImport() {
   $("#importFile").addEventListener("change", async e => {
-    const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+    const f = e.target.files[0], store = app.store; e.target.value = "";
+    if (!f || !store?.isActive() || !app.canWrite) return;
     let next;
     try {
       const txt = await f.text();
@@ -53,9 +54,11 @@ export function initImport() {
       next = migrate(json);
       if (!next) throw new Error("empty");
     } catch (err) { toast("That file doesn’t contain budget data. Pick a saved budget .json or .html file."); return; }
+    if (!store.isActive()) return;
     if (app.hasData && !(await confirmDel("Replace the current budget?", "Every number here will be swapped for the ones in this file, for everyone in the household. A backup of the current budget is kept.", "Replace"))) return;
+    if (!store.isActive()) return;
     app.state = next;
     if (app.store) app.store.replaceNext("Imported a file");
-    changed({ full: true }); toast("Imported and saved.");
+    changed({ full: true }); toast("Budget imported. Check the save status to confirm it has synced.");
   });
 }

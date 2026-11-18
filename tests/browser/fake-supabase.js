@@ -78,11 +78,16 @@
   const households = (init.households || [{ id: "hh-1", name: "Test household", role: "owner", budget: init.budget || {}, seq: init.seq || 0 }])
     .map(h => ({ seq: 0, backups: [], invites: [], snapshots: [], changes: [], reminders: [], remPrefs: null, ...copy(h), members: h.members ? copy(h.members) : [meMember(h.role || "owner")] }));
   const user = { id: ME, email: "jarden@example.com", user_metadata: { name: init.myName || "Jarden", ...(init.accent ? { accent: init.accent } : {}), ...(init.meta || {}) }, created_at: "2026-01-01T00:00:00Z" };
-  let authCb = null;
+  let authCb = null, session = null;
+  const signIn = () => ({ user, access_token: "test-token" });
+  const emitAuth = (event, next) => { session = next; if (authCb) authCb(event, next); };
 
   const fake = window.__fake = {
     households, rpcCalls: [], authCalls: [], backups: [], remUpdates: [], prefSaves: [], devices: copy(init.devices || []), fnCalls: [],
     pushKey: init.pushKey === undefined ? "BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4" : init.pushKey, listeners: [], failNext: 0, checks: {}, noPersonLinks: !!init.noPersonLinks, liveCb: null, liveDown: false, live(st) { if (this.liveCb) this.liveCb(st); }, files: copy(init.files || {}), storageCalls: [], failUpload: 0, storageOn: init.storageOn !== false, noLook: !!init.noLook, deleted: false, createMode: init.createMode || null, invite: init.invite || null, failMembers: init.failMembers || 0, createDelay: init.createDelay || 0, resendWait: init.resendWait || 0,
+    holdNextSave() {
+      fake.saveGate = new Promise(resolve => { fake.finishSave = resolve; });
+    },
     get budget() { return households[0].budget; },
     get seq() { return households[0].seq; },
     hh: id => households.find(h => h.id === id),
@@ -125,7 +130,7 @@
         const h = fake.hh(hid); if (!h || roleIn(hid) !== "owner") return { data: [], error: null };
         Object.assign(h, q.update); return { data: [{ name: h.name }], error: null };
       }
-      if (table === "budgets") { const h = fake.hh(hid); return { data: h ? { state: copy(h.budget), seq: h.seq, updated_by: ME, updated_at: new Date().toISOString() } : null, error: null }; }
+      if (table === "budgets") { const h = fake.hh(hid); return { data: h && roleIn(hid) ? { state: copy(h.budget), seq: h.seq, updated_by: ME, updated_at: new Date().toISOString() } : null, error: null }; }
       if (table === "budget_snapshots") return { data: copy((fake.hh(hid) || { snapshots: [] }).snapshots), error: null };
       if (table === "push_subscriptions") {
         if (q.del) { fake.devices = fake.devices.filter(d => d.id !== q.eq.id); return { data: null, error: null }; }
@@ -157,7 +162,7 @@
       select(cols) { q.cols = cols || ""; return b; }, eq(k, v) { q.eq[k] = v; return b; }, is(k, v) { q.is[k] = v; return b; },
       order(_c, o) { q.desc = !!(o && o.ascending === false); return b; }, lt(k, v) { q.lt[k] = Number(v); return b; }, gt(k, v) { q.gt[k] = Number(v); return b; }, limit(n) { q.limit = n; return b; },
       in(k, v) { q.in[k] = v; return b; }, upsert(v) { q.upsert = v; return b; },
-      update(v) { q.update = v; return b; }, delete() { q.del = true; return b; }, maybeSingle() { return b; },
+      update(v) { q.update = v; return b; }, delete() { q.del = true; return b; }, maybeSingle() { return b; }, setHeader() { return b; }, abortSignal() { return b; },
       then(res, rej) { return Promise.resolve(run()).then(res, rej); },
     };
     return b;
@@ -243,6 +248,8 @@
         return { data: copy(row), error: null };
       }
       case "apply_budget_ops": {
+        const gate = fake.saveGate; fake.saveGate = null;
+        if (gate) await gate;
         if (fake.failNext > 0) { fake.failNext--; return err("Failed to fetch"); }
         if (!roleIn(id)) return err("Not a member of this household");
         if (roleIn(id) === "viewer") return err("You have view-only access to this budget");
@@ -325,15 +332,16 @@
       return {
         auth: {
           // Like the real client: with no connection and an expired sign-in, there's no session to give.
-          onAuthStateChange(cb) { authCb = cb; setTimeout(() => cb("INITIAL_SESSION", init.signedOut || offline() ? null : { user }), 0); return { data: { subscription: { unsubscribe() {} } } }; },
-          async signOut() { fake.authCalls.push({ name: "signOut" }); setTimeout(() => authCb && authCb("SIGNED_OUT", null), 0); return { error: null }; },
+          onAuthStateChange(cb) { authCb = cb; setTimeout(() => emitAuth("INITIAL_SESSION", init.signedOut || offline() ? null : signIn()), 0); return { data: { subscription: { unsubscribe() {} } } }; },
+          async getSession() { return { data: { session }, error: null }; },
+          async signOut() { fake.authCalls.push({ name: "signOut" }); setTimeout(() => emitAuth("SIGNED_OUT", null), 0); return { error: null }; },
           // Phase 7A: sign-up with an email code, sign-in codes, resending, Google/Apple
           async signUp(c) { fake.authCalls.push({ name: "signUp", email: c.email, data: copy(c.options && c.options.data), redirect: c.options && c.options.emailRedirectTo }); return { data: { user: { id: "new" }, session: null }, error: null }; },
           async verifyOtp(c) {
             fake.authCalls.push({ name: "verifyOtp", email: c.email, type: c.type });
             await new Promise(r => setTimeout(r, 30));
             if (c.token !== (init.code || "123456")) return { data: {}, error: { message: "Token has expired or is invalid", status: 403 } };
-            setTimeout(() => authCb && authCb("SIGNED_IN", { user }), 0);
+            setTimeout(() => emitAuth("SIGNED_IN", signIn()), 0);
             return { data: { session: { user }, user }, error: null };
           },
           async resend(c) {
@@ -347,11 +355,11 @@
             return { data: {}, error: null };
           },
           async signInWithOAuth(c) { fake.authCalls.push({ name: "oauth", provider: c.provider, redirectTo: c.options && c.options.redirectTo }); return { data: { url: "about:blank" }, error: null }; },
-          async signInWithPassword(c) { fake.authCalls.push({ name: "signIn", email: c.email }); setTimeout(() => authCb && authCb("SIGNED_IN", { user }), 0); return { error: null }; },
+          async signInWithPassword(c) { fake.authCalls.push({ name: "signIn", email: c.email }); setTimeout(() => emitAuth("SIGNED_IN", signIn()), 0); return { error: null }; },
           async updateUser(c) {
             fake.authCalls.push({ name: "updateUser", ...copy(c) });
             if (c.data) Object.assign(user.user_metadata, c.data);
-            setTimeout(() => authCb && authCb("USER_UPDATED", { user }), 0);
+            setTimeout(() => emitAuth("USER_UPDATED", signIn()), 0);
             return { data: { user }, error: null };
           },
         },
@@ -370,7 +378,10 @@
           async remove(paths) { fake.storageCalls.push({ op: "remove", bucket, paths }); paths.forEach(p => { if (mayWrite(bucket, p)) delete fake.files[p]; }); return { data: [], error: null }; },
           async createSignedUrl(path) { fake.storageCalls.push({ op: "sign", bucket, path }); const u = mayRead(bucket, path) && fake.files[path]; return u ? { data: { signedUrl: u }, error: null } : { data: null, error: { message: "Object not found" } }; },
         }; } },
-        rpc,
+        rpc(name, args) {
+          const b = { setHeader() { return b; }, abortSignal() { return b; }, then(resolve, reject) { return rpc(name, args).then(resolve, reject); } };
+          return b;
+        },
         // Edge Functions: the reminders function's "public key" and "send a test" jobs
         functions: { async invoke(name, opts) {
           await new Promise(r => setTimeout(r, 30));

@@ -146,9 +146,11 @@ export function initEvents() {
     }
     const rp = e.target.closest("[data-rmperson]");
     if (rp) {
+      const store = app.store;
       const p = app.state.people.find(x => x.id === rp.dataset.rmperson); if (!p) return;
       const nm = p.name || "this person";
       if (!(await confirmDel(`Remove ${nm}?`, `${nm}’s pay, their percentages, their personal accounts and their personal goals will be removed from this budget. Everything else stays.`))) return;
+      if (!store?.isActive() || readOnly()) return;
       removePerson(app.state, p.id); changed({ full: true }); toast(`${nm} removed`);
       return;
     }
@@ -164,13 +166,17 @@ export function initEvents() {
     }
     const dl = e.target.closest("[data-del]");
     if (dl) {
+      const store = app.store;
       const L = list(dl.dataset.del), i = L.findIndex(x => x.id === dl.dataset.i); if (i < 0) return;
       // A net-worth account that goals point at: say which goals, and what happens to them (nothing is deleted with it)
       const used = dl.dataset.del === "nw" && !blank(L[i].name) ? allGoals().filter(g => !blank(g.name) && g.account === L[i].name).map(g => g.name) : [];
       const msg = used.length ? `${used.length === 1 ? `The goal “${used[0]}” uses` : `${used.length} goals (${used.join(", ")}) use`} this account. ${used.length === 1 ? "It keeps its" : "They keep their"} saved amounts, but you’ll need to pick another savings account on the Goals tab. The balance will be cleared for everyone in the household.`
         : "Its numbers will be cleared for everyone in the household.";
       if ((rowHasData(L[i]) || used.length) && !(await confirmDel(`Remove “${L[i].name || "this row"}”?`, msg))) return;
-      L.splice(i, 1); changed({ full: true }); return;
+      if (!store?.isActive() || readOnly()) return;
+      const current = list(dl.dataset.del), index = current.findIndex(x => x.id === dl.dataset.i);
+      if (index < 0) return;
+      current.splice(index, 1); changed({ full: true }); return;
     }
     const mv = e.target.closest("[data-move]");
     if (mv) {
@@ -192,12 +198,12 @@ export function initEvents() {
     const g = e.target.closest(".grip"); if (!g || readOnly()) return;
     e.preventDefault();
     const tr = g.closest("tr");
-    drag = { l: g.dataset.grip, id: g.dataset.i, tr, tb: tr.parentElement, target: null };
+    drag = { l: g.dataset.grip, id: g.dataset.i, tr, tb: tr.parentElement, target: null, store: app.store };
     tr.classList.add("dragging"); document.body.classList.add("is-dragging");
     try { g.setPointerCapture(e.pointerId); } catch (_) {}
   });
   document.addEventListener("pointermove", e => {
-    if (!drag) return;
+    if (!drag?.store?.isActive()) return;
     const rows = [...drag.tb.children]; let idx = rows.length;
     for (let k = 0; k < rows.length; k++) { const b = rows[k].getBoundingClientRect(); if (e.clientY < b.top + b.height / 2) { idx = k; break; } }
     rows.forEach(r => r.classList.remove("drop-before", "drop-after"));
@@ -206,8 +212,9 @@ export function initEvents() {
   });
   const endDrag = commit => {
     if (!drag) return;
-    const L = list(drag.l), from = L.findIndex(x => x.id === drag.id); let to = drag.target;
     document.body.classList.remove("is-dragging");
+    if (!drag.store?.isActive() || readOnly()) { drag = null; return; }
+    const L = list(drag.l), from = L.findIndex(x => x.id === drag.id), to = drag.target;
     const moved = commit && to !== null && from > -1 && (to > from ? to - 1 : to) !== from;
     if (moved) moveItem(L, from, to > from ? to - 1 : to);
     drag = null;

@@ -2,14 +2,15 @@
 import { app } from "./ctx.js";
 import { $, esc, toast, closePop, openPop } from "./dom.js";
 import { render } from "./render.js";
-import { createStore, isNetworkError, clearDeviceCopies } from "../sync/store.js";
+import { createStore, isNetworkError, clearDeviceCopies, hasLegacyBudgetDraft, hasDeviceBudgetDrafts } from "../sync/store.js";
 import { blankBudget } from "../model/schema.js";
-import { startSetup, endSetup, obHeader, modeChoices, rememberMode, pendingAccounts, resumeAccounts } from "./onboarding.js";
+import { startSetup, endSetup, obHeader, modeChoices, rememberMode, pendingAccounts, resumeAccounts, hasLegacyAccountDraft } from "./onboarding.js";
 import { HERO } from "./hero-art.js";
 import { loadSnapshots, ensureMonthly } from "./views/progress.js";
 import { rememberChange, resetUndo, updateUndo, historyNoticeRemote } from "./history.js";
 import { loadReminders, resetReminders, openFromHash } from "./reminders.js";
 import { disablePush } from "./push.js";
+import { closeDrawer } from "./drawer.js";
 import { useAccentOf, resetAccent } from "./accent.js";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "../config.js";
 import { calm } from "./motion.js";
@@ -52,7 +53,11 @@ function rememberMe() {
 }
 /** Forget this person on this device: the welcome-back name, the offline copy of who they are,
     and every budget copy (used for "Not you?", signing out and deleting the account). */
-function forgetMe() { try { localStorage.removeItem(WELCOME); localStorage.removeItem(OFFLINE); } catch (_) {} clearDeviceCopies(); }
+function forgetMe(options) {
+  if (options?.discardDraftsFor && options.discardDraftsFor === app.meId) stopStore();
+  try { localStorage.removeItem(WELCOME); localStorage.removeItem(OFFLINE); } catch (_) {}
+  clearDeviceCopies(options);
+}
 
 /* ---------- what's needed to open the app offline: who you are and your households ---------- */
 const OFFLINE = "mb-offline";
@@ -150,7 +155,8 @@ function applyRemoteView(meta) {
 }
 
 /* ---------- sign-in screens ---------- */
-let recovering = false, entering = false;
+let recovering = false, entering = null;
+let householdOpen = 0, authEpoch = 0, appliedAuthEpoch = 0, observedUser = null;
 export function showAuth(mode, msg, kind) {
   document.body.classList.add("signed-out"); const el = $("#auth"); el.hidden = false; el.classList.add("im");
   setThemeColour(true);
@@ -272,18 +278,20 @@ async function busy(form, fn) {
 }
 
 /* ---------- households ---------- */
-async function loadMembers() {
-  // Phase 10: who's who in the budget (person_id). Until the database has it, ask without it.
-  let { data, error } = await app.sb.from("household_members").select("user_id, display_name, email, role, person_id").eq("household_id", app.household.id).order("joined_at");
-  app.personLinks = !error;
-  if (error && /person_id|42703|column/i.test(`${error.code} ${error.message}`)) ({ data, error } = await app.sb.from("household_members").select("user_id, display_name, email, role").eq("household_id", app.household.id).order("joined_at"));
+async function loadMembers(householdId, userId) {
+  let { data, error } = await app.sb.from("household_members").select("user_id, display_name, email, role, person_id").eq("household_id", householdId).order("joined_at");
+  const personLinks = !error;
+  if (error && /person_id|42703|column/i.test(`${error.code} ${error.message}`)) ({ data, error } = await app.sb.from("household_members").select("user_id, display_name, email, role").eq("household_id", householdId).order("joined_at"));
   const prof = offlineProfile();
-  app.members = error && prof && prof.members ? (prof.members[app.household.id] || []) : (data || []);
+  if (error && (!isNetworkError(error) || prof?.user.id !== userId)) throw error;
+  return { members: error ? prof.members?.[householdId] || [] : data || [], personLinks };
 }
 async function loadHouseholds() {
+  const userId = app.meId, epoch = authEpoch;
   // Phase 8: each household's look comes too. Until the database has it, ask for the name alone.
-  let { data, error } = await app.sb.from("household_members").select("household_id, role, households(name, appearance)").eq("user_id", app.meId).order("joined_at");
-  if (error && /appearance|42703|column/i.test(`${error.code} ${error.message}`)) ({ data, error } = await app.sb.from("household_members").select("household_id, role, households(name)").eq("user_id", app.meId).order("joined_at"));
+  let { data, error } = await app.sb.from("household_members").select("household_id, role, households(name, appearance)").eq("user_id", userId).order("joined_at");
+  if (error && /appearance|42703|column/i.test(`${error.code} ${error.message}`)) ({ data, error } = await app.sb.from("household_members").select("household_id, role, households(name)").eq("user_id", userId).order("joined_at"));
+  if (epoch !== authEpoch || userId !== app.meId) return null;
   if (error) {
     const prof = offlineProfile();
     if (isNetworkError(error) && prof && prof.user.id === app.meId && prof.households) { app.households = prof.households; return app.households; }
@@ -294,22 +302,54 @@ async function loadHouseholds() {
   return app.households;
 }
 
-/** Open one household's budget: roles, saving, live updates, and the setup guide if it's empty. */
-async function openHH(id) {
-  if (app.store) { await app.store.stop(); app.store = null; }
-  livePaused = false; lastSavedMeta = null;
+function stopStore() {
+  const store = app.store;
+  app.store = null;
+  if (store) store.stop();
+}
+
+function clearHouseholdView() {
   endSetup();
-  // Forget the last household's history views straight away, so nothing from it can show while this one loads
+  if ($("#sheet").open) $("#sheet").close();
+  if ($("#dlg").open) $("#dlgNo").click();
+  closePop();
+  closeDrawer({ focus: false });
+  app.household = null; app.members = []; app.hasData = false; app.loaded = false; app.role = null; app.canWrite = false;
+  app.state = blankBudget();
   app.snapshots = null; app.compareId = null; app.pgSel = null; app.snapshotsOffline = false;
-  const hh = app.households.find(h => h.id === id) || app.households[0];
-  app.household = { id: hh.id, name: hh.name, look: hh.look || {} };
-  app.role = hh.role;
-  app.canWrite = hh.role !== "viewer";
-  try { localStorage.setItem(lastHHKey(), hh.id); } catch (_) {}
-  await loadMembers();
-  app.store = createStore({
-    sb: app.sb, householdId: hh.id,
-    getState: () => app.state,
+  resetUndo(); resetReminders();
+  $("#app").replaceChildren();
+  showConn("");
+}
+
+const legacyWarnings = new Set();
+/** Clear the last view before loading the next one, and publish only if it is still current. */
+async function openHH(id) {
+  const hh = app.households.find(h => h.id === id);
+  if (!hh || !app.meId) return false;
+  const previous = app.store, previousName = app.household?.name;
+  const pending = previous?.hasUnsaved();
+  if (pending && !previous.keepPending()) {
+    toast("Your changes haven’t saved to this device. Keep this budget open and try again.");
+    return false;
+  }
+  const opening = ++householdOpen, epoch = authEpoch, userId = app.meId;
+  stopStore();
+  clearHouseholdView();
+  livePaused = false; lastSavedMeta = null;
+  app.saveErrShown = false;
+  showAuth("loading");
+  const stillOpening = () => opening === householdOpen && epoch === authEpoch && app.meId === userId;
+  let membership;
+  try { membership = await loadMembers(hh.id, userId); }
+  catch (error) { if (!stillOpening()) return false; throw error; }
+  if (!stillOpening()) return false;
+  const role = membership.members.find(member => member.user_id === userId)?.role;
+  if (!role) throw new Error("You no longer have access to this household");
+  const canWrite = role === "editor" || role === "owner";
+  const current = () => stillOpening() && app.store === store;
+  const store = createStore({
+    sb: app.sb, userId, householdId: hh.id, canWrite, isCurrent: current,
     setState: s => { app.state = s; },
     onStatus: (st, info) => {
       app.saveStatus = st;
@@ -317,45 +357,74 @@ async function openHH(id) {
       else if (st === "saved") { app.saveErrShown = false; showSaved(info); }
       else if (st === "offline") setStatus("Offline", "offline", "You’re offline. Changes are kept on this phone and will sync when you’re back online.");
       else if (st === "error") {
-        const ro = /view-only/i.test((info && info.message) || "");
-        setStatus("Couldn’t save", "off", ro ? "You have view-only access, so changes can’t be saved." : "Your last change didn’t save yet. It will keep trying; check your connection.");
-        // a failed save is never just a small dot: say it once, over the page (nothing moves)
-        if (!app.saveErrShown) { app.saveErrShown = true; toast(ro ? "You have view-only access, so changes can’t be saved." : "Your last change didn’t save yet. It will keep trying; check your connection."); }
+        const ro = /view-only/i.test(info?.message || "");
+        const msg = ro ? "Your access changed. Your unsaved edits are kept on this device." : "Your last change didn’t save yet.";
+        setStatus("Couldn’t save", "off", msg);
+        if (!app.saveErrShown) { app.saveErrShown = true; toast(msg); }
       }
     },
-    onRemote: meta => applyRemoteView(meta),
-    onSaved: data => rememberChange(data),
+    onRemote: applyRemoteView,
+    onSaved: rememberChange,
+    onDenied: error => {
+      if (/not a member|view.only|permission/i.test(error.message || "")) {
+        reloadHouseholds(hh.id).catch(() => {});
+      }
+    },
   });
-  const loaded = await app.store.load();
+  app.store = store;
+  let loaded;
+  try {
+    loaded = await store.load();
+  } catch (error) {
+    if (!current()) return false;
+    stopStore();
+    throw error;
+  }
+  if (!current()) return false;
+  app.household = { id: hh.id, name: hh.name, look: hh.look || {} };
+  hh.role = role; app.role = role; app.canWrite = canWrite;
+  app.members = membership.members; app.personLinks = membership.personLinks;
+  try { localStorage.setItem(lastHHKey(), hh.id); } catch (_) {}
   document.body.classList.remove("signed-out"); $("#auth").hidden = true; setThemeColour(false);
   app.loaded = true;
-  app.offline = !!loaded.offline;
-  app.snapshots = null; app.compareId = null;
-  resetReminders();
-  resetUndo(); // Undo only steps back through changes made in this household, this session
+  app.offline = loaded.offline;
   saveOfflineProfile();
   if (loaded.state) {
-    app.state = loaded.state; app.hasData = true; app.store.saveCache();
-    // Phase 9A: refreshed during setup step 4 (the plan saved, accounts not yet): carry on there
-    const pend = app.canWrite ? pendingAccounts() : null; if (pend) resumeAccounts(pend);
-  }
-  else {
-    const me = app.members.find(m => m.user_id === app.meId);
-    app.state = blankBudget({ name: (me && me.display_name) || "" }); app.hasData = false;
-    if (app.canWrite) startSetup();
+    app.state = loaded.state; app.hasData = true;
+    const pend = canWrite ? pendingAccounts() : null; if (pend) resumeAccounts(pend);
+  } else {
+    const me = app.members.find(m => m.user_id === userId);
+    app.state = blankBudget({ name: me?.display_name || "" });
+    if (canWrite) startSetup();
   }
   render();
-  if (loaded.upgraded && app.canWrite) { app.store.schedule(); toast("Your budget was upgraded to the new version. A backup of the old one was kept."); }
-  else if (loaded.resumed && app.canWrite) { app.store.schedule(); toast("Saving the changes you made while offline…"); }
-  else if (loaded.offline) { setStatus("Offline", "offline", "You’re offline. Changes are kept on this phone and will sync when you’re back online."); showConn(OFFLINE_MSG); }
-  else showSaved(loaded.meta && { by: loaded.meta.updated_by, at: loaded.meta.updated_at });
+  if (loaded.offline) {
+    app.saveStatus = "offline";
+    setStatus("Offline", "offline", "You’re offline. Changes are kept on this phone and will sync when you’re back online.");
+    showConn(OFFLINE_MSG);
+  } else if ((loaded.upgraded || loaded.resumed) && canWrite) {
+    store.schedule();
+    toast(loaded.resumed ? "Saving your pending changes…" : "Your budget was upgraded. A backup of the old one is kept when it saves.");
+  } else {
+    app.saveStatus = "saved";
+    showSaved(loaded.meta && { by: loaded.meta.updated_by, at: loaded.meta.updated_at });
+  }
+  if (pending && previous.householdId !== hh.id) toast(`Pending edits for ${previousName} are kept on this device. Reopen that budget to finish syncing.`);
+  else if (previousName && previous.householdId !== hh.id) toast(`Switched to ${hh.name}`);
+  if ((hasLegacyBudgetDraft(hh.id) || hasLegacyAccountDraft(hh.id)) && !legacyWarnings.has(hh.id)) {
+    legacyWarnings.add(hh.id);
+    toast("This device has pending edits from before the update. They were kept aside because their account can’t be verified.");
+  }
+  if (hasDeviceBudgetDrafts(userId, hh.id)) {
+    if (!canWrite) toast("This budget has unsaved edits on this device. An editor role is required to sync them.");
+    else if (!loaded.resumed && !loaded.upgraded) toast("This budget has pending edits in another tab. Reopen that tab to finish syncing them.");
+  }
   loadSnapshots();
   loadReminders();
   openFromHash();
   if (app.openPaydayFromHash) app.openPaydayFromHash();
-  if (app.offline) return; // live updates start when the app reconnects
-  ensureMonthly();
-  liveSubscribe();
+  if (!app.offline) { ensureMonthly(); liveSubscribe(); }
+  return true;
 }
 
 /* ---------- live updates (Phase 9C.2) ----------
@@ -385,8 +454,9 @@ function reconnectLive() { if (livePaused && app.household && navigator.onLine !
 /** Re-read which households you're in (after creating, leaving or being removed), then open one. */
 async function reloadHouseholds(preferId) {
   const list = await loadHouseholds();
-  if (!list.length) { closeHousehold(); showAuth("household"); return; }
-  await openHH(pickHousehold(list, preferId));
+  if (!list) return false;
+  if (!list.length) { closeHousehold(); showAuth("household"); return false; }
+  return openHH(pickHousehold(list, preferId));
 }
 /** Which household to open: the one asked for, else the one open now, else the last one used here, else the first. */
 function pickHousehold(list, preferId) {
@@ -395,29 +465,36 @@ function pickHousehold(list, preferId) {
 }
 
 async function switchHousehold(id) {
-  if (app.household && id === app.household.id) return;
-  showAuth("loading");
-  await openHH(id);
-  toast(`Switched to ${app.household.name}`);
+  if (app.household?.id === id) return;
+  try {
+    await openHH(id);
+  } catch (e) {
+    showAuth("loadfail", friendly(e));
+  }
 }
 
 async function enterApp() {
-  if (entering) return; entering = true;
+  const epoch = authEpoch, userId = app.session?.user.id;
+  if (!userId || entering === epoch) return;
+  entering = epoch;
+  const current = () => epoch === authEpoch && app.session?.user.id === userId;
   const sb = app.sb;
   try {
     showAuth("loading");
-    app.meId = app.session.user.id;
+    app.meId = userId;
     await sb.rpc("accept_invites");
-    await sb.rpc("sync_my_profile"); // keep your name/email current in every household (harmless if it fails)
+    if (!current()) return;
+    await sb.rpc("sync_my_profile");
+    if (!current()) return;
     rememberMe();
     if (recovering) { showAuth("newpass"); return; }
-    clearPending(); // signed in: any "check your email" step is done
+    clearPending();
     await reloadHouseholds();
   } catch (e) {
+    if (!current()) return;
     if (isAuthError(e)) showAuth("signin", "Your session has expired. Please sign in again.");
     else showAuth("loadfail", isNetworkError(e) ? "We couldn’t connect. Check your connection and try again." : "We couldn’t load your household. Try again.");
-  }
-  finally { entering = false; }
+  } finally { if (entering === epoch) entering = null; }
 }
 
 /** Close whatever household is open (its budget, history, reminders), but stay signed in.
@@ -426,25 +503,48 @@ async function enterApp() {
     belonging to nobody", found none, and showed the same screen again (and a second tap made a
     second household). Only signing out forgets who you are now. */
 function closeHousehold() {
-  if (app.store) { app.store.stop(); app.store = null; }
-  endSetup();
-  app.household = null; app.households = []; app.members = []; app.hasData = false; app.loaded = false; app.role = null;
-  resetUndo(); resetReminders();
-  app.snapshots = null; app.compareId = null; app.pgSel = null; // nothing of the last person's history stays in memory
-  app.state = blankBudget();
-  $("#app").innerHTML = ""; showConn(""); closePop();
-  const d = $("#sheet"); if (d.open) d.close();
+  householdOpen++;
+  stopStore();
+  clearHouseholdView();
+  app.households = [];
 }
-/** Signing out: close the household and forget who was signed in. */
 function teardown() { closeHousehold(); app.meId = null; }
-export async function signOut() {
-  if (app.store) await app.store.flushNow();
-  if (app.store && app.store.hasUnsaved() && !confirm("Some changes haven’t reached the server yet (you may be offline). Sign out anyway and lose them?")) return;
-  // A signed-out device keeps no copy of your budgets (the "Welcome back" name stays).
+function clearSignedOutDevice() {
   try { localStorage.removeItem(OFFLINE); } catch (_) {}
   clearDeviceCopies();
-  await disablePush(); // this device stops getting your notifications
-  await app.sb.auth.signOut();
+}
+
+let signingOut = false;
+export async function signOut() {
+  if (signingOut) return;
+  const store = app.store, userId = app.meId, id = app.household?.id, epoch = authEpoch;
+  if (store?.hasUnsaved() && !store.busy()) await store.flushNow();
+  if (store !== app.store || userId !== app.meId) return;
+  const pending = store?.hasUnsaved() || (userId && hasDeviceBudgetDrafts(userId));
+  if (pending) {
+    const kept = !store || store.keepPending();
+    const message = kept
+      ? "Some edits haven’t reached the server. They’ll stay on this device for this account. Sign out?"
+      : "Some edits couldn’t be saved to this device. Sign out and discard those unsaved edits?";
+    if (!confirm(message)) return;
+  }
+  signingOut = true;
+  stopStore();
+  clearHouseholdView();
+  showAuth("loading");
+  try {
+    await disablePush();
+    if (epoch !== authEpoch) return;
+    const { error } = await app.sb.auth.signOut();
+    if (error) throw error;
+    clearSignedOutDevice();
+  } catch (e) {
+    if (userId === app.meId) {
+      try { await reloadHouseholds(id); }
+      catch (_) { showAuth("loadfail", "We couldn’t reopen your budget. Try again."); }
+      toast(friendly(e));
+    }
+  } finally { signingOut = false; }
 }
 
 /* ---------- creating your first household (Phase 7A) ----------
@@ -460,7 +560,7 @@ async function openIfAny(preferId, tries = 3) {
   for (let i = 0; i < tries; i++) {
     try {
       const list = await loadHouseholdsWithin(15000);
-      if (list.length) { await openHH(pickHousehold(list, preferId)); return true; }
+      if (list?.length) return openHH(pickHousehold(list, preferId));
     } catch (e) { if (isAuthError(e)) throw e; }
     if (i < tries - 1) await sleep(700 * (i + 1));
   }
@@ -549,7 +649,7 @@ async function enterOffline(prof) {
   useAccentOf(prof.user);
   app.meId = prof.user.id;
   try { await reloadHouseholds(); } catch (_) { showAuth("signin", "You’re offline, and this budget isn’t saved on this device yet. Connect to sign in."); return; }
-  showConn(OFFLINE_MSG);
+  if (app.session?.user.id === prof.user.id && app.offline) showConn(OFFLINE_MSG);
 }
 
 export function initAuth(sb) {
@@ -627,7 +727,7 @@ export function initAuth(sb) {
   document.addEventListener("keydown", e => { if ((e.key === "Enter" || e.key === " ") && e.target.matches && e.target.matches("#saveState.paused")) { e.preventDefault(); e.target.click(); } });
   window.addEventListener("online", () => {
     if (app.session && app.session.offline) { location.reload(); return; } // sign in properly now; offline edits are kept and sent
-    if (app.offline && app.household) { app.offline = false; reloadHouseholds(app.household.id).then(updateUndo); return; } // fetch the latest, merge offline edits
+    if (app.offline && app.household) { reloadHouseholds(app.household.id).then(updateUndo).catch(() => {}); return; } // fetch the latest, merge offline edits
     showConn(""); reconnectLive();
   });
 
@@ -636,10 +736,21 @@ export function initAuth(sb) {
   loadProviders();
   showAuth("loading");
   sb.auth.onAuthStateChange((event, s) => {
-    // Work is deferred so it never runs inside Supabase's own callback.
+    // Invalidate the old identity synchronously. Auth API calls and UI work stay outside the SDK callback.
+    const next = s?.user.id || null;
+    if (event === "SIGNED_OUT" || (s && next !== observedUser)) { observedUser = next; authEpoch++; }
+    const epoch = authEpoch;
     setTimeout(() => {
+      if (epoch !== authEpoch) return;
+      if (event === "SIGNED_OUT") {
+        app.session = null;
+        teardown(); clearSignedOutDevice(); resetAccent(); showAuth("signin");
+        return;
+      }
+      const replacedSession = !!app.session && !!s && appliedAuthEpoch !== epoch;
+      if (replacedSession) { teardown(); clearSignedOutDevice(); }
+      appliedAuthEpoch = epoch;
       if (event === "PASSWORD_RECOVERY") { recovering = true; app.session = s; showAuth("newpass"); return; }
-      if (event === "SIGNED_OUT") { app.session = null; resetAccent(); teardown(); showAuth("signin"); return; }
       if (!s) {
         if (event !== "INITIAL_SESSION") return;
         const prof = offlineProfile();
@@ -648,7 +759,7 @@ export function initAuth(sb) {
         if (pending()) { showAuth("verify"); return; } // refreshed (or came back) while waiting for the email code
         showAuth("signin"); return;
       }
-      const wasSignedIn = !!app.session; app.session = s;
+      const wasSignedIn = !!app.session && !replacedSession; app.session = s;
       useAccentOf(s.user); // your own colour (or the default), never the last person's
       if (event === "USER_UPDATED") rememberMe();
       if (!recovering && !wasSignedIn) enterApp();

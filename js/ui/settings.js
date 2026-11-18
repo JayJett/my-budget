@@ -197,15 +197,21 @@ export function initSettings() {
     if (b.dataset.sheet === "account") return openAccount();
     if (b.dataset.prof) return profileAction(b.dataset.prof, b);
     if (b.dataset.sheet === "leave") {
+      const store = app.store; if (!store?.isActive()) return;
       if (!(await confirmDel(`Leave ${app.household.name}?`, leaveText().replace(/<[^>]+>/g, ""), "Leave"))) return;
-      const { data, error } = await app.sb.rpc("leave_household", { p_household: app.household.id });
+      if (!store.isActive()) return;
+      const { data, error } = await store.householdRpc("leave_household", {});
+      if (!store.isActive()) return;
       if (error) return msg("mLeave", friendly(error));
       close(); toast(data === "household deleted" ? "Household deleted" : "You’ve left the household");
       return app.reloadHouseholds();
     }
     if (b.dataset.remove) {
+      const store = app.store; if (!store?.isActive()) return;
       if (!(await confirmDel(`Remove ${b.dataset.name}?`, "They’ll lose access to this budget straight away. The budget itself doesn’t change.", "Remove"))) return;
-      const { error } = await app.sb.rpc("remove_member", { p_household: app.household.id, p_user: b.dataset.remove });
+      if (!store.isActive()) return;
+      const { error } = await store.householdRpc("remove_member", { p_user: b.dataset.remove });
+      if (!store.isActive()) return;
       if (error) return msg("mPeople", friendly(error));
       toast(`${b.dataset.name} removed`); return openHouseholdSettings();
     }
@@ -244,7 +250,7 @@ export function initSettings() {
         if (v.confirm.trim() !== "DELETE") return msg("mDel", "Type DELETE (in capitals) to confirm.");
         const { error } = await app.sb.rpc("delete_my_account");
         if (error) return msg("mDel", friendly(error));
-        app.forgetMe(); close(); toast("Your account has been deleted");
+        app.forgetMe({ discardDraftsFor: app.meId }); close(); toast("Your account has been deleted");
         await app.sb.auth.signOut();
       }
       if (f.id === "setHHName") {

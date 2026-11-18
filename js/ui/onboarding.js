@@ -69,7 +69,10 @@ const planOf = () => ans && ans.mode === "solo" ? { mode: "solo", purpose: "solo
    refresh brings the step back with them; each has its id from the start, so saving twice can't add
    it twice. They're saved like the plan itself: one whole-budget save marked as the setup, so Undo
    never offers to take them away. Skipping saves nothing and invents nothing. */
-const ACC_KEY = () => `mb-ob-accounts-${app.household ? app.household.id : "x"}`;
+const ACC_KEY = () => `mb-ob-accounts-v2-${encodeURIComponent(app.meId)}:${encodeURIComponent(app.household.id)}`;
+export function hasLegacyAccountDraft(householdId) {
+  try { return !!JSON.parse(sessionStorage.getItem(`mb-ob-accounts-${householdId}`) || "null")?.length; } catch (_) { return false; }
+}
 let accs = [], accForm = null, accErr = "", expAdded = 0;
 let payErr = {}; // Phase 9C.2: person index → why their payday can't be used yet // expAdded (Phase 9C.1): expenses added from the suggestions
 const keepAccs = () => { try { sessionStorage.setItem(ACC_KEY(), JSON.stringify(accs)); } catch (_) {} };
@@ -175,7 +178,9 @@ async function saveAccounts() {
   if (accs.some(a => a.balance !== null)) app.state.nw.reviewed = ymd(app.today); // balances just entered: as good as reviewed today
   holdUndoForSetup(); // part of setting up: not something Undo takes back
   changed({ full: false });
-  try { await app.store.flushNow(); } catch (_) {}
+  const store = app.store;
+  await store.flushNow();
+  if (!store.isActive()) return;
   saving = false;
   if (app.saveStatus === "saved" || app.saveStatus === "offline") {
     dropAccs(); done = 4; stage = 5; dir = 1; draw(); feedback("success");
@@ -365,7 +370,9 @@ async function finishBudget() {
   app.state = buildBudget({ ...planOf(), people: ans.people, have: {} }, split, app.today);
   app.hasData = true;
   changed({ full: false });
-  try { await app.store.flushNow(); } catch (_) {}
+  const store = app.store;
+  await store.flushNow();
+  if (!store.isActive()) return;
   saving = false;
   if (app.saveStatus === "saved") { done = 3; stage = 4; dir = 1; keepAccs(); draw(); feedback("success"); return; }
   if (app.saveStatus === "offline") { done = 3; stage = 4; keepAccs(); draw(); toast("Saved on this device. It’ll sync when you’re back online."); return; }
