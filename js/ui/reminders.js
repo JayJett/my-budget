@@ -8,7 +8,7 @@ import { openDrawer, setDrawerContent, closeDrawer, drawerOpen } from "./drawer.
 import { remindersFor, REMINDER_TYPES, DEFAULT_PREFS, DUE_WEEKS } from "../model/reminders.js";
 import { pushSupport, currentSubscription, enablePush, disablePush, myDevices, removeDevice, sendTest } from "./push.js";
 
-export const REM_CACHE = "mb-rem-v1-";
+const cache = store => `mb-rem-v2-${store.userId}:${store.householdId}`;
 const COLS = "id, kind, title, body, tab, created_at, read_at";
 const friendly = e => app.friendly ? app.friendly(e) : (e && e.message) || "Something went wrong.";
 const offline = () => !!app.offline || navigator.onLine === false;
@@ -17,14 +17,14 @@ const R = { view: null, prefs: null, device: null };
 /* ---------- loading and the bell ---------- */
 /** This person's reminders in the open household: the copy on this device first, then the latest. */
 export async function loadReminders() {
-  const hh = app.household; if (!hh || !app.sb) return;
-  try { const c = JSON.parse(localStorage.getItem(REM_CACHE + hh.id) || "null"); if (c && !app.reminders) app.reminders = c; } catch (_) {}
+  const hh = app.household, store = app.store; if (!hh || !store?.isActive()) return;
+  try { const c = JSON.parse(localStorage.getItem(cache(store)) || "null"); if (c && !app.reminders) app.reminders = c; } catch (_) {}
   updateBell();
   if (offline()) return;
   const { data, error } = await app.sb.from("reminders").select(COLS).eq("household_id", hh.id).order("created_at", { ascending: false }).limit(50);
-  if (!app.household || app.household.id !== hh.id || error) return;
+  if (!store.isActive() || error) return;
   app.reminders = data || [];
-  try { localStorage.setItem(REM_CACHE + hh.id, JSON.stringify(app.reminders)); } catch (_) {}
+  try { localStorage.setItem(cache(store), JSON.stringify(app.reminders)); } catch (_) {}
   updateBell();
   if (R.view === "inbox") drawInbox();
 }
@@ -97,7 +97,7 @@ async function markRead(ids) {
   const now = new Date().toISOString();
   (app.reminders || []).forEach(r => { if (ids.includes(r.id) && !r.read_at) r.read_at = now; });
   updateBell();
-  try { localStorage.setItem(REM_CACHE + app.household.id, JSON.stringify(app.reminders)); } catch (_) {}
+  try { localStorage.setItem(cache(app.store), JSON.stringify(app.reminders)); } catch (_) {}
   if (offline()) return;
   const { error } = await app.sb.from("reminders").update({ read_at: now }).in("id", ids);
   if (error) toast(friendly(error));

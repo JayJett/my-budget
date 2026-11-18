@@ -46,5 +46,5 @@ export const readOnly = () => !app.canWrite || !app.household;
 export function changed({ full = false } = {}) {
   app.hasData = true;
   if (full) app.render(); else app.refresh();
-  if (app.store) app.store.schedule();
+  if (app.store) app.store.schedule(app.state);
 }

@@ -175,7 +175,9 @@ async function saveAccounts() {
   if (accs.some(a => a.balance !== null)) app.state.nw.reviewed = ymd(app.today); // balances just entered: as good as reviewed today
   holdUndoForSetup(); // part of setting up: not something Undo takes back
   changed({ full: false });
-  try { await app.store.flushNow(); } catch (_) {}
+  const store = app.store;
+  await store.flushNow();
+  if (!store.isActive()) return;
   saving = false;
   if (app.saveStatus === "saved" || app.saveStatus === "offline") {
     dropAccs(); done = 4; stage = 5; dir = 1; draw(); feedback("success");
@@ -365,7 +367,9 @@ async function finishBudget() {
   app.state = buildBudget({ ...planOf(), people: ans.people, have: {} }, split, app.today);
   app.hasData = true;
   changed({ full: false });
-  try { await app.store.flushNow(); } catch (_) {}
+  const store = app.store;
+  await store.flushNow();
+  if (!store.isActive()) return;
   saving = false;
   if (app.saveStatus === "saved") { done = 3; stage = 4; dir = 1; keepAccs(); draw(); feedback("success"); return; }
   if (app.saveStatus === "offline") { done = 3; stage = 4; keepAccs(); draw(); toast("Saved on this device. It’ll sync when you’re back online."); return; }

@@ -65,16 +65,18 @@ async function save() {
   if (!B.ok) { draw(); return; }
   if (app.offline || navigator.onLine === false) { X.err = "You’re offline. Connect to add these."; draw(); return; }
   X.busy = true; X.err = ""; draw();
+  const operation = X, store = app.store;
   try {
     const ops = B.items.map(e => ({ op: "set", path: ["spend", e.id], value: e }));
-    const res = await app.store.commit(ops, () => true); // adding by fixed ids: nothing anyone else did can clash
+    const res = await store.commit(ops, () => true); // adding by fixed ids: nothing anyone else did can clash
+    if (!store.isActive() || X !== operation || !isOpen()) return;
     if (!res.ok) throw new Error("not saved");
     const n = B.items.length, done = X.onDone; X = null;
     $("#sheet").close();
     if (done) done(n); else { app.render(); toast(`Added ${n} ${n === 1 ? "expense" : "expenses"}${B.items.some(e => e.amount === null) ? ". Add amounts when you know them." : "."}`); }
   } catch (e) {
-    if (!X) return;
-    X.busy = false; X.err = "Couldn’t add them, so nothing was added. Check your connection and try again."; draw();
+    if (!store.isActive() || X !== operation || !isOpen()) return;
+    X.busy = false; X.err = "Couldn’t confirm the change. Refresh this budget and check before trying again."; draw();
   }
 }
 

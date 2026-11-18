@@ -1,205 +1,378 @@
-/* Saving and live updates.
-
-   How it works, in plain terms:
-   - `base` is the budget exactly as the database last told us it is (stored shape).
-   - When you edit, we wait 0.8s, then send only the differences between `base` and your screen
-     (diff in ops.js) to the database function apply_budget_ops.
-   - The database applies them and sends back the full, up-to-date budget, which may include
-     someone else's changes. Any edits you made *while* it was saving are put back on top
-     ("rebasing"), so nothing you typed is lost.
-   - When someone else saves, the live-update channel tells us, and we rebase the same way.
-   - Every save has a number (seq). Anything older than what we already have is ignored.
-   - A copy of the budget, including edits not yet sent, is kept on this device (localStorage),
-     so the app opens offline and sends those edits when the connection comes back. */
+/* A store owns one user's working copy of one household. UI edits are handed to
+   it synchronously. Network continuations never read the active screen. */
 import { diff, applyOps, same } from "./ops.js";
 import { toStored, fromStored, VERSION } from "../model/schema.js";
 import { migrate } from "../model/migrate.js";
 
-export function createStore({ sb, householdId, getState, setState, onStatus, onRemote, onSaved = () => {} }) {
-  let base = {}, seq = -1;
-  let timer = null, writing = false, again = false, retryTimer = null, chain = 0;
-  let replaceReason = null;  // set when the next save must replace the whole budget (upgrade/import)
-  let queuedRemote = null;   // a live update that arrived while we were saving
-  let channel = null;
+export const CACHE_PREFIX = "mb-cache-v2-";
+const LEGACY_PREFIX = "mb-cache-v1-";
+const DRAFT_PREFIX = "mb-draft-v2-";
+const closingWrites = new Map();
+const copy = value => JSON.parse(JSON.stringify(value));
+const read = (storage, key) => {
+  try { return JSON.parse(storage.getItem(key) || "null"); } catch (_) { return null; }
+};
+const hasChanges = draft => !!draft?.local && (!!draft.replaceReason || !same(draft.base, draft.local));
+const cancelled = () => ({ message: "The budget is no longer open", cancelled: true });
+const denied = error => /not a member|permission|not signed in|view.only|no longer have access/i.test(error?.message || "") || error?.code === "42501";
+export const isNetworkError = e => navigator.onLine === false || /failed to fetch|network|load failed|fetch failed|offline|abort/i.test((e && (e.message || e.details)) || "");
 
-  const local = () => toStored(getState());
-  const dirty = () => replaceReason !== null || diff(base, local()).length > 0;
+export function hasLegacyBudgetDraft(householdId) {
+  return hasChanges(read(localStorage, LEGACY_PREFIX + householdId));
+}
 
-  /* ---------- the copy kept on this device ---------- */
-  const CACHE_KEY = CACHE_PREFIX + householdId;
-  function saveCache() {
-    try { localStorage.setItem(CACHE_KEY, JSON.stringify({ base, seq, local: local(), replaceReason, at: Date.now() })); } catch (_) { /* full or blocked: carry on */ }
+export function hasDeviceBudgetDrafts(userId, householdId) {
+  const prefix = DRAFT_PREFIX + encodeURIComponent(userId) + ":" + (householdId ? encodeURIComponent(householdId) + ":" : "");
+  try { return Object.keys(localStorage).some(key => key.startsWith(prefix) && hasChanges(read(localStorage, key))); }
+  catch (_) { return false; }
+}
+
+export function createStore({ sb, userId, householdId, canWrite, isCurrent, setState, onStatus, onRemote, onSaved = () => {}, onDenied = () => {} }) {
+  if (!userId || !householdId) throw new Error("A budget store needs a user and household");
+  const device = localStorage, tab = sessionStorage;
+  const identity = encodeURIComponent(userId) + ":" + encodeURIComponent(householdId);
+  const cacheKey = CACHE_PREFIX + identity;
+  const pointerKey = DRAFT_PREFIX + identity;
+  const draftPrefix = pointerKey + ":";
+  const draftKey = draftPrefix + crypto.randomUUID();
+  let previousDraft = read(tab, pointerKey);
+  if (typeof previousDraft !== "string" || !previousDraft.startsWith(draftPrefix)) previousDraft = null;
+  let base = {}, local = {}, seq = -1;
+  let timer = null, flight = null, writing = false, retryTimer = null, chain = 0;
+  let replaceReason = null, stopped = false, blocked = false;
+  let queuedRemote = null, channel = null, persistedDraft = null;
+
+  const active = () => !stopped && isCurrent();
+  const dirty = () => canWrite && (replaceReason !== null || !same(base, local));
+  const draft = () => ({ base, seq, local, replaceReason });
+
+  function saveDraft(detached = false) {
+    try {
+      if (detached && (persistedDraft === null || device.getItem(draftKey) !== persistedDraft)) return false;
+      if (dirty()) {
+        const value = JSON.stringify(draft());
+        device.setItem(draftKey, value);
+        persistedDraft = value;
+        if (!detached) tab.setItem(pointerKey, JSON.stringify(draftKey));
+      } else {
+        device.removeItem(draftKey);
+        persistedDraft = null;
+        if (!detached && read(tab, pointerKey) === draftKey) tab.removeItem(pointerKey);
+      }
+      if (!detached && previousDraft) {
+        if (read(tab, pointerKey) === previousDraft) tab.removeItem(pointerKey);
+        device.removeItem(previousDraft);
+        previousDraft = null;
+      }
+      return true;
+    } catch (_) { return false; }
   }
-  function readCache() { try { return JSON.parse(localStorage.getItem(CACHE_KEY) || "null"); } catch (_) { return null; } }
-  const goOnline = () => { if (dirty()) flush(); };
-  window.addEventListener("online", goOnline);
 
-  /** Accept a newer server copy, put `pending` (our unsaved edits) on top, and show the result. */
-  function adopt(serverDoc, serverSeq, pending, meta) {
-    const before = local();
-    base = serverDoc; seq = serverSeq;
-    const merged = applyOps(serverDoc, pending);
-    if (!same(merged, before)) { setState(fromStored(merged)); onRemote(meta); }
-    saveCache();
+  function cacheBase() {
+    try {
+      const cached = read(device, cacheKey);
+      if (cached && Number(cached.seq) > seq) return;
+      device.setItem(cacheKey, JSON.stringify({ base, seq }));
+    } catch (_) { /* The server copy is still authoritative. */ }
   }
 
-  /** Load the budget. Returns { state (null if nothing saved yet), upgraded, offline, resumed, meta }.
-      offline: the database couldn't be reached, so this is the copy on this device.
-      resumed: edits made earlier on this device (e.g. offline) were put back on top and need saving. */
-  async function load() {
-    const cached = readCache();
-    const { data, error } = await sb.from("budgets").select("state, seq, updated_by, updated_at").eq("household_id", householdId).maybeSingle();
-    if (error) {
-      if (!cached || !isNetworkError(error)) throw error;
-      base = cached.base || {}; seq = Number(cached.seq ?? -1); replaceReason = cached.replaceReason ?? null;
-      return { state: migrate(cached.local) || migrate(base), upgraded: false, offline: true, resumed: false, meta: null };
+  // Pin the bearer for this specific request. The shared SDK may refresh its
+  // session or switch users before its fetch executes.
+  async function request(makeRequest) {
+    if (!active()) return { error: cancelled() };
+    if (navigator.onLine === false) return { error: { message: "Offline" } };
+    try {
+      const { data, error } = await sb.auth.getSession();
+      if (!active()) return { error: cancelled() };
+      if (error) return { error };
+      const session = data?.session;
+      if (session?.user?.id !== userId || !session.access_token) return { error: { message: "Not signed in to this budget" } };
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+      try {
+        return await makeRequest().setHeader("Authorization", "Bearer " + session.access_token).abortSignal(controller.signal);
+      } finally { clearTimeout(timeout); }
+    } catch (error) { return { error }; }
+  }
+
+  const readBudget = () => request(() => sb.from("budgets").select("state, seq, updated_by, updated_at")
+    .eq("household_id", householdId).maybeSingle());
+  const writeBudget = ops => request(() => sb.rpc("apply_budget_ops", { p_household: householdId, p_ops: ops }));
+
+  function publish(merged, meta) {
+    const changed = !same(merged, local);
+    local = merged;
+    if (!active()) { saveDraft(true); return; }
+    cacheBase();
+    if (canWrite) saveDraft();
+    if (changed) {
+      setState(fromStored(merged));
+      onRemote(meta);
     }
-    const raw = (data && data.state) || {};
-    base = raw; seq = data ? Number(data.seq ?? 0) : 0;
-    // Edits made on this device that never reached the database: put them on top of the latest copy.
-    if (cached && cached.local && raw.version === VERSION && !Array.isArray(raw.people)) {
-      const pending = cached.replaceReason ? diff(raw, cached.local) : diff(cached.base || {}, cached.local);
-      if (pending.length) {
-        const merged = applyOps(raw, pending);
-        if (!same(merged, raw)) {
-          replaceReason = cached.replaceReason || null; // e.g. a file imported while offline still saves with a backup
-          return { state: fromStored(merged), upgraded: false, offline: false, resumed: true, meta: data };
-        }
+  }
+
+  function adopt(data, pending, meta) {
+    const next = Number(data.seq);
+    if (next < seq) return;
+    base = data.state;
+    seq = next;
+    publish(applyOps(base, pending), meta);
+  }
+
+  async function load() {
+    // Returning to the same budget can wait for its prior request to settle.
+    // Opening a different household never waits for that request.
+    const closing = previousDraft && closingWrites.get(previousDraft);
+    if (closing) await closing;
+    if (!active()) throw cancelled();
+    const pending = canWrite && previousDraft ? read(device, previousDraft) : null;
+    const cached = read(device, cacheKey);
+    const { data, error } = await readBudget();
+    if (!active()) throw cancelled();
+    if (!error && !data) throw { message: "You no longer have access to this household" };
+    const offline = !!error && isNetworkError(error) && !denied(error);
+    if (error && (!offline || (!cached && !pending))) throw error;
+    const source = offline ? cached || pending : data;
+    const raw = (offline ? source.base : source.state) || {};
+    base = local = raw;
+    seq = Number(source.seq ?? 0);
+    const verified = migrate(raw);
+    let state = verified;
+    let resumed = false;
+    const hasPending = hasChanges(pending);
+    if (hasPending) {
+      const merged = pending.replaceReason
+        ? pending.local
+        : applyOps(raw, diff(pending.base || {}, pending.local));
+      if (!same(merged, raw)) {
+        state = migrate(merged);
+        if (!state) throw new Error("Pending changes could not be opened");
+        local = toStored(state);
+        replaceReason = pending.replaceReason || null;
+        resumed = true;
       }
     }
-    const state = migrate(raw);
-    if (!state) { saveCache(); return { state: null, upgraded: false, offline: false, resumed: false, meta: data }; }
-    const upgraded = raw.version !== VERSION || Array.isArray(raw.people);
-    if (upgraded) replaceReason = `Upgrade from version ${raw.version ?? "?"} to version ${VERSION}`;
-    return { state, upgraded, offline: false, resumed: false, meta: data };
+    const upgraded = !resumed && !!verified && (raw.version !== VERSION || Array.isArray(raw.people));
+    if (upgraded && canWrite) {
+      local = toStored(verified);
+      replaceReason = { reason: `Upgrade from version ${raw.version ?? "?"} to version ${VERSION}` };
+    }
+    if (!offline) cacheBase();
+    if (canWrite && (resumed || previousDraft)) saveDraft();
+    return { state, upgraded, offline, resumed, meta: data };
   }
 
-  function schedule() {
+  function schedule(state) {
+    if (!active() || !canWrite) return;
+    if (state) local = toStored(state);
     chain = 0;
-    clearTimeout(timer); clearTimeout(retryTimer);
-    saveCache(); // keep the latest edits on this device straight away
+    clearTimeout(timer);
+    clearTimeout(retryTimer);
+    saveDraft();
+    if (blocked) return;
     onStatus(navigator.onLine === false ? "offline" : "saving");
     timer = setTimeout(() => { timer = null; flush(); }, 800);
   }
 
   function processQueued() {
     if (!queuedRemote) return;
-    const r = queuedRemote; queuedRemote = null; receive(r);
+    const row = queuedRemote;
+    queuedRemote = null;
+    receive(row);
   }
 
-  async function flush(retried) {
-    if (writing) { again = true; return; }
-    const target = local();
-    const ops = replaceReason !== null ? [{ op: "replace", value: target, reason: replaceReason }] : diff(base, target);
-    if (!ops.length) { onStatus("saved"); processQueued(); return; }
-    writing = true;
-    const { data, error } = await sb.rpc("apply_budget_ops", { p_household: householdId, p_ops: ops });
-    writing = false;
-    if (error) {
-      saveCache();
-      if (isNetworkError(error) && navigator.onLine === false) { onStatus("offline"); return; } // the "online" event will retry
-      if (!retried && !/not a member|permission|not signed in|view-only/i.test(error.message || "")) {
-        await new Promise(r => setTimeout(r, 700 + Math.random() * 900));
-        return flush(true);
-      }
+  function fail(error, retried, retry = true) {
+    if (!active()) return { status: "cancelled", error };
+    saveDraft();
+    if (denied(error)) {
+      blocked = true;
       onStatus("error", error);
+      onDenied(error);
+      return { status: "error", error };
+    }
+    if (isNetworkError(error) && navigator.onLine === false) {
+      onStatus("offline");
+      return { status: "offline", error };
+    }
+    if (retry) {
       clearTimeout(retryTimer);
-      retryTimer = setTimeout(() => flush(), 15000); // keep trying quietly in the background
+      retryTimer = setTimeout(() => flush(true), retried ? 15000 : 800);
+    }
+    onStatus("error", error);
+    return { status: "error", error };
+  }
+
+  async function save(retried) {
+    while (dirty() && active() && !blocked) {
+      const target = local, replacement = replaceReason;
+      const ops = replacement ? [{ op: "replace", value: target, reason: replacement.reason }] : diff(base, target);
+      writing = true;
+      const { data, error } = await writeBudget(ops);
+      writing = false;
+      if (error) {
+        if (active() && !retried && !denied(error) && navigator.onLine !== false) {
+          retried = true;
+          await new Promise(resolve => setTimeout(resolve, 800));
+          if (active()) continue;
+        }
+        return fail(error, retried);
+      }
+      if (replaceReason === replacement) replaceReason = null;
+      // A whole new replacement chosen during this request must remain intact.
+      const pending = replaceReason ? diff(data.state, local) : diff(target, local);
+      adopt(data, pending, { by: data.updated_by, at: data.updated_at, self: true });
+      if (!active()) return { status: "cancelled", acknowledged: true };
+      onSaved(data);
+      processQueued();
+      if (dirty() && ++chain >= 4) break;
+      if (!dirty()) {
+        onStatus("saved", { by: data.updated_by, at: data.updated_at });
+        return { status: "saved" };
+      }
+    }
+    if (!active()) return { status: "cancelled" };
+    if (dirty()) return fail({ message: "Changes are still waiting to save" }, retried);
+    onStatus("saved");
+    processQueued();
+    return { status: "saved" };
+  }
+
+  function flush(retried = false) {
+    if (!active()) return Promise.resolve({ status: "cancelled" });
+    if (!canWrite || blocked) return Promise.resolve({ status: "error" });
+    if (flight) return flight;
+    clearTimeout(retryTimer);
+    const task = save(retried).finally(() => {
+      if (flight === task) flight = null;
+      if (active() && !writing && !timer) processQueued();
+    });
+    flight = task;
+    return task;
+  }
+
+  function receive(row) {
+    if (!active() || blocked || (row.household_id && row.household_id !== householdId)) return;
+    const next = Number(row.seq ?? 0);
+    if (next <= seq) return;
+    if (writing || timer) {
+      if (!queuedRemote || next > Number(queuedRemote.seq)) queuedRemote = row;
       return;
     }
-    replaceReason = null;
-    const pending = diff(target, local()); // anything typed while the save was on its way
-    adopt(data.state, Number(data.seq), pending, { by: data.updated_by, at: data.updated_at, self: true });
-    onSaved(data); // e.g. remember the history entry for the Undo button
-    processQueued();
-    // Keep going if there's more to save, but never loop forever on our own.
-    if ((again || dirty()) && chain++ < 3) { again = false; return flush(); }
-    again = false;
-    onStatus(dirty() ? "error" : "saved", { by: data.updated_by, at: data.updated_at });
-  }
-
-  /** A live update from the database. */
-  function receive(row) {
-    const rseq = Number(row.seq ?? 0);
-    if (rseq <= seq) return;                         // old news, or our own save echoing back
-    if (writing || timer) { if (!queuedRemote || rseq > Number(queuedRemote.seq)) queuedRemote = row; return; }
     const doc = row.state || {};
     const meta = { by: row.updated_by, at: row.updated_at };
     if (doc.version !== VERSION || Array.isArray(doc.people)) {
-      // Someone saved with the old app: convert it, and save the converted copy.
-      base = doc; seq = rseq;
-      const s = migrate(doc);
-      if (s) { setState(s); replaceReason = "Converted a save from the old app"; onRemote(meta); schedule(); }
+      const state = migrate(doc);
+      if (!state) return;
+      const pending = dirty();
+      const merged = replaceReason ? local : applyOps(toStored(state), pending ? diff(base, local) : []);
+      base = doc; seq = next;
+      if (canWrite && !replaceReason) replaceReason = { reason: "Converted a save from the old app" };
+      publish(merged, meta);
+      if (canWrite) schedule();
       return;
     }
-    const pending = replaceReason !== null ? [] : diff(base, local());
-    adopt(doc, rseq, pending, meta);
-    if (pending.length) schedule();
+    adopt(row, replaceReason ? diff(doc, local) : diff(base, local), meta);
+    if (dirty()) schedule();
   }
 
   function subscribe(onConn) {
+    if (!active()) return;
     if (channel) sb.removeChannel(channel);
     channel = sb.channel("budget-" + householdId)
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "budgets", filter: "household_id=eq." + householdId }, payload => { if (payload.new) receive(payload.new); })
-      .subscribe(status => onConn(status));
+      .subscribe(status => { if (active()) onConn(status); });
   }
 
-  async function stop() {
+  const goOnline = () => { if (active() && dirty() && !blocked) flush(); };
+  window.addEventListener("online", goOnline);
+
+  function stop() {
+    stopped = true;
+    clearTimeout(timer); timer = null;
     clearTimeout(retryTimer);
+    queuedRemote = null;
     window.removeEventListener("online", goOnline);
-    if (timer) { clearTimeout(timer); timer = null; await flush(); }
     if (channel) { sb.removeChannel(channel); channel = null; }
+    if (flight) {
+      const done = flight.catch(() => {}).finally(() => closingWrites.delete(draftKey));
+      closingWrites.set(draftKey, done);
+    }
   }
 
-  /** Phase 9C: save a ready-made set of changes as ONE step (one database call, so all or nothing,
-      and one history entry, so one Undo), but only if the budget in the database still passes
-      `stillValid(budget)`. Any edits waiting to save go first. Returns { ok, data } or { stale: true }
-      (nothing saved; the newer budget is now on screen). Throws if it couldn't save; nothing changes. */
   async function commit(ops, stillValid) {
+    if (!active()) throw cancelled();
+    if (!canWrite || blocked) throw new Error("You can’t change this budget");
     if (timer) { clearTimeout(timer); timer = null; }
-    for (let i = 0; i < 40 && (writing || dirty()); i++) { if (!writing) await flush(); else await new Promise(r => setTimeout(r, 100)); }
-    if (writing || dirty()) throw new Error("Your other changes haven’t saved yet");
-    const { data: row, error: e1 } = await sb.from("budgets").select("state, seq, updated_by, updated_at").eq("household_id", householdId).maybeSingle();
-    if (e1) throw e1;
+    if (flight || dirty()) await flush();
+    if (!active()) throw cancelled();
+    if (flight || dirty()) throw new Error("Your other changes haven’t saved yet");
+    const { data: row, error } = await readBudget();
+    if (!active()) throw cancelled();
+    if (error) throw error;
     if (!row) throw new Error("This household has no budget yet");
+    if (flight || dirty()) throw new Error("Your other changes haven’t saved yet");
     const fresh = migrate(row.state || {});
     if (!fresh || !stillValid(fresh)) { receive(row); return { stale: true }; }
+    const target = local;
     writing = true;
-    const { data, error } = await sb.rpc("apply_budget_ops", { p_household: householdId, p_ops: ops });
-    writing = false;
-    if (error) { processQueued(); throw error; }
-    adopt(data.state, Number(data.seq), [], { by: data.updated_by, at: data.updated_at, self: true });
-    onSaved(data);
-    processQueued();
-    onStatus("saved", { by: data.updated_by, at: data.updated_at });
-    return { ok: true, data };
+    const task = writeBudget(ops).then(({ data, error: writeError }) => {
+      writing = false;
+      if (writeError) {
+        if (denied(writeError)) fail(writeError, false, false);
+        throw writeError;
+      }
+      adopt(data, diff(target, local), { by: data.updated_by, at: data.updated_at, self: true });
+      if (active()) {
+        onSaved(data);
+        processQueued();
+        onStatus(dirty() ? "saving" : "saved", { by: data.updated_by, at: data.updated_at });
+      }
+      return { ok: true, data };
+    }).finally(() => {
+      if (flight === task) flight = null;
+      if (active()) {
+        if (dirty() && !timer && !blocked) schedule();
+        else if (!timer) processQueued();
+      }
+    });
+    flight = task;
+    return task;
   }
 
-  /** Phase 9C.2: after live updates were paused, fetch the latest copy once so nothing missed is lost. */
   async function catchUp() {
-    const { data: row, error } = await sb.from("budgets").select("state, seq, updated_by, updated_at").eq("household_id", householdId).maybeSingle();
-    if (!error && row) receive(row);
+    const { data, error } = await readBudget();
+    if (!error && data) receive(data);
   }
 
-  return {
-    load, schedule, subscribe, stop, receive, commit, catchUp,
-    flushNow: () => { if (timer) { clearTimeout(timer); timer = null; } return flush(); },
-    busy: () => !!(timer || writing),
-    hasUnsaved: () => !!(timer || writing) || dirty(),
-    replaceNext: reason => { replaceReason = reason; saveCache(); },
-    /** The budget exactly as the database last told us (without edits still on their way). */
-    serverCopy: () => JSON.parse(JSON.stringify(base)),
-    saveCache,
-  };
+  return Object.freeze({
+    userId, householdId, load, schedule, subscribe, stop, receive, commit, catchUp,
+    isActive: active,
+    householdRpc: (name, params) => request(() => sb.rpc(name, { ...params, p_household: householdId })),
+    flushNow: async () => {
+      if (timer) { clearTimeout(timer); timer = null; }
+      if (flight) {
+        const inProgress = await flight.catch(error => ({ status: "error", error }));
+        if (inProgress.status) return inProgress;
+      }
+      return flush();
+    },
+    busy: () => !!(timer || flight),
+    hasUnsaved: () => dirty(),
+    keepPending: () => !dirty() || saveDraft(),
+    replaceNext: reason => { if (active() && canWrite) replaceReason = { reason }; },
+    serverCopy: () => copy(base),
+  });
 }
 
-/* ---------- helpers shared with the rest of the app ---------- */
-export const CACHE_PREFIX = "mb-cache-v1-";
-/** True when a request failed because there's no connection (rather than being refused). */
-export const isNetworkError = e => navigator.onLine === false || /failed to fetch|network|load failed|fetch failed|offline/i.test((e && (e.message || e.details)) || "");
-/** Forget every copy of household data kept on this device: budgets, Progress snapshots and reminders
-    (used when signing out or deleting your account). */
-const DEVICE_PREFIXES = [CACHE_PREFIX, "mb-snaps-v1-", "mb-rem-v1-"];
-export function clearDeviceCopies() {
-  try { Object.keys(localStorage).filter(k => DEVICE_PREFIXES.some(p => k.startsWith(p))).forEach(k => localStorage.removeItem(k)); } catch (_) {}
+/** Clear device display copies on sign-out. Pending edits remain keyed to their
+    original user and household, including legacy drafts of uncertain ownership. */
+export function clearDeviceCopies({ discardDraftsFor } = {}) {
+  try {
+    const discardPrefix = discardDraftsFor ? DRAFT_PREFIX + encodeURIComponent(discardDraftsFor) + ":" : null;
+    for (const key of Object.keys(localStorage)) {
+      if ([CACHE_PREFIX, "mb-snaps-v1-", "mb-snaps-v2-", "mb-rem-v1-", "mb-rem-v2-"].some(prefix => key.startsWith(prefix))
+          || (key.startsWith(LEGACY_PREFIX) && !hasChanges(read(localStorage, key)))
+          || (discardPrefix && key.startsWith(discardPrefix))) localStorage.removeItem(key);
+    }
+  } catch (_) {}
 }

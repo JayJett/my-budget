@@ -217,8 +217,11 @@ export function initPop() {
 export function confirmDel(title, msg, yes) {
   const d = $("#dlg"); $("#dlgT").textContent = title; $("#dlgP").textContent = msg; $("#dlgYes").textContent = yes || "Remove";
   return new Promise(res => {
-    const done = v => { d.close(); res(v); };
-    $("#dlgYes").onclick = () => done(true); $("#dlgNo").onclick = () => done(false); d.oncancel = () => res(false); d.showModal();
+    let accepted = false;
+    d.addEventListener("close", () => res(accepted), { once: true });
+    $("#dlgYes").onclick = () => { accepted = true; d.close(); };
+    $("#dlgNo").onclick = () => d.close();
+    d.showModal();
   });
 }
 

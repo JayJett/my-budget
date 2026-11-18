@@ -61,6 +61,6 @@ export function initPaydayDest() {
     const el = e.target; if (readOnly() || !el.matches || !el.matches("input[data-pd-label]")) return;
     const t = target(el); if (!t) return;
     t.obj[t.field] = { label: el.value.slice(0, 60) };
-    app.hasData = true; if (app.store) app.store.schedule();
+    app.hasData = true; if (app.store) app.store.schedule(app.state);
   });
 }

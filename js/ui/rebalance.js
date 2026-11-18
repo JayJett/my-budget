@@ -131,10 +131,10 @@ async function apply() {
   const P = proposal(); if (!P.ok) return;
   if (app.offline || navigator.onLine === false) { R.msg = { t: "You’re offline. Connect to apply these changes.", c: "bad" }; draw(); return; }
   R.busy = true; R.msg = null; draw();
-  const basis = R.basis;
+  const operation = R, store = app.store, basis = R.basis;
   try {
-    const res = await app.store.commit(P.ops, fresh => fingerprint(fresh) === basis);
-    if (!isOpen()) return;
+    const res = await store.commit(P.ops, fresh => fingerprint(fresh) === basis);
+    if (!store.isActive() || R !== operation || !isOpen()) return;
     if (res.stale) {
       R.busy = false; R.basis = fingerprint(app.state);
       R.msg = { t: "Your budget was changed by someone else, so the numbers above are updated. Check them and apply again.", c: "warn" }; draw(); return;
@@ -142,8 +142,8 @@ async function apply() {
     R = null; $("#sheet").close(); app.render();
     toast("Budget rebalanced. You can undo this.");
   } catch (e) {
-    if (!R) return;
-    R.busy = false; R.msg = { t: "Couldn’t apply the changes, so nothing was changed. Check your connection and try again.", c: "bad" }; draw();
+    if (!store.isActive() || R !== operation || !isOpen()) return;
+    R.busy = false; R.msg = { t: "Couldn’t confirm the changes. Refresh this budget and check before trying again.", c: "bad" }; draw();
   }
 }
 

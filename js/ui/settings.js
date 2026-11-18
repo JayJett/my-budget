@@ -244,7 +244,7 @@ export function initSettings() {
         if (v.confirm.trim() !== "DELETE") return msg("mDel", "Type DELETE (in capitals) to confirm.");
         const { error } = await app.sb.rpc("delete_my_account");
         if (error) return msg("mDel", friendly(error));
-        app.forgetMe(); close(); toast("Your account has been deleted");
+        app.forgetMe({ discardDraftsFor: app.meId }); close(); toast("Your account has been deleted");
         await app.sb.auth.signOut();
       }
       if (f.id === "setHHName") {

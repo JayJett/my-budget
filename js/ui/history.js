@@ -32,18 +32,19 @@ export async function openHistory() {
   H.view = "list"; H.entries = []; H.current = null;
   sheet("History", `<p class="set-note">Loading…</p>`);
   if (app.offline || navigator.onLine === false) { sheet("History", `<p class="lead">History needs a connection. Your changes are kept on this phone and will show here once they sync.</p>`); return; }
-  if (app.store && app.store.busy()) await app.store.flushNow(); // so your latest change is in the list
-  await load();
+  const store = app.store;
+  if (store?.busy()) await store.flushNow();
+  if (store?.isActive()) await load();
 }
 
 /** Fetch the latest budget and the newest entries (or the next page of older ones). */
 async function load(older) {
-  const hh = app.household; if (!hh) return;
+  const hh = app.household, store = app.store; if (!hh || !store?.isActive()) return;
   let q = app.sb.from("budget_changes").select(COLS).eq("household_id", hh.id);
   if (older && H.entries.length) q = q.lt("id", H.entries[H.entries.length - 1].id);
   const [{ data, error }, b] = await Promise.all([q.order("id", { ascending: false }).limit(PAGE),
     older ? Promise.resolve({ data: { state: H.current } }) : app.sb.from("budgets").select("state, seq").eq("household_id", hh.id).maybeSingle()]);
-  if (!isOpen() || !app.household || app.household.id !== hh.id) return;
+  if (!isOpen() || !store.isActive()) return;
   if (error || b.error) { sheet("History", `<div class="msg err">${esc(friendly(error || b.error))}</div>`); return; }
   H.current = (b.data && b.data.state) || {};
   H.entries = older ? [...H.entries, ...(data || [])] : (data || []);
@@ -75,14 +76,16 @@ async function preview(id) {
   const e = H.entries.find(x => String(x.id) === String(id)); if (!e) return;
   H.view = "preview";
   sheet("History", `<p class="set-note">Working out how the budget looked…</p>`);
-  if (app.store && app.store.busy()) await app.store.flushNow();
+  const store = app.store;
+  if (store?.busy()) await store.flushNow();
+  if (!store?.isActive()) return;
   // Always from the latest copy, in case someone changed something since the list was loaded.
   const hh = app.household;
   const [b, later] = await Promise.all([
     app.sb.from("budgets").select("state, seq").eq("household_id", hh.id).maybeSingle(),
     app.sb.from("budget_changes").select(COLS).eq("household_id", hh.id).gt("id", e.id).order("id", { ascending: false }),
   ]);
-  if (!isOpen() || H.view !== "preview") return;
+  if (!store.isActive() || !isOpen() || H.view !== "preview") return;
   if (b.error || later.error) { sheet("History", `<div class="msg err">${esc(friendly(b.error || later.error))}</div>${backBtn}`); return; }
   const now = b.data.state, then = stateAt(now, later.data || [], e.id);
   const lines = describeChanges(changesBetween(now, then), now, then);
@@ -101,15 +104,19 @@ async function preview(id) {
 const backBtn = `<button class="btn" type="button" data-hist="back">Back to history</button>`;
 
 async function restore(id, btn) {
-  const e = H.entries.find(x => String(x.id) === String(id)); if (!e) return;
+  const store = app.store;
+  const e = H.entries.find(x => String(x.id) === String(id)); if (!e || !store?.isActive()) return;
   const when = whenText(e.changed_at);
   if (!await confirmDel("Restore this version?", `The budget goes back to how it was on ${when}. This is saved as a new change, so you can undo it afterwards.`, "Restore")) return;
   btn.disabled = true;
-  if (app.store && app.store.busy()) await app.store.flushNow();
-  const { data, error } = await app.sb.rpc("restore_budget_version", { p_household: app.household.id, p_change_id: e.id });
+  if (!store.isActive()) return;
+  if (store.hasUnsaved() && (await store.flushNow()).status !== "saved") { btn.disabled = false; return; }
+  if (!store.isActive()) return;
+  const { data, error } = await store.householdRpc("restore_budget_version", { p_change_id: e.id });
+  if (!store.isActive()) return;
   btn.disabled = false;
   if (error) { toast(friendly(error)); return; }
-  adoptResult(data);
+  adoptResult(store, data);
   rememberChange(data); // so the Undo button can take the restore back
   toast(`Restored the version from ${when}`);
   await openHistory();
@@ -153,9 +160,9 @@ export function updateUndo() {
 }
 
 /** Put the new budget from an undo or restore on screen (and into the device copy). */
-function adoptResult(data) {
-  if (!data || !app.store) return;
-  app.store.receive({ state: data.state, seq: data.seq, updated_by: data.updated_by, updated_at: data.updated_at });
+function adoptResult(store, data) {
+  if (!data || !store.isActive()) return;
+  store.receive({ state: data.state, seq: data.seq, updated_by: data.updated_by, updated_at: data.updated_at });
 }
 
 /** The thing a path is about, for messages: "Groceries", "Madi’s pay", "the investment settings". */
@@ -173,22 +180,25 @@ function thingName(p, s) {
 
 /** Undo one change: the newest of yours from the Undo button, or any from the History panel. */
 async function undo(id, { fromButton } = {}) {
-  if (H.busy) return; H.busy = true; updateUndo();
+  const store = app.store;
+  if (H.busy || !store?.isActive()) return; H.busy = true; updateUndo();
   try {
-    if (app.store && app.store.busy()) await app.store.flushNow();
+    if (store.hasUnsaved() && (await store.flushNow()).status !== "saved") return;
+    if (!store.isActive()) return;
     const stack = app.undoStack || [];
     for (;;) {
       const target = id || stack.pop();
       if (!target) { toast("Nothing left to undo"); return; }
-      const before = app.store ? app.store.serverCopy() : null;
-      const { data, error } = await app.sb.rpc("undo_budget_change", { p_household: app.household.id, p_change_id: target });
+      const before = store.serverCopy();
+      const { data, error } = await store.householdRpc("undo_budget_change", { p_change_id: target });
+      if (!store.isActive()) return;
       if (error) {
         // Already undone (e.g. from History) or merged away: try the one before it.
         if (fromButton && /already been undone|no longer in the history/i.test(error.message || "")) continue;
         toast(friendly(error)); return;
       }
       if (!fromButton) { const i = stack.indexOf(Number(target)); if (i >= 0) stack.splice(i, 1); }
-      adoptResult(data);
+      adoptResult(store, data);
       const skipped = (data.skipped || []).map(x => `${x.by === app.meId ? "You have" : `${whoName(x.by)} has`} changed ${thingName(x.p, data.state)} since, so it was left as it is.`);
       const lines = before ? describeChanges(changesBetween(before, data.state), before, data.state) : [];
       if (!data.change_id) toast(skipped.length ? `Nothing to undo. ${[...new Set(skipped)].join(" ")}` : "Nothing to undo: it’s already back how it was.");
@@ -196,8 +206,8 @@ async function undo(id, { fromButton } = {}) {
       return;
     }
   } finally {
-    H.busy = false; updateUndo();
-    if (isOpen() && H.view === "list") load();
+    H.busy = false;
+    if (store.isActive()) { updateUndo(); if (isOpen() && H.view === "list") load(); }
   }
 }
 

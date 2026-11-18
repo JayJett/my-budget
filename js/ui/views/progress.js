@@ -15,7 +15,7 @@ import { addMonths } from "../../model/util.js";
 import { itemIcon } from "../icons.js";
 import { ART } from "../art.js";
 
-const CACHE = id => `mb-snaps-v1-${id}`;
+const cache = store => `mb-snaps-v2-${store.userId}:${store.householdId}`;
 const MIX = [
   { key: "cash", name: "Cash", color: "var(--joint)" },
   { key: "investments", name: "Investments", color: "var(--invest)" },
@@ -32,36 +32,39 @@ const CHECK = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke
 /* ---------- data ---------- */
 /** Load this household's snapshots: the copy on this device first (works offline), then the latest. */
 export async function loadSnapshots() {
-  const hh = app.household; if (!hh || !app.sb) return;
-  try { const c = JSON.parse(localStorage.getItem(CACHE(hh.id)) || "null"); if (c && !app.snapshots) app.snapshots = c; } catch (_) {}
-  const { data, error } = await app.sb.from("budget_snapshots").select("id, month, kind, taken_at, taken_by, data").eq("household_id", hh.id).order("taken_at");
-  if (!app.household || app.household.id !== hh.id) return; // switched household meanwhile
+  const store = app.store; if (!app.household || !store?.isActive()) return;
+  try { const c = JSON.parse(localStorage.getItem(cache(store)) || "null"); if (c && !app.snapshots) app.snapshots = c; } catch (_) {}
+  const { data, error } = await app.sb.from("budget_snapshots").select("id, month, kind, taken_at, taken_by, data").eq("household_id", store.householdId).order("taken_at");
+  if (!store.isActive()) return;
   if (error) { if (!app.snapshots) app.snapshots = []; app.snapshotsOffline = true; }
   else {
     app.snapshots = data || []; app.snapshotsOffline = false;
-    try { localStorage.setItem(CACHE(hh.id), JSON.stringify(app.snapshots)); } catch (_) {}
+    try { localStorage.setItem(cache(store), JSON.stringify(app.snapshots)); } catch (_) {}
   }
   if (app.tab === "progress") app.render();
 }
 
 /** On opening a household: take this month's snapshot if the scheduler hasn't yet (a safety net). */
 export async function ensureMonthly() {
-  const hh = app.household; if (!hh || app.offline) return;
-  const { data } = await app.sb.rpc("ensure_monthly_snapshot", { p_household: hh.id });
-  if (data === true) loadSnapshots();
+  const store = app.store; if (!store?.isActive() || app.offline) return;
+  const { data } = await store.householdRpc("ensure_monthly_snapshot", {});
+  if (store.isActive() && data === true) loadSnapshots();
 }
 
-let saving = false;
+let savingStore = null;
 async function saveNow(btn) {
-  if (saving) return; // one at a time
-  saving = true; document.querySelectorAll('[data-snap="save"]').forEach(b => { b.disabled = true; b.dataset.label = b.textContent; b.textContent = "Saving…"; });
-  if (app.store && app.store.busy()) await app.store.flushNow(); // a snapshot is of what's saved, so finish saving first
-  const { data, error } = await app.sb.rpc("save_snapshot_now", { p_household: app.household.id });
-  saving = false;
+  const store = app.store;
+  if (!store?.isActive() || savingStore === store) return;
+  savingStore = store; document.querySelectorAll('[data-snap="save"]').forEach(b => { b.disabled = true; b.dataset.label = b.textContent; b.textContent = "Saving…"; });
+  const saved = !store.hasUnsaved() || (await store.flushNow()).status === "saved";
+  const result = saved && store.isActive() ? await store.householdRpc("save_snapshot_now", {}) : { error: { message: "Your pending edits haven’t saved yet" } };
+  if (savingStore === store) savingStore = null;
+  if (!store.isActive()) return;
+  const { data, error } = result;
   document.querySelectorAll('[data-snap="save"]').forEach(b => { b.disabled = false; if (b.dataset.label) b.textContent = b.dataset.label; });
   if (error) { toast(app.friendly ? app.friendly(error) : "Couldn’t save a snapshot"); return; }
   app.snapshots = [...(app.snapshots || []).filter(s => s.kind !== "manual" || s.id !== data.id), data];
-  try { localStorage.setItem(CACHE(app.household.id), JSON.stringify(app.snapshots)); } catch (_) {}
+  try { localStorage.setItem(cache(store), JSON.stringify(app.snapshots)); } catch (_) {}
   toast("Snapshot saved", "ok"); // only once the database has confirmed it
   app.pgSel = null;
   app.render();
@@ -78,7 +81,7 @@ const dateText = s => new Date(s.taken_at).toLocaleString("en-NZ", { day: "numer
 const snapLabel = s => s.kind === "monthly" ? monthYear(monthOf(s)) : dateText(s);
 const canSave = () => !readOnly() && !app.offline;
 const saveHelp = () => readOnly() ? "Only owners and editors can save snapshots." : app.offline ? "Saving a snapshot needs a connection." : "Handy right after you’ve updated your balances on Net worth.";
-const saveBtn = (primary, label = "Save snapshot") => `<button class="btn small ${primary ? "primary" : "ghost"}" type="button" data-snap="save"${canSave() ? "" : " disabled"}${saving ? " disabled" : ""}>${saving ? "Saving…" : label}</button>`;
+const saveBtn = (primary, label = "Save snapshot") => `<button class="btn small ${primary ? "primary" : "ghost"}" type="button" data-snap="save"${canSave() ? "" : " disabled"}${savingStore === app.store ? " disabled" : ""}>${savingStore === app.store ? "Saving…" : label}</button>`;
 
 /** "+$440" / "−$80" with words for debt: "$200 less owed". Never colour alone: the sign or words say it. */
 const changeText = (d, kind) => Math.abs(d) < 0.5 ? "No change" : kind === "debt" ? `${m0(Math.abs(d))} ${d < 0 ? "less" : "more"} owed` : diffText(d, kind);

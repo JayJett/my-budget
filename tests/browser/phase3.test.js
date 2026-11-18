@@ -148,10 +148,10 @@ test("offline while the app is open: changes wait, then save when the connection
 
 test("signing out leaves no copy of the budget on the device", { skip }, async () => {
   const { page, errors, ctx } = await openInstalled({});
-  assert.ok(await page.evaluate(() => Object.keys(localStorage).some(k => k.startsWith("mb-cache-v1-"))));
+  assert.ok(await page.evaluate(() => Object.keys(localStorage).some(k => k.startsWith("mb-cache-v2-"))));
   await page.click("#menuBtn"); await page.click('[data-act="signout"]');
   await page.waitForSelector("#fSignin");
-  assert.deepEqual(await page.evaluate(() => Object.keys(localStorage).filter(k => k.startsWith("mb-cache-v1-") || k === "mb-offline")), []);
+  assert.deepEqual(await page.evaluate(() => Object.keys(localStorage).filter(k => k.startsWith("mb-cache-v2-") || k === "mb-offline")), []);
   assert.ok(await page.evaluate(() => localStorage.getItem("mb-welcome")), "the 'Welcome back' name is kept");
   assert.deepEqual(errors, []);
   await ctx.close();

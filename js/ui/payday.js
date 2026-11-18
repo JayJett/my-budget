@@ -45,21 +45,21 @@ const canTick = () => linkReady() && myPerson() === PB.pid && !app.offline; // (
 async function loadCheck() {
   const P = current(); PB.check = { state: canTick() && P.date ? "loading" : "off", row: null, busy: new Set() };
   if (PB.check.state === "off") return draw();
-  const key = `${PB.hh}|${PB.pid}|${P.date}`;
-  const { data, error } = await app.sb.rpc("payday_check_get", { p_household: PB.hh, p_person: PB.pid, p_payday: P.date });
-  if (!isOpen() || `${PB.hh}|${PB.pid}|${current().date}` !== key) return;
+  const store = app.store, operation = PB, check = PB.check;
+  const { data, error } = await store.householdRpc("payday_check_get", { p_person: PB.pid, p_payday: P.date });
+  if (!store.isActive() || !isOpen() || PB !== operation || PB.check !== check) return;
   PB.check = { state: error ? "off" : "ready", row: error ? null : data || null, busy: new Set(), err: error ? "Couldn’t load your ticks. The plan below is still right." : null };
   draw();
 }
 async function tick(gkey, on) {
   const P = current(), snapView = shown(P), C = PB.check; if (C.state !== "ready" || C.busy.has(gkey)) return;
-  const hh = PB.hh, pid = PB.pid, date = P.date;
+  const store = app.store, operation = PB, pid = PB.pid, date = P.date;
   const prev = C.row ? { ...C.row, done: { ...C.row.done } } : null;
   C.row = C.row || { plan: snapView.snapshot, done: {} };
   if (on) C.row.done[gkey] = true; else delete C.row.done[gkey];
   C.busy.add(gkey); draw();
-  const { data, error } = await app.sb.rpc("payday_check_mark", { p_household: hh, p_person: pid, p_payday: date, p_plan: snapView.snapshot, p_key: gkey, p_on: on });
-  if (!PB || PB.hh !== hh || PB.pid !== pid || current().date !== date) return;
+  const { data, error } = await store.householdRpc("payday_check_mark", { p_person: pid, p_payday: date, p_plan: snapView.snapshot, p_key: gkey, p_on: on });
+  if (!store.isActive() || !isOpen() || PB !== operation || PB.check !== C) return;
   C.busy.delete(gkey);
   if (error) { C.row = prev; toast("Couldn’t save that tick. Check your connection and try again."); }
   else C.row = data;
@@ -67,14 +67,17 @@ async function tick(gkey, on) {
 }
 async function replan() {
   const P = current(), C = PB.check; if (C.state !== "ready" || !C.row) return;
-  const { data, error } = await app.sb.rpc("payday_check_replan", { p_household: PB.hh, p_person: PB.pid, p_payday: P.date, p_plan: planSnapshot(P) });
-  if (!isOpen()) return;
+  const store = app.store, operation = PB;
+  const { data, error } = await store.householdRpc("payday_check_replan", { p_person: PB.pid, p_payday: P.date, p_plan: planSnapshot(P) });
+  if (!store.isActive() || !isOpen() || PB !== operation || PB.check !== C) return;
   if (error) { toast("Couldn’t update it. Check your connection and try again."); return; }
   C.row = data; draw();
 }
 async function linkMe() {
   if (!linkReady() || takenBy(PB.pid)) return;
-  const { error } = await app.sb.rpc("link_budget_person", { p_household: PB.hh, p_person: PB.pid });
+  const store = app.store, operation = PB, personId = PB.pid;
+  const { error } = await store.householdRpc("link_budget_person", { p_person: personId });
+  if (!store.isActive() || !isOpen() || PB !== operation || PB.pid !== personId) return;
   if (error) { toast(/someone else/i.test(error.message || "") ? "Someone else in this household has already said that’s them." : "Couldn’t save that. Check your connection and try again."); return; }
   const m = me(); if (m) m.person_id = PB.pid;
   toast("Got it. Your payday checklist is ready.");
