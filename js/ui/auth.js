@@ -311,7 +311,7 @@ function stopStore() {
 function clearHouseholdView() {
   endSetup();
   if ($("#sheet").open) $("#sheet").close();
-  if ($("#dlg").open) $("#dlg").close();
+  if ($("#dlg").open) $("#dlgNo").click();
   closePop();
   closeDrawer({ focus: false });
   app.household = null; app.members = []; app.hasData = false; app.loaded = false; app.role = null; app.canWrite = false;
