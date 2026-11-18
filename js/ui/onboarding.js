@@ -69,7 +69,10 @@ const planOf = () => ans && ans.mode === "solo" ? { mode: "solo", purpose: "solo
    refresh brings the step back with them; each has its id from the start, so saving twice can't add
    it twice. They're saved like the plan itself: one whole-budget save marked as the setup, so Undo
    never offers to take them away. Skipping saves nothing and invents nothing. */
-const ACC_KEY = () => `mb-ob-accounts-${app.household ? app.household.id : "x"}`;
+const ACC_KEY = () => `mb-ob-accounts-v2-${encodeURIComponent(app.meId)}:${encodeURIComponent(app.household.id)}`;
+export function hasLegacyAccountDraft(householdId) {
+  try { return !!JSON.parse(sessionStorage.getItem(`mb-ob-accounts-${householdId}`) || "null")?.length; } catch (_) { return false; }
+}
 let accs = [], accForm = null, accErr = "", expAdded = 0;
 let payErr = {}; // Phase 9C.2: person index → why their payday can't be used yet // expAdded (Phase 9C.1): expenses added from the suggestions
 const keepAccs = () => { try { sessionStorage.setItem(ACC_KEY(), JSON.stringify(accs)); } catch (_) {} };

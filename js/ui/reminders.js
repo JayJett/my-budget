@@ -94,22 +94,24 @@ function inboxHTML() {
 }
 
 async function markRead(ids) {
+  const store = app.store; if (!store?.isActive()) return;
   const now = new Date().toISOString();
   (app.reminders || []).forEach(r => { if (ids.includes(r.id) && !r.read_at) r.read_at = now; });
   updateBell();
-  try { localStorage.setItem(cache(app.store), JSON.stringify(app.reminders)); } catch (_) {}
+  try { localStorage.setItem(cache(store), JSON.stringify(app.reminders)); } catch (_) {}
   if (offline()) return;
   const { error } = await app.sb.from("reminders").update({ read_at: now }).in("id", ids);
-  if (error) toast(friendly(error));
+  if (error && store.isActive()) toast(friendly(error));
 }
 
 /* ---------- settings ---------- */
 export async function openReminderSettings() {
+  const store = app.store; if (!store?.isActive()) return;
   R.view = "settings";
   sheet("Reminder settings", `<p class="set-note">Loading…</p>`);
   if (offline()) { sheet("Reminder settings", `<p class="lead">Changing reminders needs a connection.</p>`); return; }
   const { data, error } = await app.sb.from("reminder_prefs").select("*").eq("household_id", app.household.id).eq("user_id", app.meId).maybeSingle();
-  if (!isOpen() || R.view !== "settings") return;
+  if (!store.isActive() || !isOpen() || R.view !== "settings") return;
   if (error) { sheet("Reminder settings", `<div class="msg err">${esc(friendly(error))}</div>`); return; }
   R.prefs = { ...DEFAULT_PREFS, ...(data || {}) };
   R.device = null;
@@ -119,8 +121,10 @@ export async function openReminderSettings() {
 
 /* ---------- this device: phone or computer notifications ---------- */
 async function loadDevice() {
+  const store = app.store; if (!store?.isActive()) return;
   let list = [], sub = null;
   try { [list, sub] = await Promise.all([myDevices(), currentSubscription()]); } catch (_) {}
+  if (!store.isActive()) return;
   R.device = { list, endpoint: sub ? sub.endpoint : null, on: !!(sub && list.some(x => x.endpoint === sub.endpoint)), busy: false, msg: R.device && R.device.msg };
   if (isOpen() && R.view === "settings") drawSettings();
 }
@@ -189,12 +193,15 @@ const myPersonId = () => { const m = (app.members || []).find(x => x.user_id ===
 const paydayOK = () => !!app.personLinks && !!myPersonId();
 let saving = Promise.resolve();
 async function savePref(key, value) {
+  const store = app.store; if (!store?.isActive()) return;
   R.prefs[key] = value;
   drawSettings();
   const row = { user_id: app.meId, household_id: app.household.id, updated_at: new Date().toISOString() };
   for (const k of Object.keys(DEFAULT_PREFS)) if (k !== "payday" || app.personLinks) row[k] = R.prefs[k]; // (payday: once the database has it)
   saving = saving.then(async () => {
+    if (!store.isActive()) return;
     const { error } = await app.sb.from("reminder_prefs").upsert(row);
+    if (!store.isActive()) return;
     const m = $("#mRem");
     if (error) { if (m) { m.className = "msg err"; m.textContent = friendly(error); } }
     else toast("Reminder settings saved");

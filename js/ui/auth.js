@@ -4,7 +4,7 @@ import { $, esc, toast, closePop, openPop } from "./dom.js";
 import { render } from "./render.js";
 import { createStore, isNetworkError, clearDeviceCopies, hasLegacyBudgetDraft, hasDeviceBudgetDrafts } from "../sync/store.js";
 import { blankBudget } from "../model/schema.js";
-import { startSetup, endSetup, obHeader, modeChoices, rememberMode, pendingAccounts, resumeAccounts } from "./onboarding.js";
+import { startSetup, endSetup, obHeader, modeChoices, rememberMode, pendingAccounts, resumeAccounts, hasLegacyAccountDraft } from "./onboarding.js";
 import { HERO } from "./hero-art.js";
 import { loadSnapshots, ensureMonthly } from "./views/progress.js";
 import { rememberChange, resetUndo, updateUndo, historyNoticeRemote } from "./history.js";
@@ -411,7 +411,7 @@ async function openHH(id) {
   }
   if (pending && previous.householdId !== hh.id) toast(`Pending edits for ${previousName} are kept on this device. Reopen that budget to finish syncing.`);
   else if (previousName && previous.householdId !== hh.id) toast(`Switched to ${hh.name}`);
-  if (hasLegacyBudgetDraft(hh.id) && !legacyWarnings.has(hh.id)) {
+  if ((hasLegacyBudgetDraft(hh.id) || hasLegacyAccountDraft(hh.id)) && !legacyWarnings.has(hh.id)) {
     legacyWarnings.add(hh.id);
     toast("This device has pending edits from before the update. They were kept aside because their account can’t be verified.");
   }

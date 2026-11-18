@@ -19,7 +19,7 @@ export function whoName(id) {
 }
 
 /* ---------- the panel ---------- */
-const H = { entries: [], current: null, more: false, view: "list", busy: false };
+const H = { entries: [], current: null, more: false, view: "list", busy: null };
 
 function sheet(title, html) {
   const d = $("#sheet");
@@ -155,8 +155,9 @@ export function updateUndo() {
   const b = $("#undoBtn"); if (!b) return;
   const show = !readOnly() && !!(app.undoStack && app.undoStack.length);
   b.hidden = !show;
-  b.disabled = !!app.offline || navigator.onLine === false || H.busy;
-  b.dataset.tip = b.disabled && !H.busy ? "Undo needs a connection." : "Undo your last change";
+  const busy = H.busy !== null && H.busy === app.store;
+  b.disabled = !!app.offline || navigator.onLine === false || busy;
+  b.dataset.tip = b.disabled && !busy ? "Undo needs a connection." : "Undo your last change";
 }
 
 /** Put the new budget from an undo or restore on screen (and into the device copy). */
@@ -181,7 +182,7 @@ function thingName(p, s) {
 /** Undo one change: the newest of yours from the Undo button, or any from the History panel. */
 async function undo(id, { fromButton } = {}) {
   const store = app.store;
-  if (H.busy || !store?.isActive()) return; H.busy = true; updateUndo();
+  if (!store?.isActive() || H.busy === store) return; H.busy = store; updateUndo();
   try {
     if (store.hasUnsaved() && (await store.flushNow()).status !== "saved") return;
     if (!store.isActive()) return;
@@ -206,7 +207,7 @@ async function undo(id, { fromButton } = {}) {
       return;
     }
   } finally {
-    H.busy = false;
+    if (H.busy === store) H.busy = null;
     if (store.isActive()) { updateUndo(); if (isOpen() && H.view === "list") load(); }
   }
 }

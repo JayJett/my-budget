@@ -374,5 +374,11 @@ export function clearDeviceCopies({ discardDraftsFor } = {}) {
           || (key.startsWith(LEGACY_PREFIX) && !hasChanges(read(localStorage, key)))
           || (discardPrefix && key.startsWith(discardPrefix))) localStorage.removeItem(key);
     }
+    if (discardDraftsFor) {
+      const setupPrefix = "mb-ob-accounts-v2-" + encodeURIComponent(discardDraftsFor) + ":";
+      for (const key of Object.keys(sessionStorage)) {
+        if (key.startsWith(discardPrefix) || key.startsWith(setupPrefix)) sessionStorage.removeItem(key);
+      }
+    }
   } catch (_) {}
 }
