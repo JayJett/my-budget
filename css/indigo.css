@@ -317,6 +317,12 @@ dialog.sheet:has([data-finance-sheet]:is([data-finance-sheet=acc],[data-finance-
 @media(max-width:360px) {
   .ind-finance .bi-amt .amt,.ind-finance :is(.b-income,.sp-sum,.gl-sum) .ind-amount { font-size:2.15rem; }
   .ind-finance .b-status { padding-inline:8px; }
+  #sheet [data-finance-sheet]:is([data-finance-sheet=acc],[data-finance-sheet=sp],[data-finance-sheet=goal],[data-finance-sheet=person]) { padding-inline:14px; }
+  #sheet :is([data-finance-sheet=acc],[data-finance-sheet=sp],[data-finance-sheet=goal],[data-finance-sheet=person]) .bs-hero > div { min-width:0; overflow-wrap:anywhere; }
+  #sheet :is([data-finance-sheet=acc],[data-finance-sheet=sp],[data-finance-sheet=goal],[data-finance-sheet=person]) .bs-shares li { grid-template-columns:minmax(0,1fr) minmax(0,max-content); gap:4px 8px; }
+  #sheet :is([data-finance-sheet=acc],[data-finance-sheet=sp],[data-finance-sheet=goal],[data-finance-sheet=person]) .bs-shares .bs-who { white-space:normal; overflow-wrap:anywhere; }
+  #sheet :is([data-finance-sheet=acc],[data-finance-sheet=sp],[data-finance-sheet=goal],[data-finance-sheet=person]) .bs-shares .bs-val { grid-column:2; min-width:0; overflow-wrap:anywhere; }
+  #sheet :is([data-finance-sheet=acc],[data-finance-sheet=sp],[data-finance-sheet=goal],[data-finance-sheet=person]) .seg-radio label { min-width:0; overflow-wrap:anywhere; }
 }
 @media(prefers-reduced-motion:reduce) {
   .ind-finance *,.ind-sheet-details * { transition:none; }
