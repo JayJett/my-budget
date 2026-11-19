@@ -56,7 +56,7 @@ export function initTooltips() {
 let popHandler = null, popOpener = null, popSheet = false, popTimer = null;
 const isPhone = () => matchMedia("(max-width:760px)").matches;
 const calmMotion = () => calm();
-const BEHIND = [".top", "#app", ".conn-wrap"];
+const BEHIND = [".top", "#tabs", "#app", ".conn-wrap"];
 
 /* Keeping the page still behind a sheet. Counted, so two things that both need it can't unlock each
    other early. Nothing about the page's position changes, so it's exactly where it was afterwards. */

@@ -58,6 +58,7 @@
 .top .bell-btn { color:var(--ind-ink); }
 .top .save-state { margin-inline:2px; }
 .top .save-state:not(.ok) { padding-inline:3px; }
+body.signed-out #tabs { display:none; }
 #tabs:not(:empty) {
   position:fixed; inset:auto 0 0; display:grid; grid-template-columns:repeat(5,minmax(0,1fr));
   padding:5px max(6px, calc((100vw - 620px) / 2)) calc(7px + env(safe-area-inset-bottom, 0px));
