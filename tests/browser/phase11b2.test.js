@@ -81,14 +81,18 @@ test("Indigo finance pages fit the mobile and desktop widths, including large te
    for(const [route,selector] of [["budget",".alloc-row"],["spending",".ex-row"],["goals",".gl-card"]]){
      if(route!=="budget"){
        const tab=page.locator('#tabs [data-tab="'+route+'"]');
-       const hit=await tab.evaluate(el=>{
+       const point=await tab.evaluate(el=>{
          const {left,top,width,height}=el.getBoundingClientRect();
-         const target=document.elementFromPoint(left+width/2,top+height/2);
-         return el.contains(target) ? null : { target:target?.outerHTML.slice(0,150), top, scroll:scrollY, viewport:visualViewport.height, offset:visualViewport.offsetTop, scale:visualViewport.scale };
+         const x=left+width/2, y=top+height/2;
+         const target=document.elementFromPoint(x,y);
+         return {x,y,reachable:el.contains(target),target:target?.outerHTML.slice(0,150)};
        });
-       assert.equal(hit,null,width+" "+route+" tab hit area "+JSON.stringify(hit));
-       if(width<600)await tab.tap();
+       assert.ok(point.reachable,width+" "+route+" tab hit area "+JSON.stringify(point));
+       // Fixed navigation is already visible. Scrolling a fixed element into view
+       // can move the mobile visual viewport just after a native dialog closes.
+       if(width<600)await page.touchscreen.tap(point.x,point.y);
        else await tab.click();
+       await page.locator('#tabs [data-tab="'+route+'"][aria-selected="true"]').waitFor();
      }
      const row=page.locator(selector).first(); await row.waitFor();
      const surface=await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1);
