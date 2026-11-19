@@ -62,7 +62,7 @@ export function renderBrand() {
   const brand = $("#brandNames");
   // Phase 9A: the household's picture and name are a button of their own: they open the household menu
   // (switch, settings, create). Your avatar on the left still opens your own menu.
-  const tx = `<span class="brand-tx"><span class="brand-t">${esc(title)}</span>${P.length > 1 && names.length ? `<small>${esc(listNames(names))}</small>` : ""}</span>`;
+  const tx = `<span class="brand-tx"><span class="brand-product">Moni Money</span><span class="brand-t">${esc(title)}</span>${P.length > 1 && names.length ? `<small>${esc(listNames(names))}</small>` : ""}</span>`;
   if (brand) brand.innerHTML = app.household
     ? `<button class="hh-trigger" id="hhBtn" type="button" aria-haspopup="menu" aria-expanded="${householdMenuOpen()}" aria-label="${esc(title)}: switch or manage households">${hhAvatarHTML(app.household, "sm")}${tx}<svg class="hh-caret" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 6.5 8 10l3.5-3.5"/></svg></button>`
     : tx;
@@ -87,7 +87,7 @@ export function render() {
   app.colours = accountColours(app.state);
   // Phase 9A: five places. Wealth is lit for any of its three sections.
   const navOn = k => k === app.tab || (k === "wealth" && WEALTH.includes(app.tab));
-  $("#tabs").innerHTML = NAV.map(([k, l]) => `<button class="tab" role="tab" type="button" data-tab="${k}" aria-selected="${navOn(k)}"><span class="ti">${ICONS[k]}</span><span class="tl">${esc(l)}</span><span class="ts">${esc(SHORT[k])}</span><span class="mark" data-mark="${k}"></span></button>`).join("");
+  $("#tabs").innerHTML = NAV.map(([k, l]) => `<button class="tab" role="tab" type="button" data-tab="${k}" aria-selected="${navOn(k)}"><span class="ti" aria-hidden="true">${ICONS[k]}</span><span class="tl">${esc(l)}</span><span class="ts">${esc(SHORT[k])}</span><span class="mark" data-mark="${k}" aria-hidden="true"></span></button>`).join("");
   const note = !app.canWrite && app.household ? `<div class="welcome ro-note"><h3>You’re viewing ${esc(app.household.name)}</h3><p>You can look around, but changes are switched off. An owner can make you an editor in Household settings.</p></div>` : "";
   // (Budget and Spending have their own period switch, in their top card.)
   $("#app").innerHTML = note + (app.loaded && !app.hasData && app.canWrite && app.tab === "budget" ? welcomeBox() : "") + (WEALTH.includes(app.tab) ? wealthNav() : "") + VIEWS_BY_TAB[app.tab].view();

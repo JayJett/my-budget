@@ -1,135 +1,142 @@
-/* Home (Phase 9A): the front door. A greeting, the next payday, whether every dollar of pay has a
-   plan, a few key figures and a short list of useful next steps.
-
-   Every number comes from compute() (model/calc.js) through model/home.js, the same figures the
-   Budget, Expenses, Goals and Wealth screens show. Nothing is invented for an empty budget: no
-   balances, no payday countdown without a payday, no score. Missing things become suggestions. */
+/* A payday first, followed by the two separate questions about the budget. All
+   displayed values come from the existing Home model and expense coverage model. */
 import { app, readOnly, TAB_HASH } from "../ctx.js";
 import { esc } from "../dom.js";
-import { money, m0, pct } from "../../model/format.js";
+import { money } from "../../model/format.js";
 import { WORDS } from "../../model/periods.js";
 import { parseDate } from "../../model/util.js";
-import { isShared } from "../../model/schema.js";
-import { paydays, planStatus, homeActions, homeFigures } from "../../model/home.js";
-import { myName } from "../profile.js";
-import { insightCopy, homePlanLines } from "../insight-view.js";
+import { paydays, planStatus } from "../../model/home.js";
+import { shortfallFix } from "../../model/rebalance.js";
+import { coverage, commitments } from "../../model/intelligence.js";
+import { primaryFinding } from "../insight-view.js";
 
-const I = d => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
-const IC = {
-  pay: I('<rect x="3" y="6" width="18" height="12" rx="2.5"/><circle cx="12" cy="12" r="2.6"/><path d="M6.5 9.5h.01M17.5 14.5h.01"/>'),
-  cal: I('<rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/>'),
-  plan: I('<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5V12h8.5"/>'),
-  acct: I('<path d="M3.5 9.5 12 4l8.5 5.5"/><path d="M5.5 10v8M10 10v8M14 10v8M18.5 10v8M3.5 19.5h17"/>'),
-  goal: I('<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1" fill="currentColor"/>'),
-  bills: I('<path d="M6 3.5h12v17l-2-1.4-2 1.4-2-1.4-2 1.4-2-1.4-2 1.4z"/><path d="M9 8h6M9 11.5h6M9 15h3.5"/>'),
-  snap: I('<path d="M4 8.5h3l1.5-2.5h7L17 8.5h3v10.5H4z"/><circle cx="12" cy="13.5" r="3.3"/>'),
-  review: I('<path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4.5V8h3.5"/><path d="M9 12.5l2 2 4-4.5"/>'),
-  invest: I('<path d="M3.5 17l5.5-5.5 4 3.5 7-8"/><path d="M15 7h5v5"/>'),
-  save: I('<path d="M5 13a7 6 0 0 1 7-6h2a6.5 6 0 0 1 4.8 2.2l1.7-.5v3.7l-1.5.6a6.5 6 0 0 1-2 2.6V19H15v-1.5h-4V19H9v-2.3A6 6 0 0 1 5 13z"/>'),
-  chev: '<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5L10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-};
+const icon = path => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + path + '</svg>';
+const CAL = icon('<rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M8 3v4m8-4v4M4 10h16"/>');
+const CARD = icon('<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 10h18m-13 4h3"/>');
+const CHECK = icon('<path d="m5 12 4 4L19 6"/>');
+const WARN = icon('<path d="M12 3 2 20h20L12 3zm0 6v4m0 3h.01"/>');
+const ARROW = icon('<path d="M4 12h15m-5-5 5 5-5 5"/>');
+const FORWARD = icon('<path d="m9 6 6 6-6 6"/>');
 
-const DAYNAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const when = d => d === 0 ? "Today" : d === 1 ? "Tomorrow" : `In ${d} days`;
-const dateLine = s => { const d = parseDate(s); return `${DAYNAMES[d.getDay()]} ${d.getDate()} ${MON[d.getMonth()]}`; };
-const FREQ = { weekly: "weekly", fortnightly: "fortnightly", monthly: "monthly" };
-/** Morning/afternoon/evening by this device's clock (the person's own time, wherever they are). */
-const hello = () => { const h = new Date().getHours(); return h < 5 ? "Hello" : h < 12 ? "Morning" : h < 18 ? "Afternoon" : "Evening"; };
+const fullDate = new Intl.DateTimeFormat("en-NZ", { weekday:"long", day:"numeric", month:"long" });
+const shortDate = new Intl.DateTimeFormat("en-NZ", { weekday:"short", day:"numeric", month:"short" });
+const when = d => d === 0 ? "Today" : d === 1 ? "Tomorrow" : "In " + d + " days";
+const amount = v => { const formatted = money(v); return formatted.includes(".") ? formatted : formatted + ".00"; };
+const per = (C, annual) => amount(C.v(annual)) + " " + WORDS[app.state.viewAs].per;
+const label = person => person.name || "Unnamed person";
 
-function payCard(S, C, w) {
-  const L = paydays(S, C, app.today), shared = isShared(S) && S.people.length > 1;
-  if (!L.length) return `<section class="card ho-pay ho-hero"><span class="eyebrow">Payday</span>
-    <p class="ho-big">Add your pay</p><p class="ho-sub">Tell Moni Money what you take home, and it’ll plan where every dollar goes.</p>
-    ${readOnly() ? "" : `<button class="btn primary small" type="button" data-home-go="budget" data-home-person="${esc((S.people[0] || {}).id || "")}">Add your pay</button>`}</section>`;
-  // Phase 9A.1: one date, the countdown, then who's paid that day and how much. People paid on another
-  // day (or with no payday yet) are listed underneath with their own date. Nobody's pay is added up.
-  const first = L[0], day = first.date, same = L.filter(p => p.date && p.date === day), rest = L.filter(p => !same.includes(p));
-  const amt = p => `<b class="ho-amt">${money(p.pay)}</b>`;
-  const who = p => shared ? `<span class="ho-who">${esc(p.name || "Someone")}</span>` : `<span class="ho-who">Your pay</span>`;
-  const row = (p, when = "") => `<li class="person pc-${esc(p.colour)}">${who(p)}${when ? `<small class="ho-on">${esc(when)}</small>` : ""}${amt(p)}</li>`;
-  const short = s => { const d = parseDate(s); return `${DAYNAMES[d.getDay()].slice(0, 3)} ${d.getDate()} ${MON[d.getMonth()]}`; };
-  if (!day) return `<section class="card ho-pay ho-hero"><span class="eyebrow">Your pay</span>
-    <ul class="ho-pays">${L.map(p => row(p)).join("")}</ul>
-    ${readOnly() ? "" : `<button class="btn soft small" type="button" data-home-go="budget" data-home-person="${esc(first.id)}">Set a payday</button>`}</section>`;
-  return `<section class="card ho-pay ho-hero" aria-labelledby="hoPayT"><span class="eyebrow" id="hoPayT">Next payday</span>
-    <p class="ho-big">${esc(dateLine(day))}</p><p class="ho-when">${when(first.inDays)}</p>
-    <ul class="ho-pays">${same.map(p => row(p)).join("")}${rest.map(p => row(p, p.date ? short(p.date) : "No payday yet")).join("")}</ul>
-    <button class="ho-pb" type="button" data-pb-open>${paySetUp(S) ? "See your payday plan" : "Set up your payday plan"}<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5L10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button></section>`;
+function linkAttrs(go, { person, click, id } = {}) {
+  return 'data-home-go="' + go + '"' + (person && !readOnly() ? ' data-home-person="' + esc(person) + '"' : "")
+    + (click && !readOnly() ? ' data-home-click="' + esc(click) + '"' : "") + (id ? ' data-home-act="' + esc(id) + '"' : "");
 }
 
-/** Phase 10: has anyone said where any money goes yet? (Just changes the words on the payday card.) */
-const paySetUp = S => S.accounts.some(a => a.dest || (a.destBy && Object.keys(a.destBy).length));
-
-function planCard(S, C, w) {
-  const st = planStatus(C);
-  if (st.k === "none") return "";
-  const v = x => money(C.v(x)) + w.short;
-  const line = st.k === "ok" ? `${shareWord(S)} has a plan` : st.k === "over" ? `Your plan is over by ${v(st.over)}` : `${v(st.left)} still to plan`;
-  const sub = st.k === "ok" ? `${m0(C.v(C.incTotal))} ${w.per}` : st.k === "over" ? "More is planned than comes in. Trim an allocation on Budget." : "Give the rest a job on Budget.";
-  // Phase 9B: a few plain facts under it (essentials, whether expenses fit their budget, room to adjust)
-  const lines = homePlanLines(S, C);
-  return `<button class="card ho-plan ho-tap ${st.k}" type="button" data-home-go="budget">
-    <span class="ho-ic" aria-hidden="true">${IC.plan}</span>
-    <span class="ho-plan-t"><b>${esc(line)}</b><small>${esc(sub)}</small>
-      <span class="ho-bar" aria-hidden="true"><span style="width:${Math.min(100, Math.max(0, st.pct * 100)).toFixed(1)}%"></span></span>
-      ${lines.length ? `<span class="ho-lines">${lines.map(([k, v, c]) => `<span class="ho-line${c ? " " + c : ""}"><span>${esc(k)}</span><b>${esc(v)}</b></span>`).join("")}</span>` : ""}</span>${IC.chev}</button>`;
+function statusIcon(svg, tone = "") {
+  return '<span class="ind-row-icon ' + tone + '">' + svg + '</span>';
 }
-const shareWord = S => isShared(S) && S.people.length > 1 ? "All of your pay" : "100% of your pay";
+function statusRow(title, sub, svg, tone = "") {
+  return statusIcon(svg, tone) + '<span class="ind-row-copy"><strong>' + esc(title) + '</strong>' +
+    (sub ? '<small>' + esc(sub) + '</small>' : "") + '</span><span class="ind-chevron">' + FORWARD + '</span>';
+}
 
-function figures(S, C, w) {
-  const F = homeFigures(S, C), v = x => m0(C.v(x));
-  const tile = (go, icon, label, value, sub, cls = "") => `<button class="ho-fig ${cls}" type="button" data-home-go="${go}"><span class="ho-ic" aria-hidden="true">${icon}</span><small>${esc(label)}</small><b>${value}</b><span class="ho-fig-sub">${esc(sub)}</span></button>`;
-  const T = [];
-  T.push(F.hasAccounts ? tile("networth", IC.acct, "Net worth", m0(F.netWorth), "", F.netWorth < 0 ? "neg" : "")
-                       : tile("networth", IC.acct, "Net worth", "—", "Add an account to see it", "empty"));
-  if (C.incTotal > 0) {
-    T.push(tile("goals", IC.save, "Saving", v(F.saving) + `<i>${esc(w.short)}</i>`, F.ef ? `Emergency fund ${pct(Math.min(1, F.ef.saved / F.ef.target))} of target` : ""));
-    T.push(tile("invest", IC.invest, "Investing", v(F.investing) + `<i>${esc(w.short)}</i>`, ""));
-    T.push(F.hasSpend ? tile("spending", IC.bills, "Expenses", v(F.committed) + `<i>${esc(w.short)}</i>`, `Of ${v(F.spendingBudget)}${w.short} set aside`, F.committed > F.spendingBudget + 0.5 ? "warn" : "")
-                      : tile("spending", IC.bills, "Expenses", "—", "Add your regular bills", "empty"));
+function payCard(S, next, same) {
+  if (!next) {
+    const cta = readOnly() ? "" : '<button type="button" class="ind-primary" ' + linkAttrs("budget", { person:S.people[0]?.id }) + '>Add your pay</button>';
+    return '<section class="ind-card ho-empty ho-pay"><p class="ind-kicker">Payday</p><h2>No regular pay yet</h2><p>Enter take-home pay to see your next payday.</p>' + cta + '</section>';
   }
-  return `<div class="ho-figs" role="list">${T.map(t => `<div role="listitem">${t}</div>`).join("")}</div>`;
+  if (!next.date) {
+    const cta = readOnly() ? "" : '<button type="button" class="ind-primary" ' + linkAttrs("budget", { person:next.id }) + '>Set a payday</button>';
+    return '<section class="ind-card ho-empty ho-pay"><p class="ind-kicker">Your pay</p><h2>No payday set</h2><p>' + esc(label(next)) + ' · ' + amount(next.pay) + ' take-home pay</p>' + cta + '</section>';
+  }
+  const peers = same.map(person => '<button class="ind-row" type="button" data-pb-open="' + esc(person.id) + '">' +
+    statusIcon(CAL, "ind-pastel") + '<span class="ind-row-copy"><strong>' + esc(label(person)) + '</strong><small>Also paid on this date</small></span>' +
+    '<b class="ind-row-amount">' + amount(person.pay) + '</b></button>').join("");
+  return '<section class="ind-card ho-pay" aria-labelledby="hoPayT">' +
+    '<div class="ho-pay-top"><h2 class="ind-kicker" id="hoPayT">Next payday</h2><span class="ho-count">' + CAL + esc(when(next.inDays)) + '</span></div>' +
+    '<p class="ind-amount ho-big">' + amount(next.pay) + '</p><p class="ho-date"><time datetime="' + esc(next.date) + '">' +
+    esc(fullDate.format(parseDate(next.date))) + '</time></p><p class="ho-person">' + esc(label(next)) + ' · Take-home pay</p>' +
+    '<button class="ind-primary ho-pb" type="button" data-pb-open="' + esc(next.id) + '">Open Payday Playbook ' + ARROW + '</button>' +
+    (peers ? '<div class="ho-peers">' + peers + '</div>' : "") + '</section>';
 }
 
-/* Phase 9B: the words come from ui/insight-view.js (the same as Budget and Expenses); Home adds icons. */
-const ICON_OF = { pay: IC.pay, payday: IC.cal, left: IC.plan, over: IC.plan, short: IC.bills, nobudget: IC.bills, accounts: IC.acct, review: IC.review, goal: IC.goal, bills: IC.bills, unmarked: IC.bills, amounts: IC.bills, snapshot: IC.snap };
-const ACT = new Proxy({}, { get: (_, k) => a => ({ icon: ICON_OF[k] || IC.plan, ...insightCopy(a) }) });
-function actions(S, C) {
-  if (readOnly()) return "";
-  const L = homeActions(S, C, { snapshots: app.snapshots });
-  if (!L.length) return "";
-  return `<section class="ho-next" aria-labelledby="hoNextT"><h2 id="hoNextT">Next steps</h2><ul class="card ho-list">${L.map(a => {
-    const x = ACT[a.key](a);
-    return `<li><button class="ho-act" type="button" data-home-go="${x.go}"${x.person ? ` data-home-person="${esc(x.person)}"` : ""}${x.click ? ` data-home-click="${esc(x.click)}"` : ""} data-home-act="${a.key}">
-      <span class="ho-ic" aria-hidden="true">${x.icon}</span><span class="ho-act-t"><b>${esc(x.t)}</b><small>${esc(x.s)}</small></span>${IC.chev}</button></li>`;
-  }).join("")}</ul></section>`;
+function coverageRow(S, C) {
+  const cv = coverage(S, C), todo = commitments(S, C).incompleteIds;
+  const known = C.incTotal > 0 && ["covered", "even", "short", "nobudget"].includes(cv.state);
+  const warning = cv.state === "short" || cv.state === "nobudget";
+  const good = known && !warning && !todo.length;
+  if (!known) {
+    const finding = primaryFinding(S, C);
+    return '<button type="button" class="ind-row" ' + linkAttrs(finding.act.go, { ...finding.act, id:finding.id }) + '>' +
+      statusRow(finding.t, finding.s, CARD, "ind-pastel") + '</button>';
+  }
+  const title = cv.state === "short" ? "Expenses are over budget" : cv.state === "nobudget" ? "Expenses have no budget yet" :
+    todo.length ? "Some expenses need amounts" : "Expenses are covered";
+  const sub = cv.state === "short" ? per(C, cv.short) + " short" :
+    cv.state === "nobudget" ? per(C, cv.planned) + " planned" : todo.length ?
+    (todo.length === 1 ? "1 expense still to check" : todo.length + " expenses still to check") :
+    cv.state === "even" ? "Exactly covered" : per(C, cv.unassigned) + " spare in bills plan";
+  const fix = cv.state === "nobudget" && cv.allocation ? { go: "budget", click: '[data-edit-acc="' + CSS.escape(cv.allocation.id) + '"]', label:"Set a budget" } :
+    todo.length ? {go:"spending", click:'[data-edit-sp="' + CSS.escape(todo[0]) + '"]', label:"Add expense amounts"} : null;
+  return '<details class="ho-coverage"><summary class="ind-row">' + statusRow(title, sub, warning || todo.length ? WARN : CHECK, good ? "ind-positive" : "ind-warning") +
+    '</summary><div class="ho-breakdown"><dl><div><dt>Planned expenses</dt><dd>' + per(C, cv.planned) + '</dd></div><div><dt>Set aside for expenses</dt><dd>' + per(C, cv.budget) +
+    '</dd></div></dl><button class="ind-link" type="button" ' + linkAttrs(fix && !readOnly() ? fix.go : "spending", fix || {}) + '>' +
+    (fix && !readOnly() ? fix.label : "Open Expenses") + '</button>' +
+    (cv.state === "short" && !readOnly() && shortfallFix(S, C) ? ' <button class="ind-link" type="button" ' +
+      linkAttrs("budget", { click:'[data-rb-open="fix"]', id:"short" }) + '>Adjust budget</button>' : "") + '</div></details>';
 }
 
+function allocationRow(C) {
+  const status = planStatus(C);
+  if (status.k === "none") return "";
+  const title = status.k === "ok" ? "Pay fully allocated" : status.k === "over" ? "Pay is overallocated" : "Pay still to allocate";
+  const sub = status.k === "ok" ? C.people.filter(p => p.annual > 0).map(label).join(" · ") :
+    per(C, status.k === "over" ? status.over : status.left);
+  return '<button class="ind-row" type="button" data-home-go="budget">' +
+    statusRow(title, sub, status.k === "over" ? WARN : CARD, status.k === "over" ? "ind-warning" : "ind-pastel") + '</button>';
+}
+function otherPaydays(people) {
+  if (!people.length) return "";
+  return '<section class="ho-group"><h2>' + (people.length === 1 && people[0].date ? "Later payday" : "Other paydays") + '</h2><div class="ind-card ind-list">' +
+    people.map(p => '<button class="ind-row" type="button" data-pb-open="' + esc(p.id) + '">' +
+      statusRow(label(p), p.date ? shortDate.format(parseDate(p.date)) : "No payday yet", CAL, "ind-warm") + '</button>').join("") + '</div></section>';
+}
 function homeHTML() {
-  const S = app.state, C = app.C, w = WORDS[S.viewAs], name = (myName() || "").split(/\s+/)[0];
-  return `<div class="home" id="homeRoot">
-    <section class="ho-greet"><h2>${esc(name ? `${hello()}, ${name}` : "Your money at a glance")}</h2></section>
-    <div class="ho-grid"><div class="ho-col">${payCard(S, C, w)}${planCard(S, C, w)}</div>
-    <div class="ho-col">${figures(S, C, w)}${actions(S, C)}</div></div>
-  </div>`;
+  const S = app.state, C = app.C, [next, ...rest] = paydays(S, C, app.today);
+  const same = next?.date ? rest.filter(p => p.date === next.date) : [];
+  return '<div class="home" id="homeRoot"><h2 class="ind-title">Home</h2>' + payCard(S, next, same) +
+    '<section class="ho-group"><h2>Budget status</h2><div class="ind-card ind-list">' + coverageRow(S, C) + allocationRow(C) + '</div></section>' +
+    otherPaydays(rest.filter(p => !same.includes(p))) + '</div>';
+}
+export function view() { return homeHTML(); }
+export function fill() {
+  const root = document.getElementById("homeRoot");
+  if (!root || !app.C) return;
+  const coverageOpen = root.querySelector(".ho-coverage")?.open;
+  root.outerHTML = homeHTML();
+  if (coverageOpen) {
+    const details = document.querySelector("#homeRoot .ho-coverage");
+    if (details) details.open = true;
+  }
 }
 
-export function view() { return homeHTML(); }
-/** Numbers changed (an edit, or someone else's): redraw Home from the same figures. */
-export function fill() { const el = document.getElementById("homeRoot"); if (el && app.C) el.outerHTML = homeHTML(); }
-
-/** Home's links: go to the screen (by its address, so Back works), then open the right sheet or button. */
+/** Follow a link only while its originating household and destination are current. */
 export function initHome() {
   document.addEventListener("click", e => {
-    const b = e.target.closest("[data-home-go]"); if (!b) return;
-    const tab = b.dataset.homeGo, person = b.dataset.homePerson, click = b.dataset.homeClick;
+    const b = e.target.closest("[data-home-go]");
+    if (!b) return;
+    const { homeGo:tab, homePerson:person, homeClick:selector } = b.dataset;
+    const store = app.store;
+    const go = "#" + TAB_HASH[tab];
+    const current = () => store?.isActive() && app.store === store && location.hash === go;
     const then = () => {
-      if (person) import("../budget-sheets.js").then(m => m.openPersonSheet(person, { focusName: false }));
-      else if (click && !readOnly()) { const el = document.querySelector(`#app ${click.split(",").map(s => s.trim()).join(", #app ")}`); if (el) el.click(); }
+      if (!current() || readOnly()) return;
+      if (person) import("../budget-sheets.js").then(m => { if (current() && !readOnly()) m.openPersonSheet(person, { focusName:false }); });
+      else if (selector) {
+        const target = document.querySelector("#app " + selector.split(",").map(s => s.trim()).join(", #app "));
+        if (target) target.click();
+      }
     };
-    if (location.hash === "#" + TAB_HASH[tab]) { then(); return; }
-    location.hash = TAB_HASH[tab];
-    setTimeout(then, 30);
+    if (location.hash === go) { then(); return; }
+    location.hash = go;
+    if (person || selector) setTimeout(then, 30);
   });
 }

@@ -20,7 +20,7 @@ export async function appFiles() {
   const js = (await walk("js")).filter(f => f.endsWith(".js"));
   const vendor = (await walk("vendor")).filter(f => f.endsWith(".js"));
   const icons = ["icons/icon.svg", "icons/icon-192.png", "icons/icon-512.png", "icons/maskable-512.png", "icons/apple-touch-icon.png", "icons/favicon-32.png"];
-  return ["index.html", "manifest.webmanifest", "css/app.css", ...js, ...vendor, ...icons].map(f => f.split(sep).join("/")).sort();
+  return ["index.html", "manifest.webmanifest", "css/app.css", "css/indigo.css", ...js, ...vendor, ...icons].map(f => f.split(sep).join("/")).sort();
 }
 export async function expected() {
   const files = await appFiles(), h = createHash("sha256");

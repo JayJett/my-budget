@@ -14,7 +14,7 @@
    anyone had already picked is lost. */
 import { app, savePrefs } from "./ctx.js";
 import { esc } from "./dom.js";
-import { ACCENTS, DEFAULT_ACCENT, CUSTOM_ACCENT } from "./accent-list.js";
+import { ACCENTS, DEFAULT_ACCENT, CUSTOM_ACCENT, NEW_USER_ACCENT } from "./accent-list.js";
 import { accentTokens, isHex } from "./palette.js";
 import { applyUI } from "./render.js";
 import { calm } from "./motion.js";
@@ -91,12 +91,31 @@ export function lookFor(user) {
 }
 export const accentFor = user => lookFor(user).accent;
 
+// OAuth can create an account on the provider round trip. A pre-existing account was created
+// before that round trip and keeps its effective default, even on a fresh device.
+const REGISTRATION = "mb-accent-registration";
+export function beginAccentRegistration() {
+  try { sessionStorage.setItem(REGISTRATION, String(Date.now())); } catch (_) { /* optional */ }
+}
+function newOAuthUser(user) {
+  try {
+    const start = Number(sessionStorage.getItem(REGISTRATION));
+    sessionStorage.removeItem(REGISTRATION);
+    const created = Date.parse(user.created_at);
+    return start > 0 && created >= start && created - start < 30 * 60_000 && Date.now() - start < 30 * 60_000;
+  } catch (_) { return false; }
+}
+
 /** Called when someone signs in (or their login details change). Also sends anything chosen offline. */
 export function useAccentOf(user) {
   const look = lookFor(user);
-  applyLook(look);
-  if (!user) return;
+  if (!user) { applyLook(look); return; }
   const local = read(user.id) || {}, dirty = { ...dirtyOf(local) }, remote = user.user_metadata || {};
+  if (newOAuthUser(user) && ![dirty.accent, remote.accent, local.accent].some(VALID.accent)) {
+    look.accent = NEW_USER_ACCENT;
+    dirty.accent = NEW_USER_ACCENT;
+  }
+  applyLook(look);
   // carry the old per-device light/dark and spacing over to this login, once
   FIELDS.forEach(f => { if (f !== "accent" && !VALID[f](remote[f]) && look[f] !== DEFAULT[f]) dirty[f] = look[f]; });
   write(user.id, { ...look, dirty });
@@ -105,7 +124,7 @@ export function useAccentOf(user) {
 
 let timer = null;
 async function save(uid) {
-  if (!app.sb || !app.session || app.session.offline) return;
+  if (!app.sb || app.session?.user?.id !== uid || app.session.offline) return;
   const sent = { ...dirtyOf(read(uid)) }; if (!Object.keys(sent).length) return;
   const { error } = await app.sb.auth.updateUser({ data: sent });
   if (error) return; // kept as "not sent yet"; tried again when back online or on next sign-in
