@@ -21,7 +21,6 @@ import { itemIcon, iconPickerHTML } from "../icons.js";
 import { OBJECT_COLOURS, isObjectColour } from "../palette.js";
 /** A goal's own colour (Phase 8), for its badge and progress bar; otherwise its group's colour. */
 const gcStyle = g => isObjectColour(g.colour) ? ` style="--gc:var(--o-${g.colour})"` : "";
-import { ART } from "../art.js";
 import { combineCard } from "../household-mode.js";
 import { isShared } from "../../model/schema.js";
 import { feedback } from "../feedback.js";
@@ -52,11 +51,11 @@ function card(g, grp, ui, i) {
   const done = isDone(g), named = !blank(g.name);
   const mv = ui.reorder && grp.kind !== "ef" ? `<span class="mv-row"><button class="mv-btn" type="button" data-move="up" data-l="${esc(grp.key)}" data-i="${esc(g.id)}" aria-label="Move ${esc(g.name || "this goal")} up"${i === 0 ? " disabled" : ""}>↑</button><button class="mv-btn" type="button" data-move="down" data-l="${esc(grp.key)}" data-i="${esc(g.id)}" aria-label="Move ${esc(g.name || "this goal")} down"${i === grp.goals.length - 1 ? " disabled" : ""}>↓</button></span>` : "";
   if (ui.reorder) return `<li class="gl-li"><div class="gl-card compact">${badge(g, grp)}<span class="gl-name">${i + 1}. ${esc(g.name || "Unnamed goal")}</span></div>${mv}</li>`;
-  return `<li class="gl-li"><button class="gl-card${done ? " done" : ""}"${gcStyle(g)} type="button" data-edit-goal="${esc(grp.key)}" data-i="${esc(g.id)}" aria-label="${esc(g.name || "Unnamed goal")}: edit">
-      <span class="gl-top">${badge(g, grp)}<span class="gl-name">${esc(g.name || "Unnamed goal")}</span>${done ? `<span class="gl-done">${CHECK}Reached</span>` : `<span class="gl-pc">${K(`g.${g.id}.pc`)}</span>`}${CHEV}</span>
-      <span class="gl-amt">${K(`g.${g.id}.amt`)}</span>
+  return `<li class="gl-li"><button class="gl-card${done ? " done" : ""}"${gcStyle(g)} type="button" data-edit-goal="${esc(grp.key)}" data-i="${esc(g.id)}" aria-label="${esc(g.name || "Unnamed goal")}: edit" aria-describedby="goal-value-${encodeURIComponent(g.id)}">
+      <span class="gl-top">${badge(g, grp)}<span class="gl-name">${esc(g.name || "Unnamed goal")}</span>${done ? `<span class="gl-done">${CHECK}Reached</span>` : ""}${CHEV}</span>
+      <span class="gl-amt" id="goal-value-${encodeURIComponent(g.id)}">${K(`g.${g.id}.amt`)}</span>
       <span class="gl-bar" aria-hidden="true"><span data-k="g.${esc(g.id)}.bar"></span></span>
-      <span class="gl-foot"><span class="gl-line">${K(`g.${g.id}.line`)}</span>${grp.kind === "ef" ? K("ef.cover", "chip") : ""}${done ? "" : K(`g.${g.id}.st`, "chip")}${named ? K(`g.${g.id}.accflag`, "chip") : ""}</span>
+      ${named ? K(`g.${g.id}.accflag`, "chip ind-goal-warning") : ""}
     </button></li>`;
 }
 
@@ -73,48 +72,51 @@ const shown = (S, grp) => grp.kind === "ef" || grp.kind === "joint" || grp.goals
 export const goalPots = S => goalGroups(S).filter(g => g.kind !== "ef" && (g.kind === "joint" || (app.C && app.C.pool.personalGoals[g.kind.id] > 0)));
 const firstGoalKey = S => goalPots(S).length > 1 ? "pick" : "gj";
 
-function section(S, grp, ui, ro) {
-  const isPerson = grp.kind !== "ef" && grp.kind !== "joint", P = S.people;
+function funding(S, grp) {
+  const P = S.people, isPerson = grp.kind !== "ef" && grp.kind !== "joint";
   const pool = grp.kind === "ef" ? K("g.ef.fn") : grp.kind === "joint" ? K("gp.jg") : K(`gpool.${grp.kind.id}`);
-  const addBtn = ro || grp.kind === "ef" || (grp.kind === "joint" && !anyGoals(S)) ? "" : `<button class="icon-add" type="button" data-goal-new="${esc(grp.key)}" aria-label="Add a goal to ${esc(grp.title)}">+</button>`;
   // How much of each pool is shared out between the goals (unchanged checks: 100%, % left, over)
-  const alloc = ui.reorder || !grp.goals.length ? "" : grp.kind === "joint"
+  const alloc = !grp.goals.length ? "" : grp.kind === "joint"
     ? `<p class="gl-alloc"><span>Shared out</span>${P.map(p => `<span class="${pc(p)}">${P.length > 1 ? `${esc(p.name || "Unnamed")} ` : ""}${K(`gj.c.${p.id}`, "chip")}</span>`).join("")}${tipq("Each goal gets a % of the fund. Below 100%, the rest stays in reserve; over 100%, goals are promised more than the fund has.")}</p>`
     : isPerson ? `<p class="gl-alloc"><span>Shared out</span>${K(`gp.${grp.kind.id}.c`, "chip")}</p>` : "";
   const spare = grp.kind === "joint" ? `<p class="gl-spare" data-k="gl.gj.spare" data-base="gl-spare"></p>` : isPerson ? `<p class="gl-spare" data-k="gl.${esc(grp.kind.id)}.spare" data-base="gl-spare"></p>` : "";
-  const body = grp.goals.length ? `<ul class="gl-list">${grp.goals.map((g, i) => card(g, grp, ui, i)).join("")}</ul>`
-    : grp.kind === "joint" && !anyGoals(S) ? `<div class="card gl-first"><div class="empty-art" aria-hidden="true">${ART.target()}</div><h3>Start saving for something</h3><p>A holiday, a car, a house deposit: set a target and watch it fill.</p>${ro ? "" : `<button class="btn primary gl-first-btn" type="button" data-goal-new="${firstGoalKey(S)}">+ Add a goal</button>`}</div>`
-    : `<div class="card gl-none"><p>${isPerson ? "No personal goals yet." : "No goals yet."}</p>${ro ? "" : `<button class="btn small soft" type="button" data-goal-new="${esc(grp.key)}">+ Add a goal</button>`}</div>`;
+  return `<section class="gl-funding"><h4>${esc(grp.title)}</h4><p>${pool} ${K("gl.per")}</p>${alloc}${spare}</section>`;
+}
+
+function section(S, grp, ui, ro) {
+  const isPerson = grp.kind !== "ef" && grp.kind !== "joint";
+  const addBtn = ro || grp.kind === "ef" || (grp.kind === "joint" && !anyGoals(S)) ? "" : `<button class="icon-add" type="button" data-goal-new="${esc(grp.key)}" aria-label="Add a goal to ${esc(grp.title)}">+</button>`;
+  const body = grp.goals.length ? `<ul class="gl-list">${grp.goals.map((g, i) => card(g, grp, ui, i)).join("")}</ul>` : "";
+  if (grp.kind === "ef" && blank(grp.goals[0].saved) && blank(grp.goals[0].target) && !ui.reorder) {
+    return `<button class="ind-link gl-ef-setup" type="button" data-edit-goal="ef" data-i="${esc(grp.goals[0].id)}">Set up emergency fund</button>`;
+  }
   return `<section class="gl-group ${isPerson ? pc(grp.kind) : grp.kind === "ef" ? "ef" : "joint"}">
-    <div class="ex-gh"><span class="ex-dot" aria-hidden="true"></span><h3>${esc(grp.title)}</h3>${grp.kind === "ef" ? "" : `<small>${grp.goals.length}</small>`}
-      <span class="ex-gt">${pool}<small class="per">${K("gl.per")}</small></span>${ui.reorder ? "" : addBtn}</div>
-    ${alloc}${spare}${body}</section>`;
+    ${grp.kind === "ef" ? "" : `<div class="ex-gh"><h3>${esc(grp.title)}</h3>${ui.reorder ? "" : addBtn}</div>`}
+    ${ui.reorder ? "" : K(`gl.${grp.key}.warning`, "gl-fund-alert")}${body}</section>`;
 }
 
 export function view() {
   const S = app.state, ro = readOnly(), ui = budgetUI(), groups = goalGroups(S).filter(g => shown(S, g));
+  const fundingOpen = document.querySelector(".gl-pools")?.open;
   const seg = `<div class="viewas seg-wrap"><div class="seg" role="group" aria-label="Show amounts per">${VIEWS.map(k => `<button type="button" data-viewas="${k}" aria-pressed="${k === S.viewAs}">${WORDS[k].noun[0].toUpperCase() + WORDS[k].noun.slice(1)}</button>`).join("")}</div></div>`;
-  const pools = groups.map(g => `<li class="${g.kind !== "ef" && g.kind !== "joint" ? pc(g.kind) : g.kind}"><i class="gl-dot"></i><span>${esc(g.title)}</span><b>${g.kind === "ef" ? K("g.ef.fn") : g.kind === "joint" ? K("gp.jg") : K(`gpool.${g.kind.id}`)}</b></li>`).join("");
-  const summary = `<section class="card gl-sum" aria-live="polite">
-    <div class="b-row"><span class="eyebrow">Goals</span>${seg}</div>
-    <div class="gl-hero-top"><div class="gl-top-l"><span class="lab">Saved so far</span><span class="amt">${K("gl.saved")}</span></div>
-      <div class="gl-top-r"><span class="lab">Your goals</span><span class="gl-count">${K("gl.count")}</span>${K("gl.count.sub", "gl-count-sub")}</div></div>
-    <p class="gl-sub">${K("gl.saved.sub")}</p>
-    <div class="gl-bar big" aria-hidden="true"><span data-k="gl.bar"></span></div>
-    <div class="gl-pools"><span class="eyebrow">Going to goals ${K("gl.perword")} ${tipq("The plan from the Budget tab. It isn’t counted as saved until you update a goal’s Saved amount.")}</span><ul>${pools}</ul></div>
-  </section>`;
-  const head = `<div class="b-row sec"><h2>Your goals</h2>${ro ? "" : `<button class="btn small ghost" type="button" data-reorder aria-pressed="${ui.reorder}">${ui.reorder ? "Done" : "Reorder"}</button>`}</div>
-    ${ui.reorder ? `<p class="dim small-note">Goals higher in a list are funded first. When one is reached, its share moves to the next unfinished goal below it (or above, if it’s last).</p>` : ""}`;
-  const sections = groups.filter(g => !ui.reorder || g.kind !== "ef").map(g => section(S, g, ui, ro)).join("");
-  const hidden = goalGroups(S).filter(g => !shown(S, g));
-  const addAny = ro || ui.reorder || !anyGoals(S) ? "" : `<button class="add-row" type="button" data-goal-new="${groups.length + hidden.length > 2 ? "pick" : "gj"}">+ Add goal</button>`;
+  const hasGoals = anyGoals(S), hasEmergency = !blank(S.goals.ef.saved) || !blank(S.goals.ef.target);
+  const summary = hasGoals || hasEmergency ? `<section class="ind-card gl-sum" aria-live="polite"><p class="ind-kicker">Saved so far</p>
+    <p class="ind-amount">${K("gl.saved")}</p><p class="ind-sub">${K("gl.saved.sub")}</p></section>` : "";
+  const empty = hasGoals || ui.reorder ? "" : `<section class="ind-card gl-first">${badge(S.goals.ef, groupOf(S,"ef"))}<h3>No goals yet</h3><p>Set a target and track what you’ve saved.</p>
+    ${ro ? "" : `<button class="ind-primary gl-first-btn" type="button" data-goal-new="${firstGoalKey(S)}">Add a goal</button>`}</section>`;
+  const head = ui.reorder ? `<div class="b-row sec"><h3>Goal priority</h3><button class="ind-link" type="button" data-reorder aria-pressed="true">Done</button></div>
+    <p class="dim small-note">Goals at the top are funded first.</p>` : "";
+  const sections = groups.filter(g => ui.reorder ? g.kind !== "ef" && g.goals.length : g.kind === "ef" || g.goals.length).map(g => section(S, g, ui, ro)).join("");
+  const addAny = ro || ui.reorder || !hasGoals ? "" : `<button class="ind-link" type="button" data-goal-new="${firstGoalKey(S)}">+ Add goal</button>`;
   const help = `<details class="help"><summary>How goals are funded</summary><ul>
     <li>The Budget tab decides how much goes to the emergency fund, ${isShared(S) ? "the joint goals fund and each person’s goals pool" : "and to your goals"}. Each goal gets a % of its fund.</li>
     <li>Goals higher in a list are funded first. When a goal is reached, its share moves to the next unfinished goal below it (or above, if it’s last). If every goal is reached, the money shows as spare.</li>
     <li>Saved is money already put aside, in the account you pick. Picking an account doesn’t move any money. The Net worth tab checks the goals in each savings account add up.</li>
     <li>Leave the deadline blank for an estimated finish date, or set one to see whether you’re on track.</li>
   </ul></details>`;
-  return `<div class="gl-page"><div class="gl-side">${summary}</div><div class="gl-main">${head}${ui.reorder ? "" : combineCard()}${sections}${addAny}${help}</div></div>`;
+  return `<div class="ind-finance gl-page"><div class="ind-page-head"><h2 class="ind-title">Goals</h2>${addAny}</div>
+    <div class="gl-side">${summary}${empty}</div><div class="gl-main">${head}${sections}${!ro && hasGoals && !ui.reorder ? '<button class="ind-link" type="button" data-reorder aria-pressed="false">Reorder goals</button>' : ""}
+    ${ui.reorder ? "" : `<details class="ind-card ind-detail gl-pools"${fundingOpen ? " open" : ""}><summary>Funding overview</summary>${seg}${groups.map(g => funding(S, g)).join("")}${combineCard()}${help}</details>`}</div></div>`;
 }
 
 /* ---------- the goal sheet (opened from ui/budget-sheets.js) ---------- */
@@ -140,17 +142,16 @@ export function goalSheet(key, g) {
     ${isEF ? `<p class="banner" data-k="ef.banner" data-base="banner"></p>` : `<label class="bs-field"><span>Name</span><input class="bs-in" type="text" ${attrs(key, g.id, "name", "text")} value="${esc(g.name)}" placeholder="e.g. Holiday" autocomplete="off"${dis}></label>`}
     <label class="bs-field"><span>Target</span>${money$("target", "Target", g.target)}</label>
     ${isEF ? `<div class="ef-suggest" id="efSuggest"></div>` : ""}
-    <h4 class="bs-h">Saved</h4>
     <label class="bs-field"><span>Saved so far ${tipq("Money already put aside for this goal. Planned contributions aren’t added automatically: update this when you check your balances.")}</span>${money$("saved", "Saved so far", g.saved)}</label>
     <label class="bs-field"><span>Kept in</span><select class="bs-in" ${attrs(key, g.id, "account", "text")} aria-label="Account"${dis}>${opts.join("")}</select>
       <small class="bs-sub">The savings account the money sits in. Picking one doesn’t move any money.${savings.length ? "" : " Add a Savings account on the Net worth tab to pick one."}</small>
       <small class="bs-warn">${K(`g.${g.id}.acw`)}</small></label>
     ${acctInfo}
-    <h4 class="bs-h">Plan</h4>
-    <div class="gl-plan"><b>${K(`g.${g.id}.fn`)}</b> <span>${esc(w.per)}</span><small>${K(`g.${g.id}.roll`)}</small></div>
+    <details class="ind-detail ind-sheet-details"><summary>Funding and timing</summary>
+    <p class="gl-plan">${K(`g.${g.id}.line`)}</p>
     ${shares}
     <label class="bs-field"><span>Deadline (optional)</span><input class="bs-in" type="date" ${attrs(key, g.id, "deadline", "date")} value="${esc(g.deadline || "")}"${dis}>
-      <small class="bs-sub">Leave it blank to see an estimated finish date.</small></label>
+      <small class="bs-sub">Leave it blank to see an estimated finish date.</small></label></details>
     ${iconPickerHTML(key, g.id, g.icon, defaultBadge(g, grp), ro, { colour: g.colour, colours: OBJECT_COLOURS, defColour: grp.kind === "ef" ? "var(--c-slate)" : grp.kind === "joint" ? "var(--accent)" : `var(--c-${grp.kind.colour})` })}
     ${isEF || ro ? "" : `<button class="btn danger-soft block" type="button" data-del="${esc(key)}" data-i="${esc(g.id)}">Delete goal</button>`}`;
 }
@@ -198,11 +199,13 @@ export function fill(D, C) {
 
   const fundCheck = x => Math.round(x * 1e4) === 1e4 ? { t: "100%", c: "ok" } : x < 1 ? { t: `${pct(1 - x)} left`, c: "warn" } : { t: "Over 100%", c: "bad" };
   P.forEach(p => { const s = S.goals.joint.reduce((a, g) => a + n(g.split[p.id]), 0); D[`gj.t.${p.id}`] = pct(s); D[`gj.c.${p.id}`] = fundCheck(s); });
+  D["gl.gj.warning"] = P.some(p => D[`gj.c.${p.id}`].c === "bad") ? "Goal shares exceed 100%" : "";
   D["gj.tv"] = money(v(C.gj.eff.reduce((s, x) => s + n(x), 0)));
   const poolCheck = x => Math.round(x * 1e4) === 1e4 ? { t: "Fully allocated", c: "ok" } : x < 1 ? { t: `${pct(1 - x)} in reserve`, c: "warn" } : { t: `Over by ${pct(x - 1)}`, c: "bad" };
   P.forEach(p => {
     const L = S.goals.personal[p.id] || [], tp = L.reduce((s, g) => s + n(g.pct), 0);
     D[`gp.${p.id}.tp`] = pct(tp); D[`gp.${p.id}.tv`] = money(v(C.gp[p.id].eff.reduce((s, x) => s + n(x), 0))); D[`gp.${p.id}.c`] = poolCheck(tp);
+    D[`gl.gp:${p.id}.warning`] = D[`gp.${p.id}.c`].c === "bad" ? "Goal shares exceed 100%" : "";
   });
 
   // new: the summary card. Saved is what's already put aside (each goal's Saved), never the plan.

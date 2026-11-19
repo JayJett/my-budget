@@ -17,14 +17,21 @@ export function toast(msg, kind) {
 
 /* ---------- tooltips ---------- */
 export function initTooltips() {
-  const tt = $("#tt");
+  const tt = $("#tt"), root = tt.parentElement;
   const show = el => {
-    const t = el.dataset.tip; if (!t) return; tt.textContent = t; tt.classList.add("on");
+    const t = el.dataset.tip; if (!t) return;
+    // A modal is above the page, so its tooltip must be inside it to be visible.
+    const surface = el.closest("dialog[open]") || root;
+    if (tt.parentElement !== surface) surface.append(tt);
+    tt.textContent = t; tt.classList.add("on");
     const b = el.getBoundingClientRect(), w = tt.offsetWidth, h = tt.offsetHeight;
     let x = Math.min(window.innerWidth - w - 8, Math.max(8, b.left + b.width / 2 - w / 2)), y = b.top - h - 8; if (y < 8) y = b.bottom + 8;
     tt.style.left = x + "px"; tt.style.top = y + "px";
   };
-  const hide = () => tt.classList.remove("on");
+  const hide = () => {
+    tt.classList.remove("on");
+    if (tt.parentElement !== root) root.append(tt);
+  };
   // Mouse: show on hover. Keyboard: show on focus. Touch: tap a "?" to show, tap anywhere else to hide.
   document.addEventListener("pointerover", e => { if (e.pointerType !== "mouse") return; const el = e.target.closest("[data-tip]"); if (el && el.dataset.tip) show(el); });
   document.addEventListener("pointerout", e => { if (e.pointerType === "mouse" && e.target.closest("[data-tip]")) hide(); });
@@ -32,6 +39,7 @@ export function initTooltips() {
   let tapped = null; // the "?" a finger last tapped: tap it again (or anywhere else) to hide
   document.addEventListener("click", e => {
     const q = e.target.closest(".qi[data-tip], .tip-t[data-tip]");
+    if (q?.closest("label")) e.preventDefault(); // opening help should leave the labelled input alone
     if (q && q !== tapped) { show(q); tapped = q; } else { hide(); tapped = null; }
   });
   document.addEventListener("focusout", hide);
@@ -48,7 +56,7 @@ export function initTooltips() {
 let popHandler = null, popOpener = null, popSheet = false, popTimer = null;
 const isPhone = () => matchMedia("(max-width:760px)").matches;
 const calmMotion = () => calm();
-const BEHIND = [".top", "#app", ".conn-wrap"];
+const BEHIND = [".top", "#tabs", "#app", ".conn-wrap"];
 
 /* Keeping the page still behind a sheet. Counted, so two things that both need it can't unlock each
    other early. Nothing about the page's position changes, so it's exactly where it was afterwards. */

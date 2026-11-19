@@ -47,7 +47,7 @@ test("under budget, exactly on budget, no budget, and no expenses each read clea
     assert.doesNotMatch(await page.textContent("#app"), /NaN|Infinity|undefined/, name);
     if (name === "exact") assert.equal(await page.locator("#poolsplit .half").count(), 0);
     if (name === "nopool") { assert.equal(await page.isVisible(".sp-nopool"), true); assert.equal(await text(page, "sp.used"), "—"); }
-    if (name === "empty") { assert.equal(await page.isVisible("text=No expenses yet"), true); assert.equal(await page.locator(".sp-empty [data-sp-new]").count(), 1); }
+    if (name === "empty") { assert.equal(await page.isVisible("text=No expenses yet"), true); assert.equal(await page.locator(".ind-page-head [data-sp-new]").count(), 1); }
     assert.deepEqual(errors, [], name); await ctx.close();
   }
 });
@@ -55,9 +55,10 @@ test("under budget, exactly on budget, no budget, and no expenses each read clea
 test("rows are grouped by type, show the amount per period, and sinking funds show due date, status and progress", { skip }, async () => {
   const { page, errors, ctx } = await spendTab(CASES.rich);
   assert.deepEqual(await page.$$eval(".ex-gh h3", els => els.map(e => e.textContent)), ["Fixed", "Flexible", "Sinking"]);
-  assert.equal(await text(page, "sp.fixed"), "$1,283.08");
+  await page.click(".sp-detail > summary");
+  assert.match(await page.textContent("#poolkey"), /Fixed \$1,283\.08/);
   assert.equal(await page.locator("#app input, #app select").count(), 0, "no form fields on the main screen");
-  assert.equal(await text(page, "sp.s2.sub"), "$180 monthly", "billed monthly, shown per fortnight");
+  assert.equal(await text(page, "sp.s2.cadence"), "$180 monthly", "billed monthly, shown per fortnight");
   assert.match(await page.textContent('[data-edit-sp="s4"]'), /Car rego[\s\S]*\$120 · due/);
   assert.equal(await page.locator('[data-edit-sp="s4"] .chip').count(), 1);
   assert.equal(await page.locator('[data-edit-sp="s4"] .ex-prog').count(), 1);
@@ -148,10 +149,10 @@ test("category colours never change with the accent; wording fits one person or 
   const before = await cat();
   await page.evaluate(() => { document.documentElement.dataset.accent = "lavender"; });
   assert.deepEqual(await cat(), before);
-  assert.equal(await page.textContent(".sp-sum .eyebrow"), "Joint spending");
+  assert.equal(await page.textContent(".sp-detail .sp-funding-source"), "Joint spending");
   await ctx.close();
   const o = await spendTab(CASES.over);
-  assert.equal(await o.page.textContent(".sp-sum .eyebrow"), "Spending");
+  assert.equal(await o.page.textContent(".sp-detail .sp-funding-source"), "Spending");
   assert.doesNotMatch(await o.page.textContent("#app"), /both of you|your partner|Joint/i);
   assert.deepEqual([...errors, ...o.errors], []); await o.ctx.close();
 });

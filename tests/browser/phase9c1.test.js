@@ -47,7 +47,7 @@ test("Expenses: pick, give one an amount, leave two blank; only the complete one
   assert.deepEqual(b.accounts, before.accounts, "allocations untouched"); assert.deepEqual(b.nw, before.nw, "balances untouched");
   await page.waitForSelector("#app .ex-row");
   assert.match(await page.textContent("#app .sp-list"), /Rent\s*Needs an amount/);
-  assert.match(await page.textContent("#app .sp-sum"), /Planned\s*\$400/, "only groceries ($200 a week) is planned");
+  assert.match(await page.textContent("#app .sp-sum"), /Planned expenses\s*\$400/, "only groceries ($200 a week) is planned");
   await tab(page, "home"); await page.waitForSelector("#app .home");
   assert.match(await page.textContent(".ho-coverage summary"), /2 expenses still to check/);
   await page.click(".ho-coverage summary");
@@ -117,17 +117,17 @@ test("doughnuts: honest parts with a text equivalent; Home is calmer; payday car
   const pad = await page.$eval(".ho-pay", e => parseFloat(getComputedStyle(e).paddingLeft)); assert.ok(pad >= 18, `padding ${pad}`);
   await shot(page, "home");
   // Phase 10A: the doughnut became a slim bar, with the same words for screen readers
-  await tab(page, "budget"); await page.waitForSelector("#incBar span");
+  await tab(page, "budget"); await page.click("[data-inc-more]"); await page.waitForSelector("#incBar span");
   const inc = await page.getAttribute("#incBar", "aria-label");
   assert.match(inc, /^Share of household pay: Jarden \d+%, Madi \d+%$/);
   assert.equal([...inc.matchAll(/(\d+)%/g)].reduce((s, m) => s + Number(m[1]), 0), 100);
-  assert.equal(await page.locator(".alloc .a-part").first().evaluate(e => getComputedStyle(e, "::before").display), "none", "no member dots on allocation rows");
+  assert.equal(await page.locator(".alloc .a-part").count(), 0, "no member dots on allocation rows");
   await shot(page, "budget");
   await page.evaluate(() => { location.hash = "#wealth/accounts"; }); await page.waitForSelector("#nwBar svg");
   const nw = await page.getAttribute("#nwBar svg", "aria-label");
   assert.match(nw, /^What you own: /); assert.doesNotMatch(nw, /Debt|owed/i, "what's owed is never a slice");
   await shot(page, "wealth");
-  await tab(page, "spending"); await page.waitForSelector("#spEss svg");
+  await tab(page, "spending"); await page.click(".sp-detail > summary"); await page.waitForSelector("#spEss svg");
   assert.match(await page.getAttribute("#spEss svg", "aria-label"), /^Planned expenses: /);
   assert.deepEqual(errors, []); await ctx.close();
 });

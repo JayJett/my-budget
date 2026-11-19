@@ -150,20 +150,20 @@ test("couples: each their own payday and pay; only you tick yours; nobody can be
 
 test("destinations are chosen in the allocation and pay sheets (accounts, never debts; or a name); before the database part, the plan still shows", { skip }, async () => {
   const { page, errors, ctx } = await open(null, { ...phone(), storage: ALL_DONE, init: one(solo(), null), hash: "budget", waitFor: "#app .b-income" });
-  await page.click('[data-edit-acc="ef"]'); await page.waitForSelector('#sheet select[data-pd="acc"]');
+  await page.click('[data-edit-acc="ef"]'); await page.click("#sheet .ind-sheet-details summary"); await page.waitForSelector('#sheet select[data-pd="acc"]');
   const opts = await page.$$eval('#sheet select[data-pd="acc"] option', e => e.map(x => x.textContent));
   assert.deepEqual(opts, ["Not chosen yet", "Everyday · Everyday", "Savings · Savings", "Somewhere else (type a name)"]);
   await page.selectOption('#sheet select[data-pd="acc"]', "nw:sv");
   await page.waitForFunction(() => window.__fake.budget.accounts.ef.dest && window.__fake.budget.accounts.ef.dest.nw === "sv", null, { timeout: 5000 });
   await page.click('#sheet [data-sheet="close"]');
-  await page.click('[data-edit-acc="ji"]'); await page.waitForSelector('#sheet select[data-pd="acc"]');
+  await page.click('[data-edit-acc="ji"]'); await page.click("#sheet .ind-sheet-details summary"); await page.waitForSelector('#sheet select[data-pd="acc"]');
   await page.selectOption('#sheet select[data-pd="acc"]', "label");
   await page.waitForSelector('#sheet input[data-pd-label="acc"]');
   await page.fill('#sheet input[data-pd-label="acc"]', "Sharesies");
   await page.waitForFunction(() => (window.__fake.budget.accounts.ji.dest || {}).label === "Sharesies", null, { timeout: 5000 });
   assert.equal(Object.keys((await budgetOf(page)).nw.accounts).length, 3, "a typed name isn’t an account");
   await page.click('#sheet [data-sheet="close"]');
-  await page.click('[data-edit-person="j"]'); await page.waitForSelector('#sheet select[data-pd="src"]');
+  if (!(await page.isVisible("#incMore"))) await page.click("[data-inc-more]"); await page.click('[data-edit-person="j"]'); await page.waitForSelector('#sheet select[data-pd="src"]');
   await page.selectOption('#sheet select[data-pd="src"]', "nw:ev");
   await page.waitForFunction(() => (window.__fake.budget.people.j.src || {}).nw === "ev", null, { timeout: 5000 });
   await page.click('#sheet [data-sheet="close"]');

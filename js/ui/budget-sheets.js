@@ -20,7 +20,6 @@ import { investSheet } from "./views/invest.js";
 import { itemIcon, iconPickerHTML, appearanceHTML, pickerOpen } from "./icons.js";
 import { OBJECT_COLOURS, isObjectColour } from "./palette.js";
 import { accIcon, toggleIncMore } from "./views/budget.js";
-import { openRebalance } from "./rebalance.js";
 import { list } from "./render.js";
 import { openPop, closePop } from "./dom.js";
 import { money } from "../model/format.js";
@@ -37,9 +36,9 @@ const TYPES = ["Joint", "Personal", "Investment"];
 const dis = () => readOnly() ? " disabled" : "";
 
 /* ---------- the sheet ---------- */
-function show(title, body) {
+function show(title, body, kind) {
   const d = $("#sheet");
-  d.innerHTML = `<div class="sheet-head"><h3 tabindex="-1" autofocus>${esc(title)}</h3><button class="btn small primary" type="button" data-sheet="close">Done</button></div><div class="sheet-body bsheet">${body}</div>`;
+  d.innerHTML = `<div class="sheet-head"><h3 tabindex="-1" autofocus>${esc(title)}</h3><button class="btn small primary" type="button" data-sheet="close">Done</button></div><div class="sheet-body bsheet" data-finance-sheet="${esc(kind || "")}">${body}</div>`;
   if (!d.open) d.showModal();
 }
 const isOurs = () => $("#sheet").open && !!$("#sheet .bsheet");
@@ -61,16 +60,17 @@ function accountSheet(a) {
   return `<div class="bs-hero"><span class="a-ic big" data-k="acc.${esc(a.id)}.ic" aria-hidden="true">${accIcon(a)}</span><div><div class="bs-amt">${K(`acc.${a.id}.t`)}</div><small>${esc(w.per)}${multi ? ", from everyone" : ""}</small></div></div>
     <label class="bs-field"><span>Name</span><input class="bs-in" type="text" ${attrs("acc", a.id, "name", "text")} value="${esc(a.name)}" placeholder="e.g. Groceries account" autocomplete="off"${dis()}></label>
     ${a.role ? `<p class="bs-note">${esc(roleNote(a.role, S))}</p>` : ""}
-    ${typeField(a, S)}
-    ${a.role === "spending" ? "" : `<fieldset class="bs-field"><legend>Could this change if needed? ${tipq("Only if you say so. Marking it adds it to “room to adjust” on Budget and Home; it doesn’t change the plan. Leave it unset for anything you want to keep, like savings you rely on.")}</legend><div class="seg seg-radio">${[["yes", "Yes, it’s adjustable"], ["", "Not set"]].map(([v, l]) => `<label><input type="radio" name="adj-${esc(a.id)}" value="${v}" ${attrs("acc", a.id, "adjustable", "text")}${((a.adjustable === true || a.adjustable === "yes") ? "yes" : "") === v ? " checked" : ""}${dis()}><span>${l}</span></label>`).join("")}</div></fieldset>`}
-    ${showOwner ? `<label class="bs-field"><span>Whose account</span><select class="bs-in" ${attrs("acc", a.id, "owner", "text")}${dis()}>${ownerOpts.map(([v, l]) => `<option value="${esc(v)}"${v === (a.owner || "") ? " selected" : ""}>${esc(l)}</option>`).join("")}</select></label>` : ""}
     <div class="bs-field"><span class="bs-label">${multi ? "Share of each person’s pay" : "Share of your pay"}</span>
       <ul class="bs-shares">${P.map(p => `<li class="${pc(p)}">
         <span class="bs-who">${multi ? `<span class="av sm">${esc((p.name || "?").charAt(0).toUpperCase())}</span>${esc(p.name || "Unnamed")}` : "Your pay"}</span>
         <span class="unit person"><input type="number" step="any" inputmode="decimal" ${attrs("acc", a.id, `split.${p.id}`, "pct")} value="${a.split[p.id] == null ? "" : +(a.split[p.id] * 100).toFixed(4)}" aria-label="${esc(p.name || "Their")} percent of pay to ${esc(a.name || "this account")}"${dis()}><i>%</i></span>
         <span class="bs-val">${K(`acc.${a.id}.v.${p.id}`)}</span>
         <small class="bs-sub">${multi ? esc(p.name || "Unnamed") + ": " : ""}${K(`tot.p.${p.id}`)} of pay allocated in total</small></li>`).join("")}</ul></div>
-    ${destFieldHTML(a)}
+    <details class="ind-detail ind-sheet-details"><summary>Allocation settings and destinations</summary>
+    ${typeField(a, S)}
+    ${a.role === "spending" ? "" : `<fieldset class="bs-field"><legend>Could this change if needed? ${tipq("Only if you say so. Marking it adds it to “room to adjust” on Budget and Home; it doesn’t change the plan. Leave it unset for anything you want to keep, like savings you rely on.")}</legend><div class="seg seg-radio">${[["yes", "Yes, it’s adjustable"], ["", "Not set"]].map(([v, l]) => `<label><input type="radio" name="adj-${esc(a.id)}" value="${v}" ${attrs("acc", a.id, "adjustable", "text")}${((a.adjustable === true || a.adjustable === "yes") ? "yes" : "") === v ? " checked" : ""}${dis()}><span>${l}</span></label>`).join("")}</div></fieldset>`}
+    ${showOwner ? `<label class="bs-field"><span>Whose account</span><select class="bs-in" ${attrs("acc", a.id, "owner", "text")}${dis()}>${ownerOpts.map(([v, l]) => `<option value="${esc(v)}"${v === (a.owner || "") ? " selected" : ""}>${esc(l)}</option>`).join("")}</select></label>` : ""}
+    ${destFieldHTML(a)}</details>
     ${appearanceHTML({ l: "acc", id: a.id, icon: a.icon, def: accIcon({ ...a, icon: null }), colour: a.colour, colours: OBJECT_COLOURS, defColour: app.colours[a.id] && !isObjectColour(a.colour) ? app.colours[a.id] : "var(--faint)", disabled: readOnly() })}
     ${!a.role && !readOnly() ? `<button class="btn danger-soft block" type="button" data-del="acc" data-i="${esc(a.id)}">Delete allocation</button>` : ""}`;
 }
@@ -148,14 +148,18 @@ function personSheet(p) {
 }
 
 /** Draw (or redraw) the open sheet from the current budget, keeping the cursor where it was. */
+let drawnSheet = null;
 function draw() {
   const s = UI.sheet; if (!s) return;
   const S = app.state, item = s.kind === "inv" ? S.invest : (s.kind === "goal" ? list(s.l) || [] : s.kind === "acc" ? S.accounts : s.kind === "sp" ? S.spend : s.kind === "nw" ? S.nw.accounts : S.people).find(x => x.id === s.id);
   if (!item || app.tab !== s.tab) { close(); return; } // deleted (here or by someone else), or left the tab
   const ae = document.activeElement, keep = ae && ae.closest && ae.closest("#sheet") && ae.dataset && ae.dataset.f ? { l: ae.dataset.l, i: ae.dataset.i, f: ae.dataset.f, v: ae.type === "radio" ? ae.value : null, s: ae.selectionStart } : null;
-  const y = $("#sheet").scrollTop;
+  const d = $("#sheet"), y = d.scrollTop;
+  const advanced = d.open && drawnSheet === s && d.querySelector(".ind-sheet-details")?.open;
+  drawnSheet = s;
   const title = item.name || { acc: "New allocation", sp: "New expense", nw: "New account", goal: "New goal", person: "Person" }[s.kind];
-  show(s.kind === "inv" ? "Assumptions" : title, s.kind === "inv" ? investSheet() : s.kind === "goal" ? goalSheet(s.l, item) : s.kind === "acc" ? accountSheet(item) : s.kind === "sp" ? expenseSheet(item) : s.kind === "nw" ? networthSheet(item) : personSheet(item));
+  show(s.kind === "inv" ? "Assumptions" : title, s.kind === "inv" ? investSheet() : s.kind === "goal" ? goalSheet(s.l, item) : s.kind === "acc" ? accountSheet(item) : s.kind === "sp" ? expenseSheet(item) : s.kind === "nw" ? networthSheet(item) : personSheet(item), s.kind);
+  if (advanced) d.querySelector(".ind-sheet-details").open = true;
   $("#sheet").scrollTop = y;
   if (keep) {
     const sel = `#sheet [data-l="${CSS.escape(keep.l)}"][data-i="${CSS.escape(keep.i)}"][data-f="${CSS.escape(keep.f)}"]${keep.v ? `[value="${CSS.escape(keep.v)}"]` : ""}`;
@@ -229,6 +233,8 @@ export function initBudgetSheets() {
     if (t.closest("[data-iv-edit]")) { UI.sheet = { kind: "inv", id: "inv", tab: app.tab }; draw(); app.refresh(); return; }
     const eg = t.closest("[data-edit-goal]"); if (eg && !eg.disabled) { openGoalSheet(eg.dataset.editGoal, eg.dataset.i); return; }
     const ep = t.closest("[data-edit-person]"); if (ep) { openPersonSheet(ep.dataset.editPerson); return; }
+    const im = t.closest("[data-inc-more]");
+    if (im) { toggleIncMore(im); return; }
     if (readOnly()) return;
     const oc = t.closest("[data-oc-pick]");
     if (oc && !oc.disabled) { // a colour is just how the item looks too
@@ -246,16 +252,6 @@ export function initBudgetSheets() {
       if (ic.dataset.icon) it.icon = ic.dataset.icon; else delete it.icon;
       changed({ full: true }); return;
     }
-    // Phase 10A: Budget's "Manage" menu (Rebalance, Reorder), and "Pay details" under the income
-    const mg = t.closest("[data-b-manage]");
-    if (mg) {
-      const canRb = app.state.accounts.length > 1 && app.C && app.C.incTotal > 0;
-      openPop(mg, `<div class="pop-h">Manage allocations</div>${canRb ? `<button class="item" type="button" data-mg="rebalance"><span>Rebalance</span><small>Move money from one allocation to another</small></button>` : ""}<button class="item" type="button" data-mg="reorder"><span>Reorder</span><small>Change the order they’re listed in</small></button>`,
-        b => { closePop(); if (b.dataset.mg === "rebalance") openRebalance(); else { UI.reorder = true; UI.reorderTab = app.tab; app.render(); } }, { label: "Manage allocations" });
-      return;
-    }
-    const im = t.closest("[data-inc-more]");
-    if (im) { toggleIncMore(im); return; }
     if (t.closest("[data-reorder]")) { const on = !(UI.reorder && UI.reorderTab === app.tab); UI.reorder = on; UI.reorderTab = app.tab; app.render(); return; }
     if (t.closest("[data-acc-new]")) { const id = addRow("acc"); UI.fresh = { id }; changed({ full: true }); openAccountSheet(id, { focusName: true }); return; }
     const sn = t.closest("[data-sp-new]");

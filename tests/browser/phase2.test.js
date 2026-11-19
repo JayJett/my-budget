@@ -20,7 +20,7 @@ test("viewers can look but not change anything", { skip }, async () => {
   await page.waitForFunction(() => document.querySelector("#saveText").textContent === "View only");
   assert.ok(await page.isVisible("text=You’re viewing Mum’s budget"));
   assert.equal(await page.locator("[data-person-new], [data-acc-new], [data-reorder]").count(), 0, "no add or reorder buttons");
-  await page.click('[data-edit-person="j"]');                        // viewers can still look at the details
+  if (!(await page.isVisible("#incMore"))) await page.click("[data-inc-more]"); await page.click('[data-edit-person="j"]');                        // viewers can still look at the details
   assert.equal(await page.isDisabled('#sheet [data-l="pp"][data-i="j"][data-f="pay"]'), true);
   assert.equal(await page.locator("#sheet [data-rmperson]").count(), 0);
   await page.click('#sheet [data-sheet="close"]');

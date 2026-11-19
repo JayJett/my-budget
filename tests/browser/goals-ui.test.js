@@ -31,20 +31,20 @@ test("a couple: summary, emergency fund, joint and each person's goals as cards,
   const { page, errors, ctx } = await goalsTab(CASES.rich, { width: 390 });
   assert.equal(await text(page, "gl.saved"), "$13,200");
   assert.equal(await text(page, "gl.saved.sub"), "of $103,600 total target");
-  assert.equal(await text(page, "gl.count"), "7"); assert.equal(await text(page, "gl.count.sub"), "2 reached"); // (Phase 9C.2: the count sits beside the saved amount)
-  assert.deepEqual(await page.$$eval(".gl-group h3", els => els.map(e => e.textContent)), ["Emergency fund", "Joint goals", "Jarden’s goals", "Madi’s goals"]);
-  assert.equal(await page.locator(".gl-main input, .gl-main select").count(), 0, "no form fields on the main screen");
-  assert.equal(await page.locator(".viewas").count(), 1, "one period switch, in the summary");
-  // cards: saved of target, plan per fortnight, estimate; reached goals say so in words, not just colour
+  assert.deepEqual(await page.$$eval(".gl-group h3", els => els.map(e => e.textContent)), ["Joint goals", "Jarden’s goals", "Madi’s goals"]);
+  assert.equal(await page.locator(".gl-main input, .gl-main select").count(), 0);
+  assert.equal(await page.locator(".viewas").isVisible(), false, "period switch belongs to Funding overview");
   assert.equal(await text(page, "g.g2.amt"), "$200 of $2,000");
-  assert.equal(await text(page, "g.g2.line"), "$392/fn · incl. $215 from Holiday", "the share passed down by the finished goal");
-  assert.equal(await text(page, "g.g2.st"), "Deadline passed");
-  assert.match(await page.textContent('[data-edit-goal="gj"][data-i="g1"]'), /Reached[\s\S]*\$3,000 of \$3,000[\s\S]*Share moved to New couch/);
-  assert.equal(await page.locator('[data-edit-goal="gj"][data-i="g1"] [data-k="g.g1.st"]').count(), 0);
-  // emergency fund: months of cover from the existing sum, and the plan from the Budget tab
-  assert.equal(await text(page, "ef.cover"), "2.5 months cover");
-  assert.equal(await text(page, "g.ef.line"), "$215/fn");
-  assert.equal(await text(page, "gj.c.j"), "100%"); assert.equal(await text(page, "gj.c.m"), "100%");
+  assert.match(await page.textContent('[data-edit-goal="gj"][data-i="g1"]'), /Reached[\s\S]*\$3,000 of \$3,000/);
+  await editGoal(page, "gj", "g2"); await page.click("#sheet .ind-sheet-details > summary");
+  assert.equal(await page.textContent('#sheet [data-k="g.g2.line"]'), "$392/fn · incl. $215 from Holiday");
+  assert.equal(await page.textContent('#sheet [data-k="g.g2.st"]'), "Deadline passed");
+  await closeSheet(page);
+  await editGoal(page, "ef", "ef");
+  assert.match(await page.textContent("#sheet .banner"), /covering 2\.5 months/);
+  await closeSheet(page);
+  assert.equal(await text(page, "gj.c.j"), "100%");
+  assert.equal(await text(page, "gj.c.m"), "100%");
   assert.equal(await page.locator("#app .attn:not([hidden])").count(), 0);
   assert.doesNotMatch(await page.textContent("#app"), /NaN|Infinity|undefined/);
   await page.screenshot({ path: join(SHOTS, "goals-390.png"), fullPage: true });
@@ -53,10 +53,11 @@ test("a couple: summary, emergency fund, joint and each person's goals as cards,
 
 test("one person: no couple wording, no empty partner sections", { skip }, async () => {
   const { page, errors, ctx } = await goalsTab(CASES.mixed);
-  assert.deepEqual(await page.$$eval(".gl-group h3", els => els.map(e => e.textContent)), ["Emergency fund", "Goals", "Personal goals"]);
+  assert.deepEqual(await page.$$eval(".gl-group h3", els => els.map(e => e.textContent)), ["Goals", "Personal goals"]);
   assert.doesNotMatch(await page.textContent("#app"), /Joint|Madi|both of you|partner/i);
   assert.equal(await text(page, "g.g1.accflag"), "Not in a savings account", "a goal kept in an everyday account is flagged");
-  assert.equal(await text(page, "ef.cover"), "1.7 months cover");
+  await editGoal(page, "ef", "ef");
+  assert.match(await page.textContent("#sheet .banner"), /covering 1\.7 months/);
   assert.deepEqual(errors, []); await ctx.close();
 });
 
@@ -70,16 +71,17 @@ test("edge cases: overfunded, no target, no plan, no spending data, no saved amo
   assert.equal(await text(o.page, "g.g3.amt"), "$2,000 of $1,500", "the real saved amount, not clamped");
   assert.equal(await o.page.$eval('[data-k="g.g3.bar"]', e => e.style.width), "100%");
   assert.equal(await text(o.page, "g.g1.amt"), "$1,000 saved");
-  assert.equal(await text(o.page, "g.g1.st"), "Needs a target");
-  assert.equal(await text(o.page, "g.g1.line"), "Nothing going to it yet");
-  assert.equal(await text(o.page, "ef.cover"), "Cover unknown");
+  await editGoal(o.page, "gj", "g1"); await o.page.click("#sheet .ind-sheet-details > summary");
+  assert.equal(await o.page.textContent('#sheet [data-k="g.g1.st"]'), "Needs a target");
+  assert.equal(await o.page.textContent('#sheet [data-k="g.g1.line"]'), "Nothing going to it yet");
+  await closeSheet(o.page); await editGoal(o.page, "ef", "ef");
+  assert.match(await o.page.textContent("#sheet .banner"), /Add spending categories/);
+  await closeSheet(o.page);
   assert.equal(await text(o.page, "gj.c.j"), "100% left");
   assert.doesNotMatch(await o.page.textContent("#app"), /NaN|Infinity|undefined/);
   assert.deepEqual(o.errors, []); await o.ctx.close();
   o = await goalsTab(CASES.empty, { width: 390 });
-  assert.equal(await text(o.page, "gl.saved"), "$0");
-  assert.equal(await text(o.page, "ef.cover"), "", "nothing saved: no cover figure");
-  assert.equal(await text(o.page, "g.ef.amt"), "$0 saved");
+  assert.equal(await o.page.locator(".gl-sum").count(), 0, "no zero-value dashboard in the empty state");
   assert.equal(await o.page.locator(".gl-first [data-goal-new]").count(), 1, "one clear way to add the first goal");
   assert.doesNotMatch(await o.page.textContent("#app"), /NaN|Infinity|undefined/);
   assert.deepEqual(o.errors, []); await o.ctx.close();
@@ -94,12 +96,13 @@ test("goal sheet: every field saves, the plan updates while editing, and over-al
   await page.fill('#sheet [data-f="name"]', "Sofa");
   await setField(page, '#sheet [data-f="saved"]', "250.5");
   await setField(page, '#sheet [data-f="target"]', "2500");
+  if (!await page.locator("#sheet .ind-sheet-details").evaluate(e => e.open)) await page.click("#sheet .ind-sheet-details summary");
   await page.fill('#sheet [data-f="deadline"]', "2027-06-01");
   await closeSheet(page); await settle(page);
   const g = (await saved(page)).goals.joint.g2;
   assert.deepEqual([g.name, g.saved, g.target, g.split.j, g.deadline, g.account], ["Sofa", 250.5, 2500, 0.7, "2027-06-01", "Joint Savings"]);
   assert.equal(await text(page, "gj.c.j"), "Over 100%");
-  assert.equal(await page.locator('.gl-alloc [data-k="gj.c.j"].bad').count(), 1, "the warning stays on the main screen");
+  assert.match(await page.locator(".gl-fund-alert").filter({hasText:"Goal shares exceed 100%"}).innerText(), /exceed 100%/);
   assert.equal(await text(page, "g.g2.amt"), "$250.50 of $2,500");
   // the account picker only links; no balance changes
   await editGoal(page, "gp:j", "g4");
@@ -130,7 +133,7 @@ test("add: closing a blank goal leaves nothing; the + Add goal menu picks the li
   await page.waitForSelector('#sheet [data-f="name"]:focus');
   await closeSheet(page); await settle(page);
   assert.equal(Object.keys((await saved(page)).goals.joint).length, 3, "no empty goal left behind");
-  await page.click('.add-row[data-goal-new="pick"]');
+  await page.click('.ind-page-head [data-goal-new="pick"]');
   assert.deepEqual(await page.$$eval("#pop [data-pick-goal] span", els => els.map(e => e.textContent)), ["Joint goals", "Jarden’s goals", "Madi’s goals"]);
   await page.click('#pop [data-pick-goal="gp:m"]');
   await page.waitForSelector('#sheet [data-f="name"]:focus');
@@ -152,20 +155,23 @@ test("reorder: touch-friendly up/down; the existing engine passes a finished goa
   const { page, errors, ctx } = await goalsTab(CASES.rich);
   await page.click("[data-reorder]");
   assert.equal(await page.locator("[data-edit-goal]").count(), 0, "cards don't open while reordering");
-  assert.match(await page.textContent(".gl-main"), /Goals higher in a list are funded first/);
+  assert.match(await page.textContent(".gl-main"), /Goals at the top are funded first/);
   await page.click('[data-move="up"][data-l="gj"][data-i="g3"]'); await settle(page);
   const order = Object.values((await saved(page)).goals.joint).sort((a, b) => a.pos - b.pos).map(g => g.id);
   assert.deepEqual(order, ["g1", "g3", "g2"]);
   await page.click("[data-reorder]");
-  assert.equal(await text(page, "g.g1.line"), "Share moved to House deposit");
+  await editGoal(page, "gj", "g1");
+  assert.equal(await page.textContent('#sheet [data-k="g.g1.line"]'), "Share moved to House deposit");
   assert.deepEqual(errors, []); await ctx.close();
 });
 
 test("cross-tab: Budget feeds the plan, Net worth sees goal edits, period switch only changes the display", { skip }, async () => {
   const { page, errors, ctx } = await goalsTab(CASES.rich);
   const before = await text(page, "gp.jg");
+  if (!await page.isVisible(".gl-pools .viewas")) await page.click(".gl-pools > summary");
   await page.click('[data-viewas="month"]');
   assert.equal(await text(page, "gl.per"), "/mo");
+  if (!await page.isVisible(".gl-pools .viewas")) await page.click(".gl-pools > summary");
   await page.click('[data-viewas="fortnight"]');
   assert.equal(await text(page, "gp.jg"), before, "switching period back and forth changes nothing");
   await goTab(page, "budget");
