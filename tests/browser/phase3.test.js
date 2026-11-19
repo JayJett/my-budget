@@ -179,9 +179,11 @@ test("phone: tooltips appear when you tap a ?, and never get left over the scree
   await page.tap('[data-tab="goals"]');
   await page.waitForSelector('[data-tab="goals"][aria-selected="true"]');
   assert.equal(await page.evaluate(() => document.querySelector("#tt").classList.contains("on")), false, "tapping a tab shows no tooltip");
-  await page.tap(".gl-sum .qi");
+  await page.tap("[data-edit-goal]");
+  await page.locator("#sheet .bsheet").waitFor();
+  await page.locator("#sheet .bs-field .qi").first().tap();
   assert.equal(await page.evaluate(() => document.querySelector("#tt").classList.contains("on")), true, "tapping ? shows its tip");
-  await page.tap("h2");
+  await page.tap("#sheet h3");
   assert.equal(await page.evaluate(() => document.querySelector("#tt").classList.contains("on")), false, "tapping elsewhere hides it");
   assert.deepEqual(errors, []);
   await ctx.close();

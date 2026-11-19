@@ -44,7 +44,7 @@ test("allocation sheet: changing a share saves just that change, and status and 
   assert.equal(await page.textContent('#sheet [data-k="tot.p.m"]'), "95%", "Madi's total, live in the sheet");
   await closeSheet(page);
   assert.match(await page.textContent('[data-k="st.m.t"]'), /^5% left · \$95$/);
-  assert.equal(await page.textContent('[data-k="st.summary"]'), "$95 left to allocate");
+  assert.equal(await page.textContent('[data-k="st.display"]'), "$95 left to allocate");
   assert.equal(await page.isVisible('[data-st="m"]'), true, "Madi is listed while she has pay left");
   assert.equal(await page.isVisible('[data-st="j"]'), false, "Jarden, who's done, isn't");
   assert.equal(await page.isVisible('[data-fill="m"]'), true, "Fill is offered");
@@ -61,6 +61,7 @@ test("allocation sheet: type and owner, add, delete, reorder", { skip }, async (
   await settle(page);
   // Type: Personal shows "Whose account"; the sheet redraws in place
   await editAccount(page, "ji");
+  await page.click("#sheet .ind-sheet-details > summary");
   await page.click('#sheet label:has(input[value="Personal"])');
   await page.waitForSelector('#sheet [data-f="owner"]');
   await page.selectOption('#sheet [data-f="owner"]', "m");
@@ -121,11 +122,11 @@ test("person sheet: pay, how often, payday and colour all save; someone else's c
 test("one person: no partner fields, no fair split, plain wording", { skip }, async () => {
   const { page, errors, ctx } = await open(SINGLE);
   await settle(page);
-  assert.equal(await page.textContent(".b-income .eyebrow"), "Income");
+  assert.equal(await page.textContent(".b-income .ind-kicker"), "Income");
   assert.equal(await page.locator("[data-edit-person]").count(), 1);
   assert.equal(await page.isVisible("#fairSec"), false);
   assert.equal(await page.locator(".st-name, .a-parts, #ribbon").count(), 0, "no per-person labels when there's one person");
-  assert.equal(await page.textContent('[data-k="st.summary"]'), "All $2,400 allocated");
+  assert.equal(await page.textContent('[data-k="st.display"]'), "Pay fully allocated");
   assert.equal(await page.isVisible("#allocStatus .st-list"), false, "no bars once everything's allocated");
   assert.equal(await page.locator("#brandNames small").count(), 0);
   await editAccount(page, "js");

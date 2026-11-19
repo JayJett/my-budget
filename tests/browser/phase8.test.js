@@ -48,7 +48,7 @@ test("Just me: a solo plan with one Goals allocation, nothing labelled Joint, an
   assert.deepEqual(acc.map(a => a.role), ["spending", null, "emergency", "goals", "invest"]);
   const meta = await page.$$eval(".alloc .a-meta", e => e.map(x => x.textContent));
   meta.forEach(m => assert.doesNotMatch(m, /Joint|Personal/));
-  assert.match(meta[0], /^Bills · 50% of pay$/);
+  assert.equal(meta.length, 0, "allocation details live in the editor");
   assert.doesNotMatch(await page.textContent("#app"), /Joint/);
   assert.equal(await page.isVisible("#undoBtn"), false, "the plan isn't something to undo");
   // the edit sheet says "Kind: Everyday money / Investing", and changing a % still works
@@ -74,7 +74,7 @@ test("With someone, before they've joined: a shared plan that stays shared", { s
   assert.equal(b.mode, "shared");
   assert.equal(acc.find(a => a.role === "spending").type, "Joint");
   assert.equal(acc.filter(a => a.role === "personalGoals").length, 1);
-  assert.match((await page.$$eval(".alloc .a-meta", e => e.map(x => x.textContent)))[0], /^Joint/);
+  assert.match(await page.getAttribute('[data-edit-acc="js"]', "aria-label"), /shared/);
   await openHousehold(page);
   assert.equal(await page.getAttribute('[data-hh-mode="shared"]', "aria-pressed"), "true", "one member so far, but still shared");
   assert.deepEqual(errors, []); await ctx.close();
@@ -92,7 +92,7 @@ test("Household settings: switching between Just me and With others changes word
   assert.equal(JSON.stringify((await budgetOf(page)).accounts), before, "no allocation changed");
   await page.click('#sheet [data-sheet="close"]');
   assert.match(await page.textContent('[data-tab="spending"]'), /Expenses/);
-  assert.match((await page.$$eval(".alloc .a-meta", e => e.map(x => x.textContent)))[0], /^Joint/);
+  assert.match(await page.getAttribute('[data-edit-acc="js"]', "aria-label"), /shared/);
   await openHousehold(page);
   await page.click('[data-hh-mode="solo"]'); await settle(page);
   assert.equal((await budgetOf(page)).mode, "solo");
@@ -108,9 +108,14 @@ test("an older solo budget with two goal pots: offered (never forced), reviewed,
   const { page, errors, ctx } = await open(toStored(s), { ...phone(), storage: ALL_DONE });
   const before = await budgetOf(page);
   await goTab(page, "goals");
-  await page.waitForSelector(".hm-combine");
+  await page.click(".gl-pools > summary"); await page.waitForSelector(".hm-combine");
   assert.equal(JSON.stringify(await budgetOf(page)), JSON.stringify(before), "showing the offer changes nothing");
-  const amt = async id => page.textContent(`[data-k="g.${id}.line"]`);
+  const amt = async id => {
+    await page.locator(`[data-edit-goal][data-i="${id}"]`).click();
+    const result = await page.textContent(`#sheet [data-k="g.${id}.line"]`);
+    await page.locator('#sheet [data-sheet="close"]').click();
+    return result;
+  };
   const was = { g1: await amt("g1"), p1: await amt("p1") };
   await page.click('[data-combine="review"]'); await page.waitForSelector(".hm-review");
   assert.match(await page.textContent(".hm-review"), /After combining, one Goals allocation gets 15%/);
@@ -137,7 +142,7 @@ test("an older solo budget with two goal pots: offered (never forced), reviewed,
 test("'Not now' hides the offer on this device; it's still in Household settings", { skip }, async () => {
   const s = blankBudget({ name: "Sam" }); s.people[0].pay = 2000;
   const { page, errors, ctx } = await open(toStored(s), { ...phone(), storage: ALL_DONE });
-  await goTab(page, "goals"); await page.waitForSelector(".hm-combine");
+  await goTab(page, "goals"); await page.click(".gl-pools > summary"); await page.waitForSelector(".hm-combine");
   await page.click('[data-combine="later"]');
   assert.equal(await page.locator(".hm-combine").count(), 0);
   await goTab(page, "budget"); await goTab(page, "goals");

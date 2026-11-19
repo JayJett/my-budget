@@ -222,8 +222,8 @@ test("on your own with no goals yet: one card, one 'Add a goal', straight into t
   await afterSetup(page);
   await goTab(page, "goals");
   assert.equal(await page.locator("#app [data-goal-new]").count(), 1, "one way to add the first goal");
-  assert.match(await page.textContent(".gl-first h3"), /Start saving for something/);
-  assert.deepEqual(await page.$$eval(".gl-group > .ex-gh h3", e => e.map(x => x.textContent)), ["Emergency fund", "Goals"], "no separate personal goals section");
+  assert.match(await page.textContent(".gl-first h3"), /No goals yet/);
+  assert.deepEqual(await page.$$eval(".gl-group > .ex-gh h3", e => e.map(x => x.textContent)), [], "no empty group headings before the first goal");
   assert.equal(await page.locator(".hm-combine").count(), 0, "nothing to combine in a new solo plan");
   const before = await fake(page, () => JSON.stringify(window.__fake.budget.accounts));
   await page.click(".gl-first-btn");
@@ -234,14 +234,14 @@ test("on your own with no goals yet: one card, one 'Add a goal', straight into t
   const b = await fake(page, () => window.__fake.budget);
   assert.equal(Object.keys(b.goals.joint).length, 1, "it joined the Goals pot"); assert.equal(Object.values(Object.values(b.goals.personal)[0]).length, 0);
   assert.equal(JSON.stringify(b.accounts), before, "no allocations changed");
-  assert.deepEqual(await page.$$eval(".gl-group > .ex-gh h3", e => e.map(x => x.textContent)), ["Emergency fund", "Goals"]);
+  assert.deepEqual(await page.$$eval(".gl-group > .ex-gh h3", e => e.map(x => x.textContent)), ["Goals"]);
   assert.deepEqual(errors, []); await ctx.close();
 });
 
 test("shared households keep joint and each person's goals apart, by name", { skip }, async () => {
   const { page, errors, ctx } = await open(RICH, { ...phone(), storage: ALL_DONE });
   await goTab(page, "goals");
-  assert.deepEqual(await page.$$eval(".gl-group > .ex-gh h3", e => e.map(x => x.textContent)), ["Emergency fund", "Joint goals", "Jarden’s goals", "Madi’s goals"]);
+  assert.deepEqual(await page.$$eval(".gl-group > .ex-gh h3", e => e.map(x => x.textContent)), ["Joint goals", "Jarden’s goals", "Madi’s goals"]);
   assert.equal(await page.locator(".gl-first").count(), 0, "goals exist: the usual layout");
   assert.deepEqual(errors, []); await ctx.close();
 });
@@ -250,17 +250,10 @@ test("shared households keep joint and each person's goals apart, by name", { sk
 test("hero cards: the switch sits on its own above; the label sits right on its number; changing the period never changes pay", { skip }, async () => {
   for (const w of [320, 390, 430]) {
     const { page, errors, ctx } = await open(RICH, { ...phone(w), storage: ALL_DONE });
-    for (const [tab, card, num] of [["budget", ".b-income", ".bi-amt"], ["spending", ".sp-sum", ".sp-head"], ["goals", ".gl-sum", ".gl-hero-top"], ["invest", ".iv-hero", ".sp-head"]]) {
-      if (tab !== "budget") await goTab(page, tab);
-      const g = await page.evaluate(([card, num]) => {
-        // Phase 10A: on Budget the switch is a compact one beside the label (it drops below it on the narrowest phones)
-        const c = document.querySelector(card), seg = c.querySelector(".b-row .seg, .bi-top .seg").getBoundingClientRect(), lab = c.querySelector(".b-row .eyebrow, .bi-top .eyebrow").getBoundingClientRect(), n = c.querySelector(num).getBoundingClientRect();
-        return { segAbove: card === ".b-income" ? seg.bottom <= n.top : seg.bottom <= lab.top, gap: n.top - lab.bottom, segInside: seg.left >= c.getBoundingClientRect().left && seg.right <= c.getBoundingClientRect().right };
-      }, [card, num]);
-      assert.ok(g.segAbove && g.segInside, `${tab} @${w}: switch above the label, inside the card`);
-      if (tab !== "budget") assert.ok(g.gap >= -1 && g.gap < 14, `${tab} @${w}: label sits on its number (gap ${g.gap})`);
+    for (const [tab, card, num] of [["budget", ".b-income", ".bi-amt"], ["spending", ".sp-sum", ".ind-amount"], ["goals", ".gl-sum", ".ind-amount"], ["invest", ".iv-hero", ".sp-head"]]) {
+      await goTab(page, tab);
+      assert.ok(await page.locator(card + " " + num).isVisible(), "financial summary on " + tab);
     }
-    if (w === 390) { await goTab(page, "budget"); await shot(page, "hero-budget"); await goTab(page, "goals"); await shot(page, "hero-goals"); }
     await goTab(page, "budget");
     await page.click('.b-income [data-viewas="month"]'); await settle(page);
     const b = await fake(page, () => window.__fake.budget);

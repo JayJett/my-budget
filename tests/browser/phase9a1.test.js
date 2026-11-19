@@ -92,7 +92,7 @@ test("step 4: '+ Add an account' is the main button and 'Skip for now' a quiet l
 test("'A recent payday' fits inside the sheet at 320–430px, and a changed date is saved", { skip }, async () => {
   for (const w of [320, 375, 390, 430]) {
     const { page, errors, ctx } = await open(RICH, { ...phone(w, 760), storage: ALL_DONE });
-    await page.click("[data-edit-person]"); await page.waitForSelector('#sheet [data-f="payday"]');
+    if (!(await page.isVisible("#incMore"))) await page.click("[data-inc-more]"); await page.click("[data-edit-person]"); await page.waitForSelector('#sheet [data-f="payday"]');
     const r = await page.$eval('#sheet [data-f="payday"]', e => { const a = e.getBoundingClientRect(), b = e.closest(".bs-field").getBoundingClientRect(), s = e.closest("#sheet"); return [a.left >= b.left - 0.5, a.right <= b.right + 0.5, s.scrollWidth <= s.clientWidth + 1]; });
     assert.deepEqual(r, [true, true, true], `w=${w}`);
     const pay = await page.$eval('#sheet .bs-pay', e => { const a = e.getBoundingClientRect(), b = e.closest(".bs-field").getBoundingClientRect(); return a.right <= b.right + 0.5; });

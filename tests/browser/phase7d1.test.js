@@ -193,11 +193,11 @@ test("Goals with no goals: one first-goal card, stacked; a button with a one-lin
     await page.click(".ob-later"); await page.waitForSelector("#app .b-income");
     await goTab(page, "goals");
     assert.equal(await page.locator(".gl-first").count(), 1, "one first-goal card");
-    assert.equal(await page.locator(".gl-first .empty-art").count(), 1);
+    assert.equal(await page.locator(".gl-first .gl-ic").count(), 1);
     const card = await rect(page, ".gl-first"), btn = await rect(page, ".gl-first-btn"), h3 = await rect(page, ".gl-first h3");
     assert.ok(btn.h < 56, `the button is one line tall (${btn.h}px)`);
     assert.ok(btn.top > h3.bottom, "button below the words, not beside them");
-    for (const s of [".gl-first h3", ".gl-first p", ".gl-first-btn", ".gl-first .empty-art"]) {
+    for (const s of [".gl-first h3", ".gl-first p", ".gl-first-btn", ".gl-first .gl-ic"]) {
       const r = await rect(page, s); assert.ok(r.left >= card.left - 0.5 && r.right <= card.right + 0.5, `${s} inside the card`);
     }
     assert.ok(card.h < 420, `card isn't oversized (${card.h}px)`);

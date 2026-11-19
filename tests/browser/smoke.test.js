@@ -151,7 +151,7 @@ test("a brand-new household opens the setup guide; skipping it gives one person 
   assert.equal(await page.locator(".tab", { hasText: "Expenses" }).count(), 1);
   const calls = await fake(page, () => window.__fake.rpcCalls.filter(c => c.name === "apply_budget_ops"));
   assert.equal(calls.length, 0, "nothing is saved until you change something");
-  await page.click("[data-edit-person]");
+  if (!(await page.isVisible("#incMore"))) await page.click("[data-inc-more]"); await page.click("[data-edit-person]");
   await setField(page, '#sheet [data-l="pp"][data-f="pay"]', "3000");
   await settle(page);
   assert.equal(Object.values((await fake(page, () => window.__fake.budget)).people)[0].pay, 3000);

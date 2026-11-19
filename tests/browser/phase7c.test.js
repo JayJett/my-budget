@@ -166,7 +166,7 @@ test("tours on empty tabs make sense, skip what isn't there, and replay from the
   await page.click('[data-tour="end"]');
   // Goals with no goals: the first-goal card, and the tour points at it
   await goTab(page, "goals");
-  assert.match(await page.textContent(".gl-first"), /Start saving for something/);
+  assert.match(await page.textContent(".gl-first"), /No goals yet/);
   await page.click("#menuBtn"); await page.click('#drawer [data-act="tours"]'); await page.click('#drawer [data-tour-replay="goals"]');
   await page.waitForSelector(".tour:not([hidden])");
   let titles = [await page.textContent("#tourT")];
