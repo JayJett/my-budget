@@ -79,7 +79,17 @@ test("Indigo finance pages fit the mobile and desktop widths, including large te
    const {page,ctx,errors}=await openSample("budget","large",width%2===0,width);
    await page.evaluate(()=>{document.documentElement.style.fontSize="150%";});
    for(const [route,selector] of [["budget",".alloc-row"],["spending",".ex-row"],["goals",".gl-card"]]){
-     if(route!=="budget")await page.locator('#tabs [data-tab="'+route+'"]').click();
+     if(route!=="budget"){
+       const tab=page.locator('#tabs [data-tab="'+route+'"]');
+       const hit=await tab.evaluate(el=>{
+         const {left,top,width,height}=el.getBoundingClientRect();
+         const target=document.elementFromPoint(left+width/2,top+height/2);
+         return el.contains(target) ? null : { target:target?.outerHTML.slice(0,150), top, scroll:scrollY, viewport:visualViewport.height, offset:visualViewport.offsetTop, scale:visualViewport.scale };
+       });
+       assert.equal(hit,null,width+" "+route+" tab hit area "+JSON.stringify(hit));
+       if(width<600)await tab.tap();
+       else await tab.click();
+     }
      const row=page.locator(selector).first(); await row.waitFor();
      const surface=await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1);
      assert.equal(surface,true,width+" "+route);
@@ -104,6 +114,8 @@ test("Indigo finance pages fit the mobile and desktop widths, including large te
      });
      assert.equal(overflow, null, width+" "+route+" sheet "+JSON.stringify(overflow));
      await page.keyboard.press("Escape");
+     await page.locator("#sheet").waitFor({state:"hidden"});
+     await page.waitForFunction(()=>!document.documentElement.classList.contains("scroll-locked"));
    }
    assert.deepEqual(errors,[]);await ctx.close();
  }
