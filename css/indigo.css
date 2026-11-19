@@ -307,7 +307,9 @@ dialog.sheet:has([data-finance-sheet]:is([data-finance-sheet=acc],[data-finance-
   --ink:var(--ind-ink); --muted:var(--ind-muted); --line:var(--ind-line);
   border-color:var(--ind-line); color:var(--ind-ink); background:var(--ind-surface); font-family:var(--ind-font);
 }
-#sheet:has([data-finance-sheet]:is([data-finance-sheet=acc],[data-finance-sheet=sp],[data-finance-sheet=goal],[data-finance-sheet=person])) .sheet-head button { min-height:44px; }
+#sheet:has(> :is([data-finance-sheet=acc],[data-finance-sheet=sp],[data-finance-sheet=goal],[data-finance-sheet=person])) > .sheet-head { gap:8px; }
+#sheet:has(> :is([data-finance-sheet=acc],[data-finance-sheet=sp],[data-finance-sheet=goal],[data-finance-sheet=person])) > .sheet-head h3 { min-width:0; overflow-wrap:anywhere; }
+#sheet:has(> :is([data-finance-sheet=acc],[data-finance-sheet=sp],[data-finance-sheet=goal],[data-finance-sheet=person])) > .sheet-head button { flex:none; min-height:44px; }
 #sheet [data-finance-sheet]:is([data-finance-sheet=acc],[data-finance-sheet=sp],[data-finance-sheet=goal],[data-finance-sheet=person]) :is(input,select,textarea) { font-size:max(16px,1rem); }
 #sheet .ind-sheet-details { margin:10px 0; padding:0 10px; border:1px solid var(--ind-line); border-radius:12px; }
 #sheet .ind-sheet-details > summary { color:var(--accent); }
