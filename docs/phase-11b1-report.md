@@ -28,6 +28,8 @@ The Playbook follows the proposed person picker, pay summary and instruction gro
 - The visual changes leave the calculation model, household store, migration files and production records outside the diff. The default scope for a Playbook opened from a reminder or Budget is preserved.
 - Draft deployment remains separate. If a released build needs rollback, use a verified frontend retaining the Phase 12A isolation fix and issue a new service-worker version. Preserve existing scoped drafts.
 
+- The desktop Expenses summary no longer sticks over Reorder when the expenses list shares its column with the summary. Expenses calculations and editing stay on their existing paths.
+
 ## Manual iPhone review
 
 1. Use a private review server from the branch with a synthetic fixture or sandbox account for both solo and shared households. Open it in Safari and add the review copy to the Home Screen. Check both in portrait at default and largest useful text sizes.

@@ -77,6 +77,11 @@
 body:not(.signed-out,.setting-up) :is(.toast,.update-bar,.tinv) { bottom:calc(84px + env(safe-area-inset-bottom, 0px)); }
 body:has(#app .home)::before { background:var(--ind-canvas); }
 
+/* The Expenses list shares the summary's grid column when Essentials is present. */
+@media (min-width:1000px) {
+  .sp-page:has(> .sp-ess) > .sp-sum { position:static; }
+}
+
 /* Shared, opt-in components. */
 .ind-card { min-width:0; border:0; border-radius:var(--ind-radius); background:var(--ind-surface); }
 .ind-title { margin:0; font:780 2rem/1.08 var(--ind-font); letter-spacing:-.05em; color:var(--ind-ink); }
