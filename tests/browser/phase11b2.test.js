@@ -90,7 +90,19 @@ test("Indigo finance pages fit the mobile and desktop widths, including large te
        await summary.focus();await page.keyboard.press("Enter");
        assert.equal(await summary.evaluate(e=>e.parentElement.open),true);
      }
-     assert.equal(await page.locator("#sheet").evaluate(e=>e.scrollWidth>e.clientWidth+1),false,width+" "+route+" sheet");
+     const overflow = await page.locator("#sheet").evaluate(sheet => {
+       if (sheet.scrollWidth <= sheet.clientWidth + 1) return null;
+       const bounds = sheet.getBoundingClientRect();
+       const right = Math.round(bounds.left + sheet.clientLeft + sheet.clientWidth);
+       const elements = [...sheet.querySelectorAll("*")].flatMap(el => {
+         const rect = el.getBoundingClientRect();
+         if (!rect.width || !rect.height || rect.right <= right + 1 && el.scrollWidth <= el.clientWidth + 1) return [];
+         const style = getComputedStyle(el);
+         return [{tag:el.tagName, class:el.getAttribute("class"), width:Math.round(rect.width), right:Math.round(rect.right), inner:el.clientWidth, content:el.scrollWidth, position:style.position, overflow:style.overflowX, text:el.textContent.trim().slice(0,90)}];
+       });
+       return {viewport:innerWidth, width:sheet.clientWidth, content:sheet.scrollWidth, right, elements:elements.slice(0,20)};
+     });
+     assert.equal(overflow, null, width+" "+route+" sheet "+JSON.stringify(overflow));
      await page.keyboard.press("Escape");
    }
    assert.deepEqual(errors,[]);await ctx.close();
