@@ -31,13 +31,6 @@ const initial = p => (p.name || "?").trim().charAt(0).toUpperCase() || "?";
 /** On your own, an allocation is described by what it's for, not whose it is (it's all yours). */
 const PURPOSE = { spending: "Bills", emergency: "Safety net", goals: "Goals", personalGoals: "Goals", invest: "Investing" };
 export const purposeWord = a => PURPOSE[a.role] || (a.type === "Investment" ? "Investing" : "Yours");
-/** "Joint", "Personal · Madi", "Investment"; on your own: "Bills & spending", "Goals", "Investing"… */
-function typeLine(a, P, S) {
-  if (!isShared(S)) return purposeWord(a);
-  const owner = a.owner && P.length > 1 ? P.find(p => p.id === a.owner) : null;
-  return [TYPE_WORD[a.type] || a.type || "", owner ? owner.name || "Unnamed" : ""].filter(Boolean).join(" · ");
-}
-
 /* ---------- Phase 10A: how things are shown (never what they're worth) ----------
    Names: in a shared budget, an allocation that belongs to someone is often named after them
    ("Jarden — Personal Goals", "Madi Spending"). Their name is already on the line underneath, in their
@@ -74,58 +67,55 @@ export function view() {
       <span class="bi-name m-name">${esc(p.name || "Unnamed")}</span>
       ${multi ? `<span class="bi-v">${K(`inc.${p.id}.v`)}</span><span class="bi-sh">${K(`inc.${p.id}.share`)}</span>` : `<span class="bi-line">${K(`pp.${p.id}.freq`)}</span>`}${CHEV}</button></li>`).join("")}</ul>`;
   const more = `<div class="bi-more" id="incMore"${incMore ? "" : " hidden"}>
+      ${multi ? `<div class="bi-bar split" id="incBar" role="img"></div>` : ""}${people}
       <ul class="bi-pays">${P.map(p => `<li class="${pc(p)}"><b>${esc(p.name || "Unnamed")}</b><span>${K(`pp.${p.id}.line`)}</span><small>${K(`inc.${p.id}.sub`)}</small></li>`).join("")}</ul>
       ${!ro && P.length < MAX_PEOPLE ? `<button class="link-btn bi-add" type="button" data-person-new>+ Add a person</button>` : ""}</div>`;
-  const income = `<section class="card b-income">
-    <div class="bi-top"><span class="eyebrow">${multi ? "Household income" : "Income"}</span>${seg}</div>
+  const income = `<section class="ind-card b-income">
+    <div class="bi-top"><span class="ind-kicker">${multi ? "Household income" : "Income"}</span></div>
     <p class="bi-amt"><span class="amt">${K("inc.c")}</span><span class="per">${esc(w.per)}</span></p>
-    ${multi ? `<div class="bi-bar split" id="incBar" role="img"></div>` : ""}
-    ${people}
+    ${seg}
     <div class="b-inc-acts"><button class="link-btn bi-more-btn" type="button" data-inc-more aria-expanded="${incMore}" aria-controls="incMore">Pay details${DOWN}</button></div>
     ${more}
   </section>`;
 
   // 2. Status: one card. How much has a plan (people only listed when someone isn't done), whether the
   //    entered expenses fit their budget (its own check, never implied by the first), and the next payday.
-  const status = `<section class="card b-status" id="allocStatus" aria-live="polite">
+  const status = `<section class="ind-card b-status" id="allocStatus" aria-live="polite">
     <div class="bs-top"><span data-k="st.ic" data-base="bs-ic" class="bs-ic" aria-hidden="true"></span>
-      <div class="bs-t"><p class="bs-h">${K("st.summary")}</p><p class="bs-s">${K("st.sub")}</p></div></div>
+      <div class="bs-t"><p class="bs-h">${K("st.display")}</p><p class="bs-s">${K("st.sub")}</p></div></div>
     <ul class="st-list" hidden>${P.map(p => `<li class="${pc(p)}" data-st="${esc(p.id)}">
       ${multi ? `<span class="st-name">${esc(p.name || "Unnamed")}</span>` : ""}
       <span class="st-bar"><span data-k="st.${esc(p.id)}.bar"></span></span>
       <span class="st-v">${K(`st.${p.id}.t`, "st-t")}</span>${ro ? "" : `<span data-k="fill.${esc(p.id)}"></span>`}</li>`).join("")}</ul>
     ${planCheckHTML(S, app.C)}
-    ${anyPay ? `<button class="bs-pay" type="button" data-pb-open><span class="bs-pay-ic">${CAL}</span><span class="bs-pay-t"><b>Payday plan</b><small>${K("pd.when")}</small></span>${CHEV}</button>` : ""}
   </section>`;
+  const payday = anyPay ? `<button class="bs-pay ind-row" type="button" data-pb-open><span class="bs-pay-ic">${CAL}</span><span class="bs-pay-t"><b>Payday plan</b><small>${K("pd.when")}</small></span>${CHEV}</button>` : "";
 
   // 3. Allocations: the main list. Amounts are all per the chosen period, said once in the heading.
   const head = ro ? "" : ui.reorder ? `<button class="btn small ghost" type="button" data-reorder aria-pressed="true">Done</button>`
-    : `<button class="btn small ghost b-add" type="button" data-acc-new><span aria-hidden="true">+</span> Add</button><button class="btn small ghost b-manage" type="button" data-b-manage aria-haspopup="menu" aria-expanded="false">Manage${DOWN}</button>`;
+    : `<button class="ind-link b-add" type="button" data-acc-new><span aria-hidden="true">+</span> Add allocation</button>`;
   const row = (a, i) => {
-    const solo = !multi, joint = multi && !(a.type === "Personal" && a.owner), full = a.name || "Unnamed", short = shortName(a, P, S);
+    const joint = multi && !(a.type === "Personal" && a.owner), full = a.name || "Unnamed", short = shortName(a, P, S);
     const owner = a.owner && multi ? P.find(p => p.id === a.owner) : null;
-    const meta = joint ? `<span class="a-meta a-parts">${P.map(p => `<span data-k="acc.${esc(a.id)}.part.${esc(p.id)}" data-base="a-part ${pc(p)}" class="a-part ${pc(p)}"></span>`).join("")}<span data-k="acc.${esc(a.id)}.none" class="a-none"></span></span>`
-      : owner ? `<span class="a-meta"><span class="a-who ${pc(owner)}">${esc(owner.name || "Unnamed")}</span> · ${esc(TYPE_WORD[a.type] || a.type || "")}</span>`
-      : `<span class="a-meta">${esc(typeLine(a, P, S))}${solo ? ` · ${K(`acc.${a.id}.pct.${P[0].id}`)}` : ""}</span>`;
+    const meta = owner ? `<span class="a-meta"><span class="a-who">${esc(owner.name || "Unnamed")}</span> · ${esc(TYPE_WORD[a.type] || a.type || "")}</span>` : "";
     const label = `${full}${joint ? ", shared" : owner ? `, ${owner.name || "Unnamed"}’s` : ""}: edit`;
     return `<li class="alloc">
-      <button class="alloc-row" type="button" data-edit-acc="${esc(a.id)}"${ui.reorder ? " disabled" : ""} aria-label="${esc(label)}">
-        <span class="a-ic" data-k="acc.${esc(a.id)}.ic" aria-hidden="true">${accIcon(a)}</span>
-        <span class="a-main"><span class="a-name"${short !== full ? ` title="${esc(full)}"` : ""}>${esc(short)}</span>${meta}
-          ${a.role === "spending" ? `<span data-k="acc.${esc(a.id)}.cov" data-base="a-cov"></span>` : ""}</span>
-        <span class="a-amt">${K(`acc.${a.id}.t`)}</span>${ui.reorder ? "" : CHEV}</button>
+      <button class="alloc-row" type="button" data-edit-acc="${esc(a.id)}"${ui.reorder ? " disabled" : ""} aria-label="${esc(label)}" aria-describedby="allocation-value-${encodeURIComponent(a.id)}">
+        <span class="a-ic" data-k="acc.${esc(a.id)}.ic" aria-hidden="true">${a.icon || a.colour ? accIcon(a) : ""}</span>
+        <span class="a-main"><span class="a-name"${short !== full ? ` title="${esc(full)}"` : ""}>${esc(short)}</span>${meta}</span>
+        <span class="a-amt" id="allocation-value-${encodeURIComponent(a.id)}">${K(`acc.${a.id}.t`)}</span>${ui.reorder ? "" : CHEV}</button>
       ${ui.reorder ? `<span class="mv-row"><button class="mv-btn" type="button" data-move="up" data-l="acc" data-i="${esc(a.id)}" aria-label="Move ${esc(full)} up"${i === 0 ? " disabled" : ""}>↑</button><button class="mv-btn" type="button" data-move="down" data-l="acc" data-i="${esc(a.id)}" aria-label="Move ${esc(full)} down"${i === S.accounts.length - 1 ? " disabled" : ""}>↓</button></span>` : ""}
     </li>`;
   };
   const allocs = `${transitionNote()}<section class="b-allocs">
-    <div class="b-row sec"><h2 class="b-h2">Your allocations<small class="b-per">Amounts ${esc(w.per)}</small></h2>${head ? `<span class="b-acts">${head}</span>` : ""}</div>
+    <div class="b-row sec"><h2 class="b-h2">Allocations</h2>${head ? `<span class="b-acts">${head}</span>` : ""}</div>
     ${ui.reorder ? `<p class="dim small-note">Use the arrows to move an allocation up or down.</p>` : ""}
-    <ul class="card alloc-list${ui.reorder ? " reordering" : ""}">${S.accounts.map(row).join("")}</ul>
+    <ul class="ind-card alloc-list${ui.reorder ? " reordering" : ""}">${S.accounts.map(row).join("")}</ul>
   </section>`;
 
   // 4. Fair split: the verdict and each person's share in two short lines; the bars and sums on request.
-  const fair = `<section class="card b-fair" id="fairSec" hidden>
-    <div class="b-row"><h2>Fair split</h2></div>
+  const fair = `<details class="ind-card ind-detail b-fair" id="fairSec" hidden>
+    <summary>Fair split</summary>
     <p class="fair-verdict">${K("fair.verdict")}</p>
     <ul class="fs-rows">${P.map(p => `<li class="${pc(p)}"><span class="fs-name">${esc(p.name || "Unnamed")}</span><span class="fs-v">${K(`fs.${p.id}`)}</span></li>`).join("")}</ul>
     <details class="more fs-more"><summary>See the details${DOWN}</summary>
@@ -134,12 +124,12 @@ export function view() {
       <div class="split-key">${P.map(p => `<span><i style="background:${personVar(p)}"></i>${esc(p.name || "Unnamed")}</span>`).join("")}<span class="fs-mark">${K("fair.line")}</span></div>
       <p>${K("fair.detail")}</p><p>${K("fair.personal")}</p>
       <p class="dim">Shared money is what goes to joint accounts and investments. Splitting equally and splitting by income are both fair; this shows which one you’re doing.</p></details>
-  </section>`;
+  </details>`;
 
   // 5. Breakdowns: compact rows, a title and one short line each; the charts inside are unchanged.
   const open = k => ui.open.has(k) ? " open" : "";
   const sum = (t, sub) => `<summary><span class="ins-t"><span>${t}</span><small>${sub}</small></span></summary>`;
-  const insights = `<section class="card b-insights">
+  const insights = `<section class="ind-card b-insights">
     <details data-ins="where"${open("where")}>${sum("Where it goes", K("ins.where"))}
       <ul class="dest">
         ${isShared(S) ? `<li><span class="dotc" style="background:var(--joint)"></span><span>Joint accounts</span><b>${K("sum.joint")}</b><small>${K("sum.joint.y")}</small></li>
@@ -165,7 +155,9 @@ export function view() {
   const note = S.note ? `<details class="b-note-old"><summary><span class="ins-t"><span>Note</span></span></summary><div class="b-note"><input class="note-input" ${attrs("root", "", "note", "text")} value="${esc(S.note)}" aria-label="Budget note">${!ro ? '<button class="note-x" type="button" id="noteX" aria-label="Remove note">×</button>' : ""}</div></details>` : "";
 
   // Phones: one column in this order. Wide screens: income, status and fair split on the left; allocations on the right.
-  return `<div class="budget"><div class="b-col">${income}${status}${multi ? fair : `<div id="fairSec" hidden></div>`}</div><div class="b-col">${allocs}${insights.replace(/<\/section>$/, note + "</section>")}</div></div>`;
+  const canRebalance = !ro && S.accounts.length > 1 && app.C?.incTotal > 0;
+  return `<div class="ind-finance budget"><div class="ind-page-head"><h2 class="ind-title">Budget</h2>${canRebalance ? '<button class="ind-link" data-rb-open type="button">Rebalance</button>' : ""}</div>
+    <div class="b-col">${income}${status}</div><div class="b-col">${allocs}${!ro && !ui.reorder ? '<button class="ind-link" type="button" data-reorder aria-pressed="false">Reorder allocations</button>' : ""}${payday}${multi ? fair : `<div id="fairSec" hidden></div>`}${insights.replace(/<\/section>$/, note + "</section>")}</div></div>`;
 }
 
 /** Other periods, for the line under each pay: "≈ $2,000 a fortnight, $4,333 a month, $52,000 a year". */
@@ -231,7 +223,7 @@ export function fill(D, C) {
     : earners.some(s => s.k === "over") ? { h: `Over-allocated by ${money(v(overT))}`, s: multi ? `${names("over")}: more is planned than comes in` : "More is planned than comes in", c: "bad", i: "!" }
     : earners.every(s => s.k === "ok") ? { h: `All ${money(v(C.incTotal))} allocated`, s: "", c: "ok", i: "✓" }
     : { h: `${money(v(leftT))} left to allocate`, s: multi ? `${names("left")} ${earners.filter(s => s.k === "left").length > 1 ? "have" : "has"} pay without a job yet` : `${pct(1 - C.tot.pct[earners[0].p.id], 1)} of your pay has no job yet`, c: "warn", i: "!" };
-  D["st.summary"] = head.h; D["st.sub"] = head.s; D["st.ic"] = { t: head.i, c: head.c };
+  D["st.summary"] = head.h; D["st.display"] = head.c === "ok" ? "Pay fully allocated" : head.h; D["st.sub"] = head.s; D["st.ic"] = { t: head.i, c: head.c };
   const showList = st.some(s => s.k === "left" || s.k === "over") || (multi && earners.length > 0 && st.some(s => s.k === "none"));
   document.querySelectorAll("#allocStatus .st-list").forEach(el => {
     el.hidden = !showList;
