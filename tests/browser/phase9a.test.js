@@ -76,20 +76,16 @@ test("Home (shared): each person's own payday and pay, never added together; fig
   const b = JSON.parse(JSON.stringify(RICH));
   const ids = Object.keys(b.people); b.people[ids[0]].payday = "2026-11-06"; b.people[ids[1]].payday = "";
   const { page, errors, ctx } = await open(b, { ...phone(), storage: ALL_DONE, hash: "", waitFor: "#app .home" });
-  assert.match(await page.textContent(".ho-greet h2"), /, Jarden$/);
+  assert.equal(await page.textContent("#homeRoot .ind-title"), "Home");
   const pay = await page.textContent(".ho-pay");
   assert.match(pay, /Next payday/); assert.match(pay, /In \d+ days|Today|Tomorrow/);
-  assert.match(pay, /No payday yet/, "the other person has no date, and none is made up");
+  assert.match(await page.textContent("#homeRoot"), /No payday yet/, "the other person has no date, and none is made up");
   assert.doesNotMatch(pay, /\$4,300/, "two people's pay isn't added up as one payday");
-  const homeNW = (await page.textContent('.ho-fig[data-home-go="networth"] b')).trim();
-  const homeSave = (await page.textContent('.ho-fig[data-home-go="goals"] b')).replace(/\/fn/, "").trim();
+  assert.equal(await page.locator(".ho-fig").count(), 0, "financial tiles were removed");
+  assert.match(await page.locator(".ho-pay .ho-big").innerText(), /\$2,400\.00/);
   await shot(page, "home-shared");
-  await page.click('.ho-fig[data-home-go="networth"]'); await page.waitForSelector("#app .nw-hero");
+  await goTab(page, "networth"); await page.waitForSelector("#app .nw-hero");
   assert.equal(await hash(page), "#wealth/accounts");
-  assert.ok((await page.textContent("#app .nw-hero")).includes(homeNW), `net worth ${homeNW} matches Accounts`);
-  await goTab(page, "goals");
-  const pools = await page.$$eval(".gl-pools b", e => e.map(x => Number(x.textContent.replace(/[^\d.]/g, ""))));
-  assert.equal(pools.reduce((s, x) => s + x, 0), Number(homeSave.replace(/[^\d.]/g, "")), "saving = emergency fund + goal pools");
   assert.deepEqual(errors, []); await ctx.close();
 });
 
@@ -104,17 +100,11 @@ test("Home for a brand-new solo budget: no made-up balances or dates; next steps
   // Phase 9C.2: setup asks for the last payday, so the payday card counts down from the start
   assert.match(await page.textContent(".ho-pay"), /\$2,000/); assert.match(await page.textContent(".ho-pay"), /Next payday/);
   assert.doesNotMatch(await page.textContent(".ho-pay"), /Set a payday/);
-  assert.equal((await page.textContent('.ho-fig[data-home-go="networth"] b')).trim(), "—", "no net worth without accounts");
-  assert.match(await page.textContent(".ho-plan"), /100% of your pay has a plan/);
-  assert.deepEqual(await page.$$eval("[data-home-act]", e => e.map(x => x.dataset.homeAct)), ["accounts", "goal", "bills"]);
+  assert.match(await page.textContent("#homeRoot"), /Pay fully allocated/);
+  assert.equal(await page.locator(".ho-fig").count(), 0, "no placeholder net worth");
   await shot(page, "home-new-solo");
-  await page.click('[data-home-act="accounts"]');
-  await page.waitForSelector('#sheet [data-l="nw"][data-f="name"]');
-  assert.equal(await hash(page), "#wealth/accounts", "straight to adding an account");
-  await page.click('#sheet .sheet-head [data-sheet="close"]');
-  await goTab(page, "home");
   await page.click('[data-home-act="bills"]');
-  await page.waitForSelector('#sheet [data-l="sp"][data-f="name"]');
+  await page.waitForSelector("#app .sp-empty");
   assert.equal(await hash(page), "#expenses");
   assert.deepEqual(errors, []); await ctx.close();
 });
@@ -234,7 +224,8 @@ test("step 4: four steps, clearly optional; savings, investments, KiwiSaver and 
   assert.equal(b.goals.ef.saved, null, "no separate emergency-fund balance invented");
   assert.equal(nw.some(a => /emergency/i.test(a.name)), false);
   await page.click('[data-obact="finish"]'); await page.waitForSelector("#app .home");
-  assert.equal((await page.textContent('.ho-fig[data-home-go="networth"] b')).trim(), "$22,700", "net worth: 1,300 + 10,000 + 12,000 − 600");
+  await goTab(page, "networth");
+  assert.match(await page.textContent("#app .nw-hero"), /\$22,700/, "net worth: 1,300 + 10,000 + 12,000 − 600");
   assert.equal(await page.isVisible("#undoBtn"), false, "setup isn't something to undo");
   assert.equal(await page.locator('[data-home-act="accounts"]').count(), 0);
   assert.deepEqual(errors, []); await ctx.close();

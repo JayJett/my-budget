@@ -33,10 +33,10 @@ const one = (budget, me = null, extra = {}) => ({ households: [{ id: "hh-1", nam
 
 test("solo, nothing set up yet: the plan is still useful; 'this is me' unlocks the checklist", { skip }, async () => {
   const { page, errors, ctx } = await open(null, { ...phone(), storage: ALL_DONE, init: one(solo()), hash: "", waitFor: "#app .home" });
-  assert.match(await page.textContent(".ho-pay .ho-pb"), /Set up your payday plan/);
+  assert.match(await page.textContent(".ho-pay .ho-pb"), /Open Payday Playbook/);
   await page.click(".ho-pay [data-pb-open]"); await page.waitForSelector("#sheet .pb");
   const t = await pb(page);
-  assert.match(t, /In 2 days\s*Wednesday 11 Nov\s*\$2,000\s*Fortnightly pay/);
+  assert.match(t, /Wednesday,? 11 November\s*In 2 days[\s\S]*\$2,000\.00\s*Fortnightly pay/);
   assert.match(t, /Set aside\s*Spending[\s\S]*\$1,000[\s\S]*Emergency Fund[\s\S]*\$400[\s\S]*Goals[\s\S]*\$400[\s\S]*Investments[\s\S]*\$200/);
   assert.doesNotMatch(t, /Transfer to/, "no made-up transfers");
   assert.equal(await page.locator("#sheet .pb-check").count(), 0, "no ticking until you say who you are");
@@ -52,13 +52,13 @@ test("solo, nothing set up yet: the plan is still useful; 'this is me' unlocks t
 test("destinations: keep, grouped transfer with its parts, set aside; ticks are personal, kept, and change nothing else", { skip }, async () => {
   const { page, errors, ctx } = await open(null, { ...phone(), storage: ALL_DONE, init: one(solo({ dests: true }), "j"), hash: "", waitFor: "#app .home" });
   const before = await budgetOf(page), saves = () => fake(page, () => window.__fake.rpcCalls.filter(c => c.name === "apply_budget_ops").length), s0 = await saves();
-  assert.match(await page.textContent(".ho-pay .ho-pb"), /See your payday plan/);
+  assert.match(await page.textContent(".ho-pay .ho-pb"), /Open Payday Playbook/);
   await page.click(".ho-pay [data-pb-open]"); await page.waitForSelector("#sheet .pb-check");
   const t = await pb(page);
-  assert.match(t, /\$2,000\s*Fortnightly pay · into Everyday/);
+  assert.match(t, /\$2,000\.00\s*Fortnightly pay · into Everyday/);
   assert.match(t, /Keep in\s*Everyday[\s\S]*\$1,000/);
-  assert.match(t, /Transfer to\s*Savings\s*Emergency Fund \+ Goals[\s\S]*\$800/);
-  assert.match(t, /Set aside\s*Investments\s*Not linked to an account yet[\s\S]*\$200/);
+  assert.match(t, /Transfer to\s*Savings\s*2 allocations[\s\S]*\$800/);
+  assert.match(t, /Set aside\s*Investments\s*No destination yet[\s\S]*\$200/);
   assert.equal(await page.locator("#sheet .pb-check").count(), 2, "keep and transfer can be ticked; set aside can't");
   assert.match(await pb(page), /0 of 2 marked done/);
   await page.click('#sheet [data-pb-tick="move:nw:sv"]');
@@ -78,7 +78,7 @@ test("destinations: keep, grouped transfer with its parts, set aside; ticks are 
   await page.waitForFunction(() => /0 of 2 marked done/.test(document.querySelector("#sheet .pb").textContent));
   await page.click('#sheet [data-pb-tick="keep:nw:ev"]'); await page.waitForFunction(() => /1 of 2/.test(document.querySelector("#sheet .pb").textContent)); await page.waitForFunction(() => !document.querySelector("#sheet [data-pb-tick][aria-busy]"));
   // the next payday is a list of its own
-  await page.click('#sheet [data-pb-k="1"]'); await page.waitForFunction(() => /Wednesday 25 Nov/.test(document.querySelector("#sheet .pb").textContent));
+  await page.click('#sheet [data-pb-k="1"]'); await page.waitForFunction(() => /Wednesday,? 25 November/.test(document.querySelector("#sheet .pb").textContent));
   await page.waitForFunction(() => /0 of 2 marked done/.test(document.querySelector("#sheet .pb").textContent));
   // nothing financial moved
   assert.equal(await saves(), s0, "ticking never saves the budget");
@@ -128,17 +128,19 @@ test("couples: each their own payday and pay; only you tick yours; nobody can be
   const init = { households: [{ id: "hh-1", name: "Ours", role: "owner", budget: toStored(S), members: members("j", [{ user_id: "u-madi", display_name: "Madi", email: "m@example.com", role: "editor", joined_at: "2026-01-02", person_id: "m" }]) }] };
   const { page, errors, ctx } = await open(null, { ...phone(), storage: ALL_DONE, init, hash: "", waitFor: "#app .home" });
   await page.click(".ho-pay [data-pb-open]"); await page.waitForSelector("#sheet .pb");
-  assert.match(await page.textContent("#sheet .sheet-head h3"), /Jarden’s payday/, "opens on your own");
-  assert.match(await pb(page), /Wednesday 18 Nov\s*\$2,900\s*Fortnightly pay/);
+  assert.equal(await page.textContent('#sheet [data-pb-person="m"][aria-pressed="true"]'), "Madi", "opens on the next payday shown on Home");
+  await page.click('#sheet [data-pb-person="j"]');
+  assert.match(await page.textContent('#sheet [data-pb-person="j"][aria-pressed="true"]'), /Jarden/);
+  assert.match(await pb(page), /Wednesday,? 18 November[\s\S]*\$2,900\.00\s*Fortnightly pay/);
   assert.match(await pb(page), /Transfer to\s*Joint shares[\s\S]*\$290/);
   await page.click('#sheet [data-pb-person="m"]');
-  await page.waitForFunction(() => /Madi’s payday/.test(document.querySelector("#sheet .sheet-head h3").textContent));
+  await page.waitForSelector('#sheet [data-pb-person="m"][aria-pressed="true"]');
   const t = await pb(page);
-  assert.match(t, /Thursday 12 Nov\s*\$600\s*Weekly pay/, "Madi's own weekly payday and pay");
+  assert.match(t, /Thursday,? 12 November[\s\S]*\$600\.00\s*Weekly pay/, "Madi's own weekly payday and pay");
   assert.match(t, /Transfer to\s*Madi's shares[\s\S]*\$60/, "her own place for her part");
   assert.equal(await page.locator("#sheet .pb-check").count(), 0, "you can't tick Madi's list");
   assert.equal(await page.locator("#sheet [data-pb-link]").count(), 0, "and can't say you're Madi");
-  assert.match(t, /Madi can tick these off on their own phone/);
+  assert.match(t, /This person’s checklist is private/);
   await shot(page, "couple");
   // the database refuses it too
   const r = await page.evaluate(async () => { const { app } = await import("./js/ui/ctx.js"); return (await app.sb.rpc("payday_check_mark", { p_household: "hh-1", p_person: "m", p_payday: "2026-11-12", p_plan: {}, p_key: "x", p_on: true })).error.message; });
@@ -167,7 +169,7 @@ test("destinations are chosen in the allocation and pay sheets (accounts, never 
   await page.click('#sheet [data-sheet="close"]');
   await page.click("#app [data-pb-open]"); await page.waitForSelector("#sheet .pb");
   const t = await pb(page);
-  assert.match(t, /Transfer to\s*Savings[\s\S]*\$400/); assert.match(t, /Transfer to\s*Sharesies[\s\S]*\$200/); assert.match(t, /into Everyday/);
+  assert.match(t, /Transfer to\s*Savings[\s\S]*\$400/); assert.match(t, /Transfer to[\s\S]*Sharesies[\s\S]*\$200/); assert.match(t, /into Everyday/);
   assert.deepEqual(errors, []); await ctx.close();
   // the database part isn't set up yet: no ticking, no "this is me"; the plan is the same
   const o = await open(null, { ...phone(), storage: ALL_DONE, init: { ...one(solo({ dests: true }), "j"), noPersonLinks: true }, hash: "", waitFor: "#app .home" });

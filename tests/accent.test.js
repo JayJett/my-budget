@@ -2,16 +2,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { ACCENTS } from "../js/ui/accent-list.js";
+import { ACCENTS, NEW_USER_ACCENT, DEFAULT_ACCENT } from "../js/ui/accent-list.js";
 
 const css = readFileSync(new URL("../css/app.css", import.meta.url), "utf8");
+const indigo = readFileSync(new URL("../css/indigo.css", import.meta.url), "utf8");
 const lum = hex => {
   const c = hex.replace("#", "").match(/../g).map(x => parseInt(x, 16) / 255).map(v => v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
   return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
 };
 const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
 const vars = block => Object.fromEntries([...block.matchAll(/--([\w-]+):\s*(#[0-9A-Fa-f]{6})/g)].map(m => [m[1], m[2]]));
-const tokens = sel => { const i = css.indexOf(sel + "{"); assert.ok(i >= 0, `missing ${sel}`); return vars(css.slice(i, css.indexOf("}", i))); };
+const tokens = sel => { const text = sel.includes('data-accent="indigo"') ? indigo : css; const i = Math.max(text.indexOf(sel + "{"), text.indexOf(sel + " {")); assert.ok(i >= 0, `missing ${sel}`); return vars(text.slice(i, text.indexOf("}", i))); };
 const base = { light: tokens(":root"), dark: tokens(':root[data-theme="dark"]') };
 
 for (const { key, label } of ACCENTS) {
@@ -27,9 +28,10 @@ for (const { key, label } of ACCENTS) {
   });
 }
 
-test("ten accents (Phase 8: Emerald, Teal, Sky and Purple added), each with a name, and Mint is the default", () => {
-  assert.deepEqual(ACCENTS.map(a => a.key), ["mint", "emerald", "teal", "ocean", "sky", "lavender", "purple", "rose", "coral", "amber"]);
-  assert.equal(ACCENTS[0].key, "mint");
+test("eleven named accents, Indigo for new users and Mint for existing users without a choice", () => {
+  assert.deepEqual(ACCENTS.map(a => a.key), ["indigo", "mint", "emerald", "teal", "ocean", "sky", "lavender", "purple", "rose", "coral", "amber"]);
+  assert.equal(DEFAULT_ACCENT, "mint");
+  assert.equal(NEW_USER_ACCENT, "indigo");
 });
 
 test("accents never touch member, status or chart colours", () => {

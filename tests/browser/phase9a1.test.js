@@ -21,7 +21,9 @@ test("payday card: one date and countdown, then each person and their pay; no 'P
   const card = await page.textContent(".ho-pay");
   assert.doesNotMatch(card, /Planned, not yet in your account/);
   assert.equal((card.match(/Nov/g) || []).length, 1, "the date appears once");
-  assert.deepEqual(await page.$$eval(".ho-pays li", e => e.map(x => [x.querySelector(".ho-who").textContent.trim(), x.querySelector(".ho-amt").textContent])), [["Jarden", "$2,400"], ["Madi", "$1,900"]]);
+  assert.match(card, /Jarden[\s\S]*Take-home pay/);
+  assert.match(card, /Madi[\s\S]*\$1,900\.00/);
+  assert.match(card, /\$2,400\.00/);
   assert.doesNotMatch(card, /\$4,300/, "no total of two people's pay");
   await shot(page, "pay-same-day");
   await ctx.close(); assert.deepEqual(errors, []);
@@ -29,9 +31,12 @@ test("payday card: one date and countdown, then each person and their pay; no 'P
 
 test("payday card: different days stay apart, each with its own date; no payday yet says so", { skip }, async () => {
   let { page, errors, ctx } = await open(withPaydays("2026-11-04", "2026-11-06"), { ...phone(), storage: ALL_DONE, hash: "", waitFor: "#app .home", clock: PAYDAY_CLOCK });
-  const rows = await page.$$eval(".ho-pays li", e => e.map(x => x.textContent.replace(/\s+/g, " ").trim()));
-  assert.equal(rows.length, 2);
-  assert.match(rows[1], /Fri 6 Nov/, "the second person's own date");
+  const later = page.locator(".ho-group button[data-pb-open]");
+  assert.equal(await later.count(), 1);
+  assert.match(await later.innerText(), /Madi[\s\S]*Fri,? 6 Nov/, "the second person’s own date");
+  assert.doesNotMatch(await later.innerText(), /\$1,900/);
+  await later.click();
+  assert.match(await page.locator(".pb .pb-pay").innerText(), /\$1,900\.00/);
   assert.deepEqual(errors, []); await ctx.close();
   ({ page, errors, ctx } = await open(withPaydays("", ""), { ...phone(320, 640), storage: ALL_DONE, hash: "", waitFor: "#app .home" }));
   assert.match(await page.textContent(".ho-pay"), /Your pay/);
@@ -51,13 +56,13 @@ test("your menu has no Reminders; the bell still opens them, with Reminder setti
   assert.deepEqual(errors, []); await ctx.close();
 });
 
-test("bottom bar: the chosen tab is its colour and a bolder label, with no pill behind it (light and dark)", { skip }, async () => {
+test("bottom bar: the chosen tab is its colour and a bolder label, with a tint only behind the icon (light and dark)", { skip }, async () => {
   for (const dark of [false, true]) {
     const { page, errors, ctx } = await open(RICH, { ...phone(390, 844, dark), storage: ALL_DONE, hash: "", waitFor: "#app .home" });
     for (const t of ["home", "budget", "spending", "goals", "wealth"]) {
       await page.click(`#tabs [data-tab="${t}"]`); await page.waitForSelector(`#tabs [data-tab="${t}"][aria-selected="true"]`);
-      const s = await page.$eval(`#tabs [data-tab="${t}"]`, e => { const ti = getComputedStyle(e.querySelector(".ti")), tb = getComputedStyle(e); return [ti.backgroundColor, tb.backgroundColor, tb.color, getComputedStyle(e.querySelector(".ts")).fontWeight]; });
-      assert.equal(s[0], "rgba(0, 0, 0, 0)", `${t}: no pill`); assert.equal(s[1], "rgba(0, 0, 0, 0)");
+      const s = await page.$eval(`#tabs [data-tab="${t}"]`, e => { const ti = getComputedStyle(e.querySelector(".ti")), tb = getComputedStyle(e); return [ti.backgroundColor, tb.backgroundColor, tb.color, getComputedStyle(e.querySelector(".tl")).fontWeight]; });
+      assert.notEqual(s[0], "rgba(0, 0, 0, 0)", `${t}: active icon has a tint`); assert.equal(s[1], "rgba(0, 0, 0, 0)");
       const off = await page.$eval(`#tabs .tab:not([aria-selected="true"])`, e => getComputedStyle(e).color);
       assert.notEqual(s[2], off, `${t}: coloured`); assert.ok(Number(s[3]) >= 700, `${t}: bolder label`);
     }
@@ -104,7 +109,7 @@ test("'A recent payday' fits inside the sheet at 320–430px, and a changed date
 test("Compact spacing doesn't add big gaps above Home's greeting or Wealth's cards", { skip }, async () => {
   const { page, errors, ctx } = await open(RICH, { ...phone(), storage: { ...ALL_DONE, "jm-budget-prefs": JSON.stringify({ density: "compact" }) }, hash: "", waitFor: "#app .home" });
   const gap = (a, b) => page.evaluate(([a, b]) => Math.round(document.querySelector(b).getBoundingClientRect().top - document.querySelector(a).getBoundingClientRect().bottom), [a, b]);
-  assert.ok(await gap(".ho-greet", ".ho-pay") <= 16, "greeting to card");
+  assert.ok(await gap(".ind-title", ".ho-pay") <= 16, "greeting to card");
   await goTab(page, "networth");
   assert.ok(await gap(".wl-nav", "#app .nw-hero") <= 20, "Wealth switch to card");
   assert.deepEqual(errors, []); await ctx.close();

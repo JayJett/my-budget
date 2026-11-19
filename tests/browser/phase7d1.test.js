@@ -120,9 +120,9 @@ test("header: your avatar opens the account menu (the ⋯ button is gone); long 
     assert.match(await btn.getAttribute("aria-label"), /^Open account menu \(Jarden\)$/);
     assert.equal(await page.textContent("#meSlot .av"), "J");
     const box = await btn.boundingBox(); assert.ok(box.width >= 44 && box.height >= 44, "44px to tap");
-    // nothing in the header overlaps: avatar | name | status and buttons
+    // nothing in the header overlaps: household | status and buttons | avatar
     const r = await page.evaluate(() => { const g = s => document.querySelector(s).getBoundingClientRect(); return { av: g("#menuBtn"), name: g("#brandNames"), right: g(".save-area") }; });
-    assert.ok(r.av.right <= r.name.left + 1 && r.name.right <= r.right.left + 1, `w=${w}: header pieces overlap`);
+    assert.ok(r.name.right <= r.right.left + 1 && r.av.left >= r.right.left && r.av.right <= r.right.right + 1, `w=${w}: header pieces overlap`);
     await btn.click();
     await page.waitForSelector("#drawer:not([hidden])");
     for (const a of ["profile", "history", "appearance", "tours", "data", "signout"])

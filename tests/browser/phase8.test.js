@@ -349,12 +349,12 @@ test("setup step 1: 'Make it look like yours' is folded away, opens in place, sa
   assert.deepEqual(errors, []); await ctx.close();
 });
 
-test("Appearance: a live preview, ten colours plus your own, motion, and a reset to defaults", { skip }, async () => {
+test("Appearance: a live preview, eleven colours plus your own, motion, and a reset to defaults", { skip }, async () => {
   const noVibrate = () => { try { delete Navigator.prototype.vibrate; } catch (_) {} };
   const { page, errors, ctx } = await open(null, { ...phone(), storage: ALL_DONE, init: { ...TWO(), meta: { accent: "rose", theme: "dark", motion: "reduce" } }, initScript: noVibrate });
   await page.click("#menuBtn"); await page.waitForSelector("#drawer:not([hidden])"); await page.click('#drawer [data-act="appearance"]');
   await page.waitForSelector("#sheet .ap-prev");
-  assert.equal(await page.locator("#sheet [data-accent-pick]").count(), 10);
+  assert.equal(await page.locator("#sheet [data-accent-pick]").count(), 11);
   assert.equal(await page.getAttribute('#sheet [data-look="motion"][data-v="reduce"]', "aria-checked"), "true");
   assert.equal(await page.evaluate(() => document.documentElement.dataset.motion), "reduce", "Reduced motion calms the whole app");
   const prevColour = () => page.$eval(".ap-prev-sw", e => getComputedStyle(e).backgroundColor);
