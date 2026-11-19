@@ -81,6 +81,7 @@ test("Indigo finance pages fit the mobile and desktop widths, including large te
    for(const [route,selector] of [["budget",".alloc-row"],["spending",".ex-row"],["goals",".gl-card"]]){
      if(route!=="budget"){
        const tab=page.locator('#tabs [data-tab="'+route+'"]');
+       await tab.waitFor({state:"visible"});
        const point=await tab.evaluate(el=>{
          const {left,top,width,height}=el.getBoundingClientRect();
          const x=left+width/2, y=top+height/2;
