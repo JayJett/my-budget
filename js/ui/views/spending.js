@@ -43,7 +43,7 @@ function row(s, ui, i, L) {
       <span class="ex-main"><span class="ex-name">${esc(s.name || "Unnamed")}</span>
         <span class="ex-sub" id="expense-detail-${encodeURIComponent(s.id)}">${ui.reorder ? esc(t.key) : K(`sp.${s.id}.cadence`)}${isYearlySinking(s) && !ui.reorder ? ` ${K(`sp.${s.id}.sk`, "chip")}` : ""}</span>
         ${isYearlySinking(s) && !ui.reorder ? `<span class="ex-prog" aria-hidden="true"><span data-k="sp.${esc(s.id)}.bar"></span></span>` : ""}</span>
-      <span class="ex-amt" id="expense-value-${encodeURIComponent(s.id)}">${K(`sp.${s.id}.v`)}</span>${ui.reorder ? "" : '<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5L10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'}</button>
+      <span class="ex-amt" id="expense-value-${encodeURIComponent(s.id)}">${K(`sp.${s.id}.v`)}<small>${K(`sp.${s.id}.per`)}</small></span>${ui.reorder ? "" : '<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5L10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'}</button>
     ${ui.reorder ? `<span class="mv-row"><button class="mv-btn" type="button" data-move="up" data-l="sp" data-i="${esc(s.id)}" aria-label="Move ${esc(s.name || "this")} up"${i === 0 ? " disabled" : ""}>↑</button><button class="mv-btn" type="button" data-move="down" data-l="sp" data-i="${esc(s.id)}" aria-label="Move ${esc(s.name || "this")} down"${i === L.length - 1 ? " disabled" : ""}>↓</button></span>` : ""}
   </li>`;
 }
@@ -122,7 +122,8 @@ export function fill(D, C) {
       : s.type === "Sinking" && s.period === "Year" ? (s.sink ? `${money(n(s.amount))} · due ${monthYear(s.sink.next)}` : `${money(n(s.amount))} a year`)
       : s.period && s.period.toLowerCase() !== C.view ? `${money(n(s.amount))} ${PERIOD_WORD[s.period] || ""}`.trim()
       : (s.notes || "").trim().slice(0, 60);
-    D[`sp.${s.id}.cadence`] = s.annual === null || todo || isYearlySinking(s) ? D[`sp.${s.id}.sub`] : PERIOD_WORD[s.period] || "";
+    D[`sp.${s.id}.cadence`] = s.annual === null || todo || isYearlySinking(s) || s.period?.toLowerCase() !== C.view
+      ? D[`sp.${s.id}.sub`] : "";
   });
   D["sp.tot"] = money(v(C.committed)); D["sp.totp"] = C.pool.spending ? pct(C.committed / C.pool.spending, 1) : "";
   const fx = C.spType("Fixed"), fl = C.spType("Flexible"), sk = C.spType("Sinking");

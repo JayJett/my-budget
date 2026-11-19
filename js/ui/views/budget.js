@@ -95,7 +95,7 @@ export function view() {
   const head = ro ? "" : ui.reorder ? `<button class="btn small ghost" type="button" data-reorder aria-pressed="true">Done</button>`
     : `<button class="ind-link b-add" type="button" data-acc-new><span aria-hidden="true">+</span> Add allocation</button>`;
   const row = (a, i) => {
-    const joint = multi && !(a.type === "Personal" && a.owner), full = a.name || "Unnamed", short = shortName(a, P, S);
+    const joint = isShared(S) && !(a.type === "Personal" && a.owner), full = a.name || "Unnamed", short = shortName(a, P, S);
     const owner = a.owner && multi ? P.find(p => p.id === a.owner) : null;
     const meta = owner ? `<span class="a-meta"><span class="a-who">${esc(owner.name || "Unnamed")}</span> · ${esc(TYPE_WORD[a.type] || a.type || "")}</span>` : "";
     const label = `${full}${joint ? ", shared" : owner ? `, ${owner.name || "Unnamed"}’s` : ""}: edit`;
