@@ -233,6 +233,8 @@ export function initBudgetSheets() {
     if (t.closest("[data-iv-edit]")) { UI.sheet = { kind: "inv", id: "inv", tab: app.tab }; draw(); app.refresh(); return; }
     const eg = t.closest("[data-edit-goal]"); if (eg && !eg.disabled) { openGoalSheet(eg.dataset.editGoal, eg.dataset.i); return; }
     const ep = t.closest("[data-edit-person]"); if (ep) { openPersonSheet(ep.dataset.editPerson); return; }
+    const im = t.closest("[data-inc-more]");
+    if (im) { toggleIncMore(im); return; }
     if (readOnly()) return;
     const oc = t.closest("[data-oc-pick]");
     if (oc && !oc.disabled) { // a colour is just how the item looks too
@@ -250,8 +252,6 @@ export function initBudgetSheets() {
       if (ic.dataset.icon) it.icon = ic.dataset.icon; else delete it.icon;
       changed({ full: true }); return;
     }
-    const im = t.closest("[data-inc-more]");
-    if (im) { toggleIncMore(im); return; }
     if (t.closest("[data-reorder]")) { const on = !(UI.reorder && UI.reorderTab === app.tab); UI.reorder = on; UI.reorderTab = app.tab; app.render(); return; }
     if (t.closest("[data-acc-new]")) { const id = addRow("acc"); UI.fresh = { id }; changed({ full: true }); openAccountSheet(id, { focusName: true }); return; }
     const sn = t.closest("[data-sp-new]");
