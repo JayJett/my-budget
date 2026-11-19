@@ -1,6 +1,8 @@
 /* The accent colours a person can choose (their colours live in css/app.css, light and dark).
    Kept separate from accent.js so the tests can read it without a browser. */
+export const NEW_USER_ACCENT = "indigo";
 export const ACCENTS = [
+  { key: NEW_USER_ACCENT, label: "Indigo" },
   { key: "mint", label: "Mint" },
   { key: "emerald", label: "Emerald" },   // Phase 8: four more
   { key: "teal", label: "Teal" },

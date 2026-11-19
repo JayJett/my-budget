@@ -11,7 +11,8 @@ import { rememberChange, resetUndo, updateUndo, historyNoticeRemote } from "./hi
 import { loadReminders, resetReminders, openFromHash } from "./reminders.js";
 import { disablePush } from "./push.js";
 import { closeDrawer } from "./drawer.js";
-import { useAccentOf, resetAccent } from "./accent.js";
+import { useAccentOf, resetAccent, beginAccentRegistration } from "./accent.js";
+import { NEW_USER_ACCENT } from "./accent-list.js";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "../config.js";
 import { calm } from "./motion.js";
 
@@ -665,7 +666,7 @@ export function initAuth(sb) {
     const v = Object.fromEntries(new FormData(f).entries());
     if (f.id === "fSignin") await busy(f, async () => { const { error } = await sb.auth.signInWithPassword({ email: v.email.trim(), password: v.password }); if (error) authMsg(friendly(error)); });
     if (f.id === "fSignup") await busy(f, async () => {
-      const { data, error } = await sb.auth.signUp({ email: v.email.trim(), password: v.password, options: { data: { name: v.name.trim() }, emailRedirectTo: here() } });
+      const { data, error } = await sb.auth.signUp({ email: v.email.trim(), password: v.password, options: { data: { name: v.name.trim(), accent: NEW_USER_ACCENT }, emailRedirectTo: here() } });
       if (error) return authMsg(friendly(error));
       if (!data.session) { startPending(v.email.trim(), "signup"); showAuth("verify"); }
     });
@@ -706,6 +707,7 @@ export function initAuth(sb) {
   document.addEventListener("click", async e => {
     const b = e.target.closest("[data-oauth]"); if (!b || b.disabled) return;
     b.disabled = true; const old = b.innerHTML; b.textContent = "Opening " + PROVIDERS[b.dataset.oauth] + "…";
+    beginAccentRegistration();
     const { error } = await sb.auth.signInWithOAuth({ provider: b.dataset.oauth, options: { redirectTo: here() } });
     if (error) { b.disabled = false; b.innerHTML = old; authMsg(friendly(error)); }
   });

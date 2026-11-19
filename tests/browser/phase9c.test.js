@@ -203,8 +203,9 @@ test("320–430px: the sheet fits, the Apply button stays on screen, nothing scr
 
 test("Home: the shortfall step opens the same fix on Budget", { skip }, async () => {
   const { page, errors, ctx } = await open(solo(), { ...phone(), storage: ALL_DONE, hash: "", waitFor: "#app .home" });
-  assert.match(await page.textContent(".ho-next"), /Planned expenses are over their budget[\s\S]*Adjust your plan or trim expenses/);
-  await page.click('.ho-next [data-home-act="short"]');
+  assert.match(await page.textContent(".ho-coverage summary"), /Expenses are over budget/);
+  await page.click(".ho-coverage summary");
+  await page.click('[data-home-act="short"]');
   await page.waitForSelector("#sheet .rb");
   assert.equal(await page.inputValue("#sheet [data-rb-amount]"), "1215.31");
   assert.deepEqual(errors, []); await ctx.close();

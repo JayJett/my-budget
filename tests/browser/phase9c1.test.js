@@ -49,8 +49,9 @@ test("Expenses: pick, give one an amount, leave two blank; only the complete one
   assert.match(await page.textContent("#app .sp-list"), /Rent\s*Needs an amount/);
   assert.match(await page.textContent("#app .sp-sum"), /Planned\s*\$400/, "only groceries ($200 a week) is planned");
   await tab(page, "home"); await page.waitForSelector("#app .home");
-  assert.match(await page.textContent(".ho-next"), /2 expenses need an amount/);
-  await page.click('.ho-next [data-home-act="amounts"]');
+  assert.match(await page.textContent(".ho-coverage summary"), /2 expenses still to check/);
+  await page.click(".ho-coverage summary");
+  await page.getByRole("button", { name: "Add expense amounts" }).click();
   await page.waitForSelector('#sheet [data-l="sp"][data-f="amount"]');
   assert.deepEqual(errors, []); await ctx.close();
 });
@@ -113,7 +114,7 @@ test("doughnuts: honest parts with a text equivalent; Home is calmer; payday car
   const { page, errors, ctx } = await open(toStored(migrate(RICH_V3)), { ...phone(), storage: ALL_DONE, hash: "", waitFor: "#app .home" });
   assert.equal(await page.locator(".ho-pay .ho-dot").count(), 0, "names, no dots");
   assert.doesNotMatch(await page.textContent("#app .home"), /every dollar given a job|From the balances you’ve entered|Planned each pay/);
-  const pad = await page.$eval(".ho-pay", e => parseFloat(getComputedStyle(e).paddingLeft)); assert.ok(pad >= 22, `padding ${pad}`);
+  const pad = await page.$eval(".ho-pay", e => parseFloat(getComputedStyle(e).paddingLeft)); assert.ok(pad >= 18, `padding ${pad}`);
   await shot(page, "home");
   // Phase 10A: the doughnut became a slim bar, with the same words for screen readers
   await tab(page, "budget"); await page.waitForSelector("#incBar span");

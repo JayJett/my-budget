@@ -45,10 +45,10 @@ test("Expenses: mark an expense essential; the Essentials card and Home follow; 
   assert.doesNotMatch(await page.textContent("#spEss"), /aren’t marked/);
   assert.match(await page.textContent("#app .sp-head"), /not yet assigned to an expense/, "budget minus planned isn't called spare");
   await shot(page, "expenses");
-  await tab(page, "home"); await page.waitForSelector(".ho-lines");
-  assert.match(await page.textContent(".ho-lines"), /Essentials\s*\$700\/fn · 35% of pay/);
-  assert.match(await page.textContent(".ho-lines"), /Expenses\s*Fit their budget/);
-  assert.match(await page.textContent(".ho-lines"), /Room to adjust\s*Up to \$600\/fn/, "300 with no plan + 200 not assigned + 100 flexible");
+  await tab(page, "home"); await page.waitForSelector(".ho-coverage");
+  assert.match(await page.textContent(".ho-coverage summary"), /Expenses are covered/);
+  await page.click(".ho-coverage summary");
+  assert.match(await page.locator(".ho-breakdown").innerText(), /Planned expenses/);
   assert.deepEqual(errors, []); await ctx.close();
 });
 
@@ -95,9 +95,8 @@ test("Budget: one finding about expenses; where pay goes and room to adjust behi
 
 test("a shortfall is a problem everywhere, the same amount; it leads the Budget card even when every dollar has a plan", { skip }, async () => {
   const { page, errors, ctx } = await open(solo([["Rent", "Fixed", 1120, "Fortnight", "essential"]], { spending: 0.5, emergency: 0.1, goals: 0.25, invest: 0.15 }), { ...phone(), storage: ALL_DONE, hash: "", waitFor: "#app .home" });
-  assert.match(await page.textContent(".ho-next"), /Planned expenses are over their budget/);
-  assert.match(await page.textContent(".ho-next"), /By \$120\/fn/);
-  assert.match(await page.textContent(".ho-lines"), /Over budget by \$120\/fn/);
+  assert.match(await page.textContent(".ho-coverage summary"), /Expenses are over budget[\s\S]*\$120\.00 per fortnight short/);
+  assert.match(await page.textContent("#homeRoot"), /Pay fully allocated/);
   await tab(page, "budget"); await page.waitForSelector("#planCheck");
   assert.match(await page.textContent("#planCheck .pc-main"), /Expenses are over budget\s*\$120\/fn short/);
   assert.equal(await page.getAttribute("#planCheck .pc-main", "data-insight"), "short");
@@ -114,8 +113,8 @@ test("a shortfall is a problem everywhere, the same amount; it leads the Budget 
 
 test("no expenses yet: no made-up coverage or essentials; one clear next step", { skip }, async () => {
   const { page, errors, ctx } = await open(solo([], { spending: 0.5, emergency: 0.1, goals: 0.25, invest: 0.15 }), { ...phone(), storage: ALL_DONE, hash: "", waitFor: "#app .home" });
-  assert.equal(await page.locator(".ho-lines").count(), 0, "nothing to say yet");
-  assert.match(await page.textContent(".ho-next"), /Add your regular expenses/);
+  assert.equal(await page.locator(".ho-coverage").count(), 0, "nothing to break down yet");
+  assert.match(await page.textContent('[data-home-act="bills"]'), /Add expenses to check/);
   await tab(page, "spending"); await page.waitForSelector("#app .sp-empty");
   assert.equal(await page.locator("#spEss").count(), 0);
   await tab(page, "budget"); await page.waitForSelector("#planCheck");
@@ -164,12 +163,13 @@ test("switching households: every summary is the new household's", { skip }, asy
     { id: "hh-2", name: "Mum’s", role: "editor", budget: solo([["Rates", "Fixed", 300, "Fortnight", "essential"]]) },
   ] };
   const { page, errors, ctx } = await open(null, { ...phone(), storage: ALL_DONE, init, hash: "", waitFor: "#app .home" });
-  assert.match(await page.textContent(".ho-lines"), /Over budget by \$120/);
+  assert.match(await page.textContent(".ho-coverage summary"), /\$120\.00 per fortnight short/);
   await page.click("#hhBtn"); await page.click('#hhPop [data-switch="hh-2"]');
-  await page.waitForFunction(() => /Mum/.test(document.querySelector("#brandNames").textContent) && document.querySelector(".ho-lines"));
-  assert.doesNotMatch(await page.textContent("#app"), /Over budget by \$120/);
-  assert.match(await page.textContent(".ho-lines"), /Essentials\s*\$300\/fn · 15% of pay/);
-  assert.match(await page.textContent(".ho-lines"), /Fit their budget/);
+  await page.waitForFunction(() => /Mum/.test(document.querySelector("#brandNames").textContent) && document.querySelector(".ho-coverage summary"));
+  assert.doesNotMatch(await page.textContent(".ho-coverage summary"), /\$120\.00 per fortnight short/);
+  assert.match(await page.textContent(".ho-coverage summary"), /Expenses are covered/);
+  await page.click(".ho-coverage summary");
+  assert.match(await page.locator(".ho-breakdown").innerText(), /\$300\.00 per fortnight/);
   assert.deepEqual(errors, []); await ctx.close();
 });
 

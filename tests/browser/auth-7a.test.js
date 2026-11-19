@@ -113,6 +113,7 @@ test("sign up → 'check your email' with the address and a link to open (no cod
   assert.match(await page.textContent(".auth-card"), /sam@example\.com/);
   assert.match(await page.textContent(".auth-card"), /Tap the link in it/);
   assert.equal(await page.locator("#fVerify, .otp").count(), 0, "no code to type");
+  assert.equal((await auth(page, "signUp"))[0].data.accent, "indigo", "only new registrations are seeded with Indigo");
   assert.equal((await auth(page, "signUp"))[0].redirect.endsWith("/"), true, "the confirmation link comes back to the app");
   await page.screenshot({ path: join(SHOTS, "auth-verify-390.png") });
   assert.deepEqual(errors, []); await ctx.close();
