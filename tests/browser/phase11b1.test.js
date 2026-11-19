@@ -122,4 +122,3 @@ test("the Indigo shell and Playbook fit six widths in both themes with an altern
     }
   }
 });
-

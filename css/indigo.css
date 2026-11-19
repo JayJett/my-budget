@@ -207,4 +207,3 @@ dialog.sheet:has(.pb) { max-width:460px; width:min(100% - 24px,460px); padding:0
 @media(prefers-reduced-motion:reduce) {
   .ind-primary,.ind-row,.pb button,.pb-prog-bar i { animation:none; transition:none; }
 }
-
