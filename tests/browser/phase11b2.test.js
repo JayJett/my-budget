@@ -81,14 +81,15 @@ test("Indigo finance pages fit the mobile and desktop widths, including large te
    for(const [route,selector] of [["budget",".alloc-row"],["spending",".ex-row"],["goals",".gl-card"]]){
      if(route!=="budget"){
        const tab=page.locator('#tabs [data-tab="'+route+'"]');
-       await tab.waitFor({state:"visible"});
-       const point=await tab.evaluate(el=>{
+       const hit=await page.waitForFunction(route=>{
+         const el=document.querySelector('#tabs [data-tab="'+CSS.escape(route)+'"]');
+         if(!el)return false;
          const {left,top,width,height}=el.getBoundingClientRect();
          const x=left+width/2, y=top+height/2;
-         const target=document.elementFromPoint(x,y);
-         return {x,y,reachable:el.contains(target),target:target?.outerHTML.slice(0,150)};
-       });
-       assert.ok(point.reachable,width+" "+route+" tab hit area "+JSON.stringify(point));
+         return width>0&&height>0&&el.contains(document.elementFromPoint(x,y))&&{x,y};
+       },route,{timeout:5000});
+       const point=await hit.jsonValue();
+       await hit.dispose();
        // Fixed navigation is already visible. Scrolling a fixed element into view
        // can move the mobile visual viewport just after a native dialog closes.
        if(width<600)await page.touchscreen.tap(point.x,point.y);
