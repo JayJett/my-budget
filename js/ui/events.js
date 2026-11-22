@@ -21,14 +21,15 @@ const tabScroll = {};
 export function switchTab(t) {
   if (!t) return;
   tabScroll[app.tab] = window.scrollY;
-  const navFocused = !!document.activeElement?.closest("#tabs");
+  const navFocused = document.activeElement?.closest("#tabs,.wl-seg")?.classList.contains("wl-seg") ? ".wl-seg"
+    : document.activeElement?.closest("#tabs") ? "#tabs" : "";
   const sheet = $("#sheet"); if (sheet && sheet.open) sheet.close();
   const dlg = $("#dlg"); if (dlg && dlg.open) $("#dlgNo").click();
   closePop(); closeDrawer({ focus: false }); closeHouseholdMenu();
   if (WEALTH.includes(t)) app.wealthTab = t; // Wealth reopens on the section you were last in
   app.tab = t;
   if (app.household) render();
-  if (navFocused) $('#tabs [aria-selected="true"]')?.focus({ preventScroll:true });
+  if (navFocused) $(`${navFocused} [aria-selected="true"]`)?.focus({ preventScroll:true });
   window.scrollTo({ top: tabScroll[t] || 0 });
 }
 
@@ -233,10 +234,10 @@ export function initEvents() {
     const ng = $(`.grip[data-grip="${CSS.escape(g.dataset.grip)}"][data-i="${CSS.escape(g.dataset.i)}"]`); if (ng) ng.focus();
   });
 
-  $("#tabs").addEventListener("keydown", e => {
-    const t = e.target.closest("[role=tab]");
-    if (!t || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
-    const tabs = [...e.currentTarget.querySelectorAll("[role=tab]")];
+  document.addEventListener("keydown", e => {
+    const t = e.target.closest("[role=tab]"), group = t?.closest("#tabs,.wl-seg");
+    if (!group || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
+    const tabs = [...group.querySelectorAll("[role=tab]")];
     const i = tabs.indexOf(t), n = tabs.length;
     const next = e.key === "Home" ? 0 : e.key === "End" ? n - 1 : (i + (e.key === "ArrowRight" ? 1 : -1) + n) % n;
     e.preventDefault();

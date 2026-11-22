@@ -46,7 +46,7 @@ export const TOURS = {
       { sel: ["#nwHead", "#app .nw-hero"], title: "Your net worth", text: "Everything you own minus everything you owe, worked out from the balances you enter here. Nothing comes from your bank automatically." },
       { sel: ["#app .nw-main .sp-list", "#app .sp-empty"], title: () => has("#app .sp-empty") ? "Start with an account" : "Your accounts",
         text: () => has("#app .sp-empty") ? "Add your first account here: everyday or savings, investments, KiwiSaver, or a debt such as a loan." : "Grouped by type: savings, investments, KiwiSaver and debts. Tap an account to update its balance." },
-      { sel: ["#app .nw-review"], title: "Keeping it current", text: "Balances only change when you change them. Every so often, check them against your bank and tap Reviewed today." },
+      { sel: ["#app .nw-review"], title: "Keeping it current", text: "Balances only change when you change them. Open Review balances after checking the amounts, then mark them reviewed." },
     ],
   },
   spending: {
@@ -72,9 +72,7 @@ export const TOURS = {
   invest: {
     invite: "See how the forecast is worked out.",
     stops: [
-      { sel: ['#app .iv-src-i[data-tab="networth"]'], title: "Starting balance", text: "Comes from your Investment accounts in Wealth → Accounts." },
-      { sel: ['#app .iv-src-i[data-tab="budget"]'], title: "What goes in", text: "Your Investment allocations on the Budget tab. Change them there and this updates." },
-      { sel: ["#app .iv-as"], title: "Your assumptions", text: "The yearly return, how much contributions grow, and fees. They’re your own estimates, not a recommendation. Tap Adjust to change them." },
+      { sel: ["#app [data-iv-edit]"], title: "Your assumptions", text: "Adjust the return, contribution growth and fees. The breakdown also shows balances from Wealth and contributions from Budget." },
       { sel: ["#ivChart", "#app .iv-hero"], title: "The forecast", text: "An illustration of how it could grow over 5 to 30 years. Real returns go up and down, so it’s not a guarantee or advice." },
     ],
   },
@@ -82,10 +80,9 @@ export const TOURS = {
     invite: "See how your snapshots show change over time.",
     stops: [
       { sel: ["#app .pg-start"], title: "Your journey starts here", text: "A snapshot saves today’s balances and goals. One is saved automatically on the 1st of each month, and you can save one any time." },
-      { sel: ["#app .pg-hero:not(.pg-start) .sp-head", "#app .pg-hero:not(.pg-start)"], title: "Net worth over time", text: "Today’s net worth, and how it’s changed since your last monthly snapshot." },
+      { sel: ["#app .pg-hero:not(.pg-start) .sp-head", "#app .pg-hero:not(.pg-start)"], title: "Net worth over time", text: "The amount compares the latest recorded snapshots. Open Current balances and detail to compare with what you’ve entered today." },
       { sel: ["#app .pg-hist"], title: "Your history", text: () => has("#app .pg-sparse") ? "The chart starts with your second monthly snapshot. Nothing is made up in between, so it grows more useful each month." : "Each solid dot is a saved snapshot; the hollow one is today. Tap the chart to see a month." },
-      { sel: ["#app .pg-ad"], title: "Assets and debt", text: "Cash, investments, KiwiSaver and debt, and how each has changed." },
-      { sel: ["#app .pg-gl"], title: "Goal progress", text: "How each savings goal is moving towards its target." },
+      { sel: ["#app .pg-hl"], title: "Saved snapshots", text: "Open a dated entry to compare it with your current balances and goals." },
     ],
   },
 };

@@ -25,8 +25,6 @@ import { n, blank, uid, ymd } from "../model/util.js";
 import { openExpensePicker } from "./expense-picker.js";
 import { paydayErrors } from "../model/onboarding.js";
 import { nwType, nwIcon } from "./views/networth.js";
-import { HERO } from "./hero-art.js";
-import { setThemeColour } from "./auth.js";
 import { markTour } from "./tour.js";
 import { holdUndoForSetup } from "./history.js";
 import { calm } from "./motion.js";
@@ -94,9 +92,9 @@ export function startSetup() {
   ans = { mode, people: [{ name: myName, pay: null, freq: "fortnightly", payday: "" }], needName: !myName };
   stage = 2; done = 1; split = null; dir = 1; saving = false; saveErr = ""; shownStage = 0;
   app.setup = { render: draw };
-  document.body.classList.add("setting-up"); setThemeColour(true);
+  document.body.classList.add("setting-up");
 }
-export function endSetup() { app.setup = null; document.body.classList.remove("setting-up"); setThemeColour(false); }
+export function endSetup() { app.setup = null; document.body.classList.remove("setting-up"); }
 
 function accountsStep(P) {
   const S = app.state, shared = isShared(S) && S.people.length > 0, v = x => fmtMoney(x, true);
@@ -113,7 +111,7 @@ function accountsStep(P) {
   // Phase 9A.1: before any account, "+ Add an account" is THE button and "Skip for now" a quiet link;
   // once there are accounts, "Save and continue" is the button and adding another is the quieter row.
   const form = accForm ? accFormHTML(shared) : accs.length ? `<button class="add-row ob-add" type="button" data-obact="acc-add">+ Add another account</button>` : "";
-  return `${accs.length || accForm ? "" : `<div class="ob-art" aria-hidden="true">${HERO.jar()}</div>`}<h2 id="obTitle" tabindex="-1">Let’s add your accounts</h2>
+  return `<h2 id="obTitle" tabindex="-1">Let’s add your accounts</h2>
     <p class="lead">Add what you have and what you owe. You can always do this later.</p>
     ${rows ? `<ul class="ob-accs">${rows}</ul>` : ""}${totals}${form}
     ${accErr ? `<p class="msg err" role="alert">${esc(accErr)}</p>` : ""}
@@ -263,13 +261,13 @@ const lookPart = () => `<div class="ob-look"><button class="linkish ob-look-btn"
 
 function body() {
   const P = ans.people;
-  if (stage === 1) return `<div class="ob-art" aria-hidden="true">${HERO.together()}</div><h2 id="obTitle" tabindex="-1">Let’s make this yours</h2><p class="lead">Are you budgeting on your own or with someone else?</p>
+  if (stage === 1) return `<h2 id="obTitle" tabindex="-1">Let’s make this yours</h2><p class="lead">Are you budgeting on your own or with someone else?</p>
     ${modeChoices(ans.mode, false)}
     ${lookPart()}
     <p class="ob-hint">${app.household ? `Your household: <b>${esc(app.household.name)}</b>. You can rename it or invite people in Household settings.` : ""}</p>
     ${nav("Continue", { back: false })}`;
 
-  if (stage === 2) return `<div class="ob-art" aria-hidden="true">${HERO.jar()}</div><h2 id="obTitle" tabindex="-1">Let’s start with your income</h2><p class="lead">How much do you usually take home after tax?</p>
+  if (stage === 2) return `<h2 id="obTitle" tabindex="-1">Let’s start with your income</h2><p class="lead">How much do you usually take home after tax?</p>
     ${ans.needName ? `<label class="ob-field"><span>Your first name</span><input type="text" data-ob="people.0.name" value="${esc(P[0].name)}" autocomplete="given-name" placeholder="First name"></label>` : ""}
     ${P.map((p, i) => payBlock(p, i)).join("")}
     ${ans.mode === "with" && P.length < MAX_PEOPLE ? `<button class="add-row ob-add" type="button" data-obact="addperson">+ Add ${P.length > 1 ? "someone else’s" : "their"} pay too <small>optional</small></button>` : ""}
@@ -303,9 +301,9 @@ function body() {
   // Done. The picture and words sit in the middle; the two choices sit where "Continue" was.
   const first = (P[0].name || "").trim(), withAccs = (app.state.nw.accounts || []).length > 0;
   return `<div class="ob-done"><div class="ob-done-mid">
-      <div class="ob-done-art" aria-hidden="true">${HERO.grow()}<span class="ob-done-ic"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5l3 3 6-7"/></svg></span></div>
+      <div class="ob-done-art" aria-hidden="true"><span class="ob-done-ic"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5l3 3 6-7"/></svg></span></div>
       <h2 id="obTitle" tabindex="-1">Your budget is ready${first ? `, ${esc(first)}` : ""}!</h2>
-      <p class="lead">${withAccs ? "Your plan and accounts are saved. You can change anything whenever you like." : "Your plan is saved. Add your accounts any time in Wealth, and your goals when you’re ready."}</p></div>
+      <p class="lead">${withAccs ? "Your plan and accounts are saved." : "Your plan is saved."}</p></div>
     <div class="ob-done-acts"><button class="btn primary block" type="button" data-obact="tour">Show me around</button>
     <button class="linkish ob-skip-link" type="button" data-obact="finish">Open Moni Money</button></div></div>`;
 }
@@ -315,11 +313,12 @@ function payBlock(p, i) {
   return `<section class="ob-pay" aria-label="${other ? esc(p.name || "Their") + " pay" : "Your pay"}">
     ${other ? `<div class="ob-pay-h"><label class="ob-field grow"><span>Their first name</span><input type="text" data-ob="people.${i}.name" value="${esc(p.name)}" autocomplete="off" placeholder="First name"></label><button class="icon-x" type="button" data-obact="rmperson" data-i="${i}" aria-label="Remove ${esc(p.name || "this person")}">×</button></div>`
       : ans.people.length > 1 ? `<p class="ob-who">${esc(p.name || "You")}</p>` : ""}
-    <label class="ob-amount"><span class="sr-only">${other ? "Their" : "Your"} take-home pay</span><span class="ob-cur" aria-hidden="true">$</span><input type="text" inputmode="decimal" autocomplete="off" data-ob="people.${i}.pay" data-obt="num" value="${blank(p.pay) ? "" : fmtNum(p.pay)}" placeholder="0"></label>
-    <div class="seg seg-radio ob-freq" role="radiogroup" aria-label="How often">${FREQS.map(([v, l]) => `<label><input type="radio" name="freq${i}" value="${v}" data-ob="people.${i}.freq"${p.freq === v ? " checked" : ""}><span>${l}</span></label>`).join("")}</div>
+    <label class="ob-amount"><span class="ob-pay-label">${other ? "Their" : "Your"} take-home pay</span><span class="ob-cur" aria-hidden="true">$</span><input type="text" inputmode="decimal" autocomplete="off" data-ob="people.${i}.pay" data-obt="num" value="${blank(p.pay) ? "" : fmtNum(p.pay)}" placeholder="0"></label>
+    <div class="seg seg-radio ob-freq" role="radiogroup" aria-label="Pay frequency">${FREQS.map(([v, l]) => `<label><input type="radio" name="freq${i}" value="${v}" data-ob="people.${i}.freq"${p.freq === v ? " checked" : ""}><span>${l}</span></label>`).join("")}</div>
     ${(() => { const err = payErr[i], id = `obPd${i}`; // Phase 9C.2: with pay entered, the last payday is needed (it sets the payday plan)
       return `<label class="ob-field ob-payday${err ? " bad" : ""}"><span>${other ? "When were they last paid?" : "When were you last paid?"}</span>
-      <input type="date" id="${id}" data-ob="people.${i}.payday" value="${esc(p.payday)}" max="${ymd(app.today)}"${n(p.pay) > 0 ? ` required aria-required="true"` : ""}${err ? ` aria-invalid="true" aria-describedby="${id}e"` : ""}></label>
+      <input type="date" id="${id}" data-ob="people.${i}.payday" value="${esc(p.payday)}" max="${ymd(app.today)}"${n(p.pay) > 0 ? ` required aria-required="true"` : ""}${err ? ` aria-invalid="true" aria-describedby="${id}e"` : ` aria-describedby="${id}help"`}></label>
+      <small class="ob-pay-hint" id="${id}help">Required with regular pay.</small>
       ${err ? `<p class="ob-err" id="${id}e" role="alert">${esc(err)}</p>` : ""}`; })()}
   </section>`;
 }

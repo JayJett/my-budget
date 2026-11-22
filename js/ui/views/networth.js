@@ -10,13 +10,12 @@
 import { miniDonut } from "../mini-donut.js";
 import { app, readOnly } from "../ctx.js";
 import { esc } from "../dom.js";
-import { K, tipq, attrs } from "../inputs.js";
+import { K, attrs } from "../inputs.js";
 import { budgetUI } from "../budget-sheets.js";
-import { drawSplit } from "../charts.js";
+import { isShared } from "../../model/schema.js";
 import { nwStatus as nwStatusOf } from "../../model/calc.js"; // the status wording is the model's own, unchanged
 import { money, MONTHS } from "../../model/format.js";
 import { n, blank, parseDate, daysBetween } from "../../model/util.js";
-import { ART } from "../art.js";
 import { itemIcon } from "../icons.js";
 import { isObjectColour } from "../palette.js";
 
@@ -50,14 +49,16 @@ const tracksGoals = a => a.type === "Savings" && !blank(a.name);
 
 function row(a, ui, i, L) {
   const t = nwType(a.type), em = (app.C && app.C.earmark[a.id]) || 0, showBar = tracksGoals(a) && em > 0 && !ui.reorder;
-  const over = em > n(a.balance);
+  const over = em > n(a.balance), shared = isShared(app.state);
+  const owner = shared && app.state.people.find(p => p.id === a.owner);
+  const rowId = encodeURIComponent(a.id);
   return `<li class="ex">
-    <button class="ex-row" type="button" data-edit-nw="${esc(a.id)}"${ui.reorder ? " disabled" : ""} aria-label="${esc(a.name || "Unnamed account")}: edit">
+    <button class="ex-row" type="button" data-edit-nw="${esc(a.id)}"${ui.reorder ? " disabled" : ""} aria-label="${esc(a.name || "Unnamed account")}: ${readOnly() ? "view" : "edit"}" aria-describedby="nw-detail-${rowId} nw-value-${rowId}">
       <span class="ex-ic" style="--cat:${isObjectColour(a.colour) ? `var(--o-${a.colour})` : t.col}" aria-hidden="true">${itemIcon(a.icon) || nwIcon(a.type)}</span>
       <span class="ex-main"><span class="ex-name">${esc(a.name || "Unnamed account")}</span>
-        <span class="ex-sub">${ui.reorder ? esc(t.label) : K(`nw.${a.id}.sub`)}${ui.reorder ? "" : ` ${K(`nw.${a.id}.flag`, "chip")}`}</span>
+        <span class="ex-sub" id="nw-detail-${rowId}">${ui.reorder ? esc(t.label) : `${shared ? `<span class="nw-owner">${esc(owner?.name || (a.owner ? "Owner unavailable" : "Shared"))}</span>` : ""}${K(`nw.${a.id}.sub`)}`}${ui.reorder ? "" : ` ${K(`nw.${a.id}.flag`, "chip")}`}</span>
         ${showBar ? `<span class="ex-prog nw-em${over ? " over" : ""}" aria-hidden="true"><span data-k="nw.${esc(a.id)}.bar"></span></span>` : ""}</span>
-      <span class="ex-amt${a.type === "Debt" ? " owed" : ""}">${K(`nw.${a.id}.v`)}<small>${K(`nw.${a.id}.ow`)}</small></span>${ui.reorder ? "" : CHEV}</button>
+      <span class="ex-amt${a.type === "Debt" ? " owed" : ""}" id="nw-value-${rowId}">${K(`nw.${a.id}.v`)}<small>${K(`nw.${a.id}.ow`)}</small></span>${ui.reorder ? "" : CHEV}</button>
     ${ui.reorder ? `<span class="mv-row"><button class="mv-btn" type="button" data-move="up" data-l="nw" data-i="${esc(a.id)}" aria-label="Move ${esc(a.name || "this")} up"${i === 0 ? " disabled" : ""}>↑</button><button class="mv-btn" type="button" data-move="down" data-l="nw" data-i="${esc(a.id)}" aria-label="Move ${esc(a.name || "this")} down"${i === L.length - 1 ? " disabled" : ""}>↓</button></span>` : ""}
   </li>`;
 }
@@ -66,27 +67,32 @@ export function view() {
   const S = app.state, L = S.nw.accounts, ro = readOnly(), ui = budgetUI();
   const savings = L.filter(tracksGoals);
 
-  const hero = `<section class="card nw-hero" aria-live="polite">
-    <span class="eyebrow">Net worth ${tipq("Everything you own (cash, savings, investments, super) minus everything you owe. It isn’t all spending money: super and investments are long-term.")}</span>
-    <div class="nw-head" id="nwHead"><span class="amt">${K("nw.net")}</span></div>
+  const open = id => document.getElementById(id)?.open ? " open" : "";
+  const hero = `<section class="ind-card nw-hero" aria-live="polite">
+    <p class="ind-kicker">Net worth</p>
+    <div class="nw-head" id="nwHead"><span class="amt ind-amount">${K("nw.net")}</span></div>
     <p class="nw-ad"><span>Assets <b>${K("nw.assets")}</b></span><span>Owed <b>${K("nw.debt")}</b></span></p>
+    <p class="ind-sub nw-manual">Manually entered balances</p>
+  </section>`;
+
+  const breakdown = L.length ? `<details class="ind-card ind-detail nw-breakdown" id="nwBreakdown"${open("nwBreakdown")}><summary>Assets and goal earmarks</summary>
     <div class="nw-mix" id="nwMix"><span class="nw-donut" id="nwBar"></span><ul class="nw-key" id="nwKey"></ul></div>
     ${savings.length ? `<div class="nw-gm">
-      <div class="b-row"><span class="eyebrow">Goal money in savings ${tipq("Goals on the Goals tab say which savings account their Saved money sits in. That money is part of the balance, not extra: it’s just spoken for.")}</span></div>
+      <h3>Goal money in savings</h3>
       <div class="sp-figs"><div><small>In savings</small><b>${K("nw.gm.sav")}</b></div><div><small>For goals</small><b>${K("nw.gm.em")}</b></div><div><small>Not earmarked</small><b>${K("nw.gm.free")}</b></div></div>
-      <p class="nw-over" data-k="nw.gm.over" data-base="nw-over"></p></div>` : ""}
-  </section>`;
+      <p class="ind-sub">Earmarked money is already included in savings.</p>
+    </div>` : ""}</details>` : "";
 
-  const review = `<section class="card nw-review">
-    <div class="nw-rv-top"><span class="nw-rv-ic" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3" width="11" height="10.5" rx="2"/><path d="M2.5 6.5h11M5.5 1.8v2.4M10.5 1.8v2.4M6 10l1.4 1.4L10 8.8"/></svg></span>
-      <div class="nw-rv-txt"><b>${K("nw.rev.when")}</b><small>Balances are typed in by you, not live from the bank.</small><span>${K("nw.rev", "chip")}</span></div></div>
-    ${ro ? "" : `<div class="nw-rv-act"><button class="btn small primary" type="button" id="revToday">Reviewed today</button>
-      <details class="more nw-rv-date"><summary>Pick a date</summary><input type="date" class="bs-in" id="rev" ${attrs("root", "", "nw.reviewed", "date")} value="${esc(S.nw.reviewed || "")}" aria-label="Last reviewed"></details></div>`}
-  </section>`;
+  const review = L.length ? `<details class="ind-card ind-detail nw-review" id="nwReview"${open("nwReview")}>
+    <summary><span>Review balances</span><small>${K("nw.rev.when")}</small></summary>
+    ${K("nw.rev", "chip")}
+    ${ro ? "" : `<div class="nw-rv-act"><button class="ind-primary" type="button" id="revToday">Reviewed today</button>
+      <details class="more nw-rv-date"${document.querySelector(".nw-rv-date")?.open ? " open" : ""}><summary>Pick a date</summary><input type="date" class="bs-in" id="rev" ${attrs("root", "", "nw.reviewed", "date")} value="${esc(S.nw.reviewed || "")}" aria-label="Last reviewed"></details></div>`}
+  </details>` : "";
 
   let list;
-  if (!L.length) list = `<section class="card sp-empty"><div class="empty-art" aria-hidden="true">${ART.wallet()}</div><h2>Start with an account</h2>
-    <p class="dim">Add your bank accounts, savings, KiwiSaver and any debts to see where you stand.</p>${ro ? "" : `<button class="btn primary" type="button" data-nw-new="Savings">+ Add account</button>`}</section>`;
+  if (!L.length) list = `<section class="ind-card sp-empty"><h2>Start with an account</h2>
+    <p class="ind-sub">Enter your balances to see your net worth.</p>${ro ? "" : `<button class="ind-primary" type="button" data-nw-new="Savings">+ Add account</button>`}</section>`;
   else if (ui.reorder) list = `<section class="sp-list">
     <div class="b-row sec"><h2>Accounts</h2><button class="btn small ghost" type="button" data-reorder aria-pressed="true">Done</button></div>
     <p class="dim small-note">Move accounts up or down. The order is kept within each group.</p>
@@ -95,15 +101,15 @@ export function view() {
     const known = GROUPS.flatMap(g => g.types), other = L.filter(a => !known.includes(a.type));
     const groups = [...GROUPS, ...(other.length ? [{ key: "other", title: "Other", types: null }] : [])];
     list = `<section class="sp-list">
-      <div class="b-row sec"><h2>Accounts ${tipq(NW_TYPES.map(t => `${t.key}: ${t.help}`).join(" "))}</h2>${ro ? "" : `<button class="btn small ghost" type="button" data-reorder aria-pressed="false">Reorder</button>`}</div>
+      <div class="b-row sec"><h2>Accounts</h2>${ro ? "" : `<button class="ind-link add-row" type="button" data-nw-new="Savings">+ Add account</button>`}</div>
       ${groups.map(g => {
         const items = g.types ? L.filter(a => g.types.includes(a.type)) : other; if (!items.length) return "";
         const col = g.types ? nwType(g.types[g.types.length - 1]).col : "var(--faint)";
-        return `<div class="ex-group" style="--cat:${col}"><div class="ex-gh"><span class="ex-dot" aria-hidden="true"></span><h3>${esc(g.title)}</h3><small>${items.length}</small>
+        return `<div class="ex-group" style="--cat:${col}"><div class="ex-gh"><h3>${esc(g.title)}</h3>
           <span class="ex-gt">${g.tot ? K(g.tot) : ""}</span>${ro || !g.add ? "" : `<button class="icon-add" type="button" data-nw-new="${g.add}" aria-label="Add ${g.key === "debt" ? "a debt" : `an account to ${esc(g.title.toLowerCase())}`}">+</button>`}</div>
-          <ul class="card ex-list">${items.map(a => row(a, ui, L.indexOf(a), L)).join("")}</ul></div>`;
+          <ul class="ind-card ex-list">${items.map(a => row(a, ui, L.indexOf(a), L)).join("")}</ul></div>`;
       }).join("")}
-      ${ro ? "" : `<button class="add-row" type="button" data-nw-new="Savings">+ Add account</button>`}
+      ${ro ? "" : `<button class="ind-link" type="button" data-reorder aria-pressed="false">Reorder accounts</button>`}
     </section>`;
   }
 
@@ -114,7 +120,7 @@ export function view() {
     <li>Enter debts as positive numbers; they’re subtracted from your assets.</li>
     <li>Update balances roughly monthly and press “Reviewed today”.</li>
   </ul></details>`;
-  return `<div class="nw-page"><div class="nw-side">${hero}${L.length ? review : ""}</div><div class="nw-main">${list}${help}</div></div>`;
+  return `<div class="nw-page"><div class="nw-side">${hero}<p class="nw-over" data-k="nw.gm.over" data-base="nw-over" role="status"></p></div><div class="nw-main">${list}${review}${breakdown}${help}</div></div>`;
 }
 
 function reviewedWhen(s, today) {
@@ -164,6 +170,7 @@ export function fill(D, C) {
 }
 
 export function draw(C) {
+  document.querySelector("#nwHead")?.classList.toggle("neg", C.nw.net < -0.004);
   const el = document.querySelector("#nwBar"); if (!el) return;
   // Phase 9C.1: what you own, by kind, as a small doughnut. Only assets: what's owed is never a slice.
   const parts = NW_TYPES.filter(t => t.key !== "Debt").map(t => ({ name: t.label, label: t.label, v: { Operating: C.nw.op, Savings: C.nw.sav, Investment: C.nw.inv, Super: C.nw.sup }[t.key], col: t.col }));
@@ -171,5 +178,4 @@ export function draw(C) {
   el.innerHTML = chart;
   document.querySelector("#nwMix").hidden = !shown.length;
   document.querySelector("#nwKey").innerHTML = shown.map(p => `<li><i style="background:${p.col}" aria-hidden="true"></i><span>${p.name}</span><b>${money(p.v)}</b></li>`).join("");
-  const head = document.querySelector("#nwHead"); if (head) head.classList.toggle("neg", C.nw.net < -0.004);
 }

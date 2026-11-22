@@ -7,12 +7,11 @@
    again and nothing is saved. It's a projection, never shown as money you have. */
 import { app, readOnly } from "../ctx.js";
 import { esc } from "../dom.js";
-import { K, TH, tipq, attrs } from "../inputs.js";
+import { K, TH, attrs } from "../inputs.js";
 import { WORDS } from "../../model/periods.js";
 import { money, m0, pct } from "../../model/format.js";
 import { blank } from "../../model/util.js";
 import { drawGrowth } from "../charts.js";
-import { ART } from "../art.js";
 
 export const HORIZONS = [5, 10, 20, 30];          // milestones in the projection (it runs to 30 years)
 const horizon = () => HORIZONS.includes(app.ivH) ? app.ivH : 30;
@@ -22,28 +21,25 @@ const pctText = v => `${+(Number(v || 0) * 100).toFixed(2)}%`;
 export function view() {
   const S = app.state, w = WORDS[S.viewAs], h = horizon(), ro = readOnly();
   const empty = !!app.C && !(app.C.inv.start > 0) && !(app.C.inv.annual > 0); // nothing to forecast: no $0 chart or $0 milestones
-  const hero = `<section class="card iv-hero" aria-live="polite">
-    <div class="b-row"><span class="eyebrow">Forecast ${tipq("An illustration of where regular investing could lead, using your assumptions below. Real returns go up and down; this is not a guarantee or advice.")}</span>
-      <div class="seg iv-h" role="group" aria-label="Years ahead">${HORIZONS.map(y => `<button type="button" data-iv-h="${y}" aria-pressed="${y === h}">${y}y</button>`).join("")}</div></div>
-    <div class="sp-head"><span class="amt">${K("iv.h.bal")}</span></div>
-    <p class="iv-lab">${K("iv.h.lab")}</p>
-    ${empty ? `<div class="iv-empty"><div class="empty-art" aria-hidden="true">${ART.growth()}</div><p><b>Nothing invested yet</b>Add an Investment account on Net worth, or give an Investment allocation a share of pay on Budget, to see a forecast.</p></div>` : ""}
-    ${empty ? "" : `<div class="sp-figs iv-figs"><div><small><i class="dot dash"></i>You put in</small><b>${K("iv.h.c")}</b></div><div><small><i class="dot" style="background:var(--invest)"></i>Growth after fees</small><b>${K("iv.h.g")}</b></div></div>
+  const hero = `<section class="ind-card iv-hero" aria-live="polite">
+    ${empty ? `<div class="iv-empty"><h2>Nothing invested yet</h2><p class="ind-sub">Add an investment account in Wealth or allocate pay to investments in Budget.</p><span hidden>${K("iv.h.bal")}</span></div>`
+      : `<p class="ind-kicker">${K("iv.h.lab")}</p>
+    <div class="sp-head"><span class="amt ind-amount">${K("iv.h.bal")}</span></div>
+    <p class="ind-sub">Illustrative estimate after fees, not a guarantee.</p>
+    <div class="seg iv-h" role="group" aria-label="Years ahead">${HORIZONS.map(y => `<button type="button" data-iv-h="${y}" aria-label="${y} years" aria-pressed="${y === h}">${y}y</button>`).join("")}</div>
     <div class="iv-chart" id="ivChart" tabindex="0" role="group" aria-label="Forecast chart. Use the left and right arrow keys to pick a year." aria-describedby="ivRead"></div>
     <div class="iv-read" id="ivRead" aria-live="polite"></div>`}
-    <p class="iv-note">Illustrative projection, not a guarantee.</p>
   </section>`;
   const sources = `<section class="iv-src">
     <button type="button" class="card iv-src-i" data-tab="networth"><small>Starting investments</small><b>${K("iv.start")}</b><span>From Net worth</span></button>
     <button type="button" class="card iv-src-i" data-tab="budget"><small>Going in</small><b>${K("iv.per")}<i>${esc(w.short)}</i></b><span>From Budget · ${K("iv.yr")}</span></button>
   </section>`;
-  const assumptions = `<section class="card iv-as">
-    <div class="b-row"><h2>Assumptions</h2><button class="btn small ghost" type="button" data-iv-edit>${ro ? "View" : "Adjust"}</button></div>
+  const assumptions = `<section class="iv-as">
     <ul class="iv-as-l"><li><small>Return</small><b>${K("iv.as.rate")}</b></li><li><small>Contributions grow</small><b>${K("iv.as.growth")}</b></li><li><small>Fees</small><b>${K("iv.as.fee")}</b></li></ul>
   </section>`;
   const miles = `<section class="iv-miles"><div class="b-row sec"><h2>Milestones</h2></div>
     <div class="iv-m-grid">${HORIZONS.map(y => `<button type="button" class="card iv-m${y === h ? " on" : ""}" data-iv-h="${y}" aria-pressed="${y === h}"><small>${y} years</small><b>${K(`iv.m${y}`)}</b><span>${K(`iv.m${y}.s`)}</span></button>`).join("")}</div></section>`;
-  const table = `<details class="card iv-years" id="ivYears"${app.ivYearsOpen ? " open" : ""}><summary><span>Yearly breakdown</span><small>All 30 years</small></summary>
+  const table = `<details class="ind-card ind-detail iv-years" id="ivYears"${app.ivYearsOpen ? " open" : ""}><summary><span>Yearly breakdown</span><small>All 30 years</small></summary>
     <div class="iv-tbl"><table>
       <thead><tr><th>Year</th>${TH("Put in", "Your own money put in so far, including the starting balance.", "num")}${TH("Balance", "Projected value at the end of the year.", "num")}${TH("Growth", "Balance minus what you put in: what the investments could earn, after fees.", "num")}${TH("Multiplier", "Balance ÷ put in. 2× means every dollar you put in became two.", "num")}</tr></thead>
       <tbody>${Array.from({ length: 30 }, (_, i) => i + 1).map(y => `<tr${y === h ? ' class="on"' : ""}><td>${y}</td><td class="num">${K(`iv.y${y}.c`)}</td><td class="num"><b>${K(`iv.y${y}.b`)}</b></td><td class="num">${K(`iv.y${y}.g`)}</td><td class="num dim">${K(`iv.y${y}.x`)}</td></tr>`).join("")}</tbody>
@@ -53,7 +49,12 @@ export function view() {
     <li>Returns compound and fees come off the balance every fortnight, so the growth shown is after fees. Contributions rise by the yearly increase you set.</li>
     <li>Markets go up and down; the smooth line is the long-term shape under fixed assumptions, not a prediction.</li>
   </ul></details>`;
-  return `<div class="iv-page"><div class="iv-side">${hero}</div><div class="iv-main">${sources}${assumptions}${empty ? "" : miles + table}${help}</div></div>`;
+  const advanced = document.getElementById("ivDetails")?.open;
+  return `<div class="iv-page"><div class="iv-side">${hero}
+    <button class="ind-primary iv-edit" type="button" data-iv-edit>${ro ? "View assumptions" : "Edit assumptions"}</button></div>
+    <div class="iv-main"><details class="ind-card ind-detail iv-details" id="ivDetails"${advanced ? " open" : ""}><summary>Forecast assumptions and breakdown</summary>
+      ${assumptions}${sources}${empty ? "" : `<div class="sp-figs iv-figs"><div><small>You put in</small><b>${K("iv.h.c")}</b></div><div><small>Growth after fees</small><b>${K("iv.h.g")}</b></div></div>${miles}`}${help}</details>
+      ${empty ? "" : table}</div></div>`;
 }
 
 /** The assumptions sheet (opened from ui/budget-sheets.js). The same three saved settings as before. */
@@ -74,7 +75,7 @@ export function investSheet() {
 function readout(C) {
   const el = document.querySelector("#ivRead"); if (!el) return;
   const y = picked(), d = C.inv.years[y];
-  el.innerHTML = `<b>${y === 0 ? "Now" : `Year ${y}`}</b><span><i class="dot" style="background:var(--invest)"></i>Balance ${m0(d.bal)}</span><span><i class="dot dash"></i>Put in ${m0(d.contrib)}</span><span>Growth ${m0(d.growth)}</span>`;
+  el.innerHTML = `<b>${y === 0 ? "Now" : `Year ${y}`}</b><span>Balance ${m0(d.bal)}</span>`;
 }
 
 export function fill(D, C) {

@@ -7,13 +7,12 @@
    the chart, changing the time range or comparing never writes anything. */
 import { app, readOnly } from "../ctx.js";
 import { $, esc, toast } from "../dom.js";
-import { tipq } from "../inputs.js";
 import { trendPoints, progressNotes, goalNote, goalHistory, compare, summarize, summarizeSnapshot, diffText, isGood, monthOf, previousMonthPoint } from "../../model/snapshots.js";
 import { money, m0, monthYear } from "../../model/format.js";
 import { drawMixChart, drawHistory, sparkline } from "../charts.js";
 import { addMonths } from "../../model/util.js";
 import { itemIcon } from "../icons.js";
-import { ART } from "../art.js";
+import { calm } from "../motion.js";
 
 const cache = store => `mb-snaps-v2-${store.userId}:${store.householdId}`;
 const MIX = [
@@ -81,7 +80,7 @@ const dateText = s => new Date(s.taken_at).toLocaleString("en-NZ", { day: "numer
 const snapLabel = s => s.kind === "monthly" ? monthYear(monthOf(s)) : dateText(s);
 const canSave = () => !readOnly() && !app.offline;
 const saveHelp = () => readOnly() ? "Only owners and editors can save snapshots." : app.offline ? "Saving a snapshot needs a connection." : "Handy right after you’ve updated your balances on Net worth.";
-const saveBtn = (primary, label = "Save snapshot") => `<button class="btn small ${primary ? "primary" : "ghost"}" type="button" data-snap="save"${canSave() ? "" : " disabled"}${savingStore === app.store ? " disabled" : ""}>${savingStore === app.store ? "Saving…" : label}</button>`;
+const saveBtn = (label = "Save snapshot") => `<button class="ind-primary" type="button" data-snap="save"${canSave() ? "" : " disabled"}${savingStore === app.store ? " disabled" : ""}>${savingStore === app.store ? "Saving…" : label}</button>`;
 
 /** "+$440" / "−$80" with words for debt: "$200 less owed". Never colour alone: the sign or words say it. */
 const changeText = (d, kind) => Math.abs(d) < 0.5 ? "No change" : kind === "debt" ? `${m0(Math.abs(d))} ${d < 0 ? "less" : "more"} owed` : diffText(d, kind);
@@ -101,15 +100,13 @@ function ranges(pts) {
 
 export function view() {
   const snaps = app.snapshots;
-  if (!snaps) return `<div class="card pg-empty"><p class="lead">Loading your snapshots…</p></div>`;
+  if (!snaps) return `<div class="ind-card pg-empty" role="status"><p class="ind-sub">Loading snapshots…</p></div>`;
   const nowSum = summarize(app.state);
-  if (!snaps.length) return `<div class="pg-page"><section class="card pg-hero pg-start">
-      <span class="eyebrow">Your progress</span>
+  if (!snaps.length) return `<div class="pg-page"><section class="ind-card pg-hero pg-start">
       <div class="sp-head"><span class="amt">${money(nowSum.netWorth)}</span><span class="lab">net worth today</span></div>
-      <div class="empty-art" aria-hidden="true">${ART.growth()}</div>
       <h2>Your journey starts here</h2>
-      <p class="lead">A snapshot keeps a copy of your balances and goals. One is saved automatically on the 1st of every month, and each one adds a point to your history.</p>
-      <div class="pg-save">${saveBtn(true, "Save your first snapshot")}<small>${esc(saveHelp())}</small></div>
+      <p class="ind-sub">Save a record of your balances and goals. Monthly snapshots are taken on the 1st of every month.</p>
+      <div class="pg-save">${readOnly() ? "" : saveBtn("Save your first snapshot")}<small>${esc(saveHelp())}</small></div>
     </section></div>`;
 
   const pts = trendPoints(snaps, app.state, app.today), rec = pts.filter(p => !p.now), now = pts[pts.length - 1];
@@ -117,23 +114,27 @@ export function view() {
   const rg = ranges(pts);
   if (!rg.some(r => r[0] === app.pgRange)) app.pgRange = "all";
   const shown = rangePoints(pts);
-  const hero = `<section class="card pg-hero" aria-live="polite">
-    <div class="b-row"><span class="eyebrow">Your progress</span>${saveBtn(false)}</div>
-    <div class="sp-head"><span class="amt">${money(now.netWorth)}</span><span class="lab">net worth today</span></div>
-    ${prev ? `<p class="pg-delta">${changeChip(now.netWorth - prev.netWorth, "total")} <span>since ${esc(monthYear(prev.date))}</span></p>` : ""}
-    <ul class="pg-notelist" id="pgNotes">${progressNotes(pts, app.today).map(t => `<li>${esc(t)}</li>`).join("")}</ul>
-  </section>`;
+  const latest = rec.at(-1), previous = rec.at(-2);
+  const delta = previous ? latest.netWorth - previous.netWorth : null;
+  const hero = `<div class="pg-summary" aria-live="polite">
+    <div><p class="ind-kicker">${previous ? "Change in recorded net worth" : "Recorded net worth"}</p>
+    <p class="ind-amount pg-recorded">${delta === null ? money(latest.netWorth) : esc(changeText(delta, "total"))}</p>
+    <p class="ind-sub">${previous ? `${esc(snapLabel(previous.snap))} to ${esc(snapLabel(latest.snap))}` : esc(snapLabel(latest.snap))}</p>
+    ${previous ? `<p class="pg-latest"><b>${money(latest.netWorth)}</b> at the latest snapshot</p>` : ""}</div>
+    ${app.snapshotsOffline ? '<p class="ind-sub" role="status">Showing the copy saved on this device.</p>' : ""}
+  </div>`;
 
-  const history = rec.length < 2 ? `<section class="card pg-hist pg-sparse">
+  const history = rec.length < 2 ? `<section class="pg-hist pg-sparse">
       <div class="b-row"><h2>Net worth history</h2></div>
       <div class="pg-two"><div><small>${esc(rec.length ? snapLabel(rec[0].snap) : "")} · snapshot</small><b>${money(rec[0].netWorth)}</b></div><div><small>Today · current balances</small><b>${money(now.netWorth)}</b></div></div>
       <p class="dim small-note">Your history chart starts with your second monthly snapshot. Nothing is filled in between.</p>
     </section>`
-    : `<section class="card pg-hist">
-      <div class="b-row"><h2>Net worth history ${tipq("Each solid dot is a recorded snapshot (the latest of each month). The hollow dot is today, from your Net worth tab.")}</h2>
+    : `<section class="pg-hist">
+      <div class="b-row"><h2 class="sr-only">Net worth history</h2>
         ${rg.length ? `<div class="seg iv-h" role="group" aria-label="Time range">${rg.map(([k, l]) => `<button type="button" data-pg-range="${k}" aria-pressed="${k === app.pgRange}">${l}</button>`).join("")}</div>` : ""}</div>
       <div class="iv-chart" id="pgNet" tabindex="0" role="group" aria-label="Net worth history chart. Use the left and right arrow keys to pick a point." aria-describedby="pgRead"></div>
       <div class="iv-read pg-read" id="pgRead" aria-live="polite"></div>
+      <p class="ind-sub pg-legend">Hollow point: current balances</p>
       <p class="sr-only">Recorded net worth: ${shown.map(p => `${p.now ? "today" : p.label} ${m0(p.netWorth)}`).join(", ")}.</p>
     </section>`;
 
@@ -155,30 +156,37 @@ export function view() {
 
   const cmp = app.compareId && snaps.find(s => String(s.id) === String(app.compareId));
   const options = [...snaps].reverse().map(s => `<option value="${esc(s.id)}"${cmp && String(cmp.id) === String(s.id) ? " selected" : ""}>${esc(snapLabel(s))} · ${esc(whoSaved(s))}</option>`).join("");
-  const compareBox = `<section class="card pg-cmp" id="pgCompare">
-    <div class="b-row"><h2>Compare</h2>${cmp ? `<button class="btn small ghost" type="button" data-compare="close">Close</button>` : ""}</div>
+  const compareBox = `<details class="ind-card ind-detail pg-cmp" id="pgCompare"${cmp || document.getElementById("pgCompare")?.open ? " open" : ""}>
+    <summary>Compare with today</summary>
+    ${cmp ? `<button class="ind-link" type="button" data-compare="close">Clear comparison</button>` : ""}
     <label class="bs-field pg-cmp-pick"><span>Today’s balances compared with a snapshot</span><select class="bs-in" id="pgCmpSel"><option value="">Pick a snapshot</option>${options}</select></label>
     ${cmp ? compareHTML(cmp) : ""}
-  </section>`;
+  </details>`;
 
-  const list = [...snaps].reverse();
-  const nwOf = s => summarizeSnapshot(s).netWorth;
-  const historyList = `<section class="card pg-hl">
-    <div class="b-row"><h2>History</h2><small class="dim">${snaps.length} ${snaps.length === 1 ? "snapshot" : "snapshots"}</small></div>
-    <ul class="pg-list">${list.map((s, i) => {
-      const older = list[i + 1], d = older ? nwOf(s) - nwOf(older) : null;
-      return `<li><span><b>${esc(snapLabel(s))}</b><small>${esc(whoSaved(s))}</small></span>
-        <span class="pg-nw">${m0(nwOf(s))}${d === null ? "" : `<small>${esc(changeText(d, "total"))} vs before</small>`}</span>
-        <button class="btn small ghost" type="button" data-compare="${esc(s.id)}"${cmp && String(cmp.id) === String(s.id) ? ' aria-pressed="true"' : ""}>Compare</button></li>`;
-    }).join("")}</ul>
-    <div class="pg-save">${saveBtn(false)}<small>${esc(saveHelp())}${app.snapshotsOffline ? " Showing the copy saved on this device." : ""} The newest 24 saved snapshots are kept, plus every monthly one.</small></div>
+  const snapshots = [...snaps].reverse();
+  const snapRow = s => `<li><button class="ind-row" type="button" data-compare="${esc(s.id)}"${cmp && String(cmp.id) === String(s.id) ? ' aria-pressed="true"' : ""}>
+      <span class="ind-row-copy"><strong>${esc(snapLabel(s))}</strong><small>${esc(whoSaved(s))}</small></span>
+      <b class="pg-nw">${money(summarizeSnapshot(s).netWorth)}</b><span aria-hidden="true">›</span></button></li>`;
+  const historyList = `<section class="pg-hl">
+    <div class="b-row"><h2>Snapshots</h2>${readOnly() ? "" : saveBtn()}</div>
+    ${app.offline && !readOnly() ? `<p class="ind-sub">${esc(saveHelp())}</p>` : ""}
+    <ul class="ind-card ind-list pg-list">${snapshots.slice(0, 3).map(snapRow).join("")}</ul>
+    ${snapshots.length > 3 ? `<details class="ind-card ind-detail" id="pgOlder"${document.getElementById("pgOlder")?.open ? " open" : ""}><summary>Older snapshots</summary>
+      <ul class="ind-list pg-list">${snapshots.slice(3).map(snapRow).join("")}</ul></details>` : ""}
   </section>`;
 
   const help = `<details class="help"><summary>About snapshots</summary><ul>
     <li>A snapshot is a copy of your Net worth balances and your goals at one moment. One is saved automatically on the 1st of each month (NZ time); you can save one any time too.</li>
-    <li>Snapshots are never changed afterwards: editing balances or goals today only changes “Today”.</li>
+    <li>Snapshots are never changed afterwards: editing balances or goals today only changes “Today”. The newest 24 manual snapshots and every monthly snapshot are kept.</li>
   </ul></details>`;
-  return `<div class="pg-page"><div class="pg-side">${hero}${history}</div><div class="pg-main">${assets}${goals}${compareBox}${historyList}${help}</div></div>`;
+  const current = `<details class="ind-card ind-detail pg-details" id="pgDetails"${document.getElementById("pgDetails")?.open ? " open" : ""}><summary>Current balances and detail</summary>
+    <div class="sp-head"><span class="amt">${money(now.netWorth)}</span><span class="lab">net worth today</span></div>
+    ${prev ? `<p class="pg-delta">${changeChip(now.netWorth - prev.netWorth, "total")} <span>since ${esc(monthYear(prev.date))}</span></p>` : ""}
+    <ul class="pg-notelist" id="pgNotes">${progressNotes(pts, app.today).map(t => `<li>${esc(t)}</li>`).join("")}</ul>
+    ${assets}${goals}</details>`;
+  return `<div class="pg-page"><div class="pg-side"><section class="ind-card pg-hero">${hero}${history}</section></div>
+    <div class="pg-main">${historyList}${compareBox}${current}${help}</div></div>`;
+
 }
 
 function compareHTML(s) {
@@ -196,7 +204,7 @@ export function fill() {}
 /** The figures beside the history chart for the picked point (recorded, or Today). */
 function readout(p) {
   const el = $("#pgRead"); if (!el || !p) return;
-  el.innerHTML = `<b>${p.now ? "Today · current balances" : esc(snapLabel(p.snap))}</b><span>Net worth ${money(p.netWorth)}</span><span class="dim">Cash ${m0(p.cash)} · Investments ${m0(p.investments)} · Super ${m0(p.super)} · Debt ${m0(p.debt)}</span>`;
+  el.innerHTML = `<b>${p.now ? "Today · current balances" : esc(snapLabel(p.snap))}</b><span>Net worth ${money(p.netWorth)}</span>`;
 }
 
 export function draw() {
@@ -219,7 +227,7 @@ export function initProgress() {
   document.addEventListener("change", e => {
     if (e.target.id !== "pgCmpSel") return;
     app.compareId = e.target.value || null; app.render();
-    const box = $("#pgCompare"); if (box) box.scrollIntoView({ block: "start", behavior: "smooth" });
+    const box = $("#pgCompare"); if (box) box.scrollIntoView({ block: "start", behavior: calm() ? "auto" : "smooth" });
   });
   document.addEventListener("click", e => {
     const s = e.target.closest("[data-snap]");
@@ -230,7 +238,7 @@ export function initProgress() {
     if (c) {
       app.compareId = c.dataset.compare === "close" || String(app.compareId) === c.dataset.compare ? null : c.dataset.compare;
       app.render();
-      const box = $("#pgCompare"); if (box && app.compareId) box.scrollIntoView({ block: "start", behavior: "smooth" });
+      const box = $("#pgCompare"); if (box && app.compareId) box.scrollIntoView({ block: "start", behavior: calm() ? "auto" : "smooth" });
     }
   });
 }

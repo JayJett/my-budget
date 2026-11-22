@@ -37,18 +37,19 @@ const close = `<button class="dr-x" type="button" data-dr-close aria-label="Clos
 const subHead = title => `<div class="dr-sub-h"><button class="dr-back-btn" type="button" data-act="menu-back" aria-label="Back to the menu">${MENU_ICONS.back}</button><h2>${esc(title)}</h2>${close}</div>`;
 
 export function mainMenu() {
-  const s = app.session, hhs = app.households || [];
+  const s = app.session;
   const name = myName() || (s && s.user.email) || "You";
-  const profile = s ? `<button class="dr-me" type="button" data-act="profile" aria-label="My profile: ${esc(name)}">${avatarHTML("lg")}<span class="dr-me-t"><b>${esc(name)}</b><small>View my profile</small></span>${MENU_ICONS.chev}</button>` : "";
-  // (Phase 9A: switching households and Household settings moved to the household menu in the header)
-  const switcher = "";
-  return `<div class="dr-top">${profile}${close}</div>${switcher}
-    <nav class="dr-sec" aria-label="Menu">
-      ${row("history", "history", "History")}
-      ${row("appearance", "appearance", "Appearance")}
-      ${row("tours", "tours", "Guided tours")}
-    </nav>
-    <div class="dr-sec">${row("data", "data", "Data & backups")}</div>
+  const profile = s ? `<button class="dr-me" type="button" data-act="profile" aria-label="My profile: ${esc(name)}">${avatarHTML("lg")}<span class="dr-me-t"><b>${esc(name)}</b><small>Profile and account</small></span>${MENU_ICONS.chev}</button>` : "";
+  const household = app.household && `<button class="dr-row" type="button" data-act="household">${hhAvatarHTML(app.household, "sm")}
+    <span>${esc(app.household.name)}<small>${esc(ROLE[app.role] || "")}</small></span>${MENU_ICONS.chev}</button>`;
+  return `<div class="dr-sub-h"><h2>Settings</h2>${close}</div>
+    ${profile ? `<section class="dr-sec" aria-label="Profile and account">${profile}</section>` : ""}
+    ${household ? `<section class="dr-sec"><h3 class="dr-label">Household</h3>${household}</section>` : ""}
+    <section class="dr-sec" aria-label="Preferences">${row("appearance", "appearance", "Appearance")}
+      ${s ? row("reminders", "reminders", "Notifications") : ""}</section>
+    <section class="dr-sec"><h3 class="dr-label">Data &amp; backups</h3>${row("data", "data", "Import, export and backups")}
+      ${row("history", "history", "Budget edit history")}</section>
+    <section class="dr-sec"><h3 class="dr-label">Help</h3>${row("tours", "tours", "Guided tours")}</section>
     ${s ? `<div class="dr-foot"><button class="dr-row dr-out" type="button" data-act="signout">${MENU_ICONS.signout}<span>Sign out</span></button></div>` : ""}`;
 }
 
@@ -74,7 +75,7 @@ export function menuAct(b) {
   if (act === "data") { setDrawerContent(dataMenu()); return; }
   if (act === "menu-back") { setDrawerContent(mainMenu()); return; }
   if (!act && !b.dataset.tourReplay && !b.dataset.switch) return;
-  closeDrawer({ focus: !["household", "history", "appearance", "account", "reminders", "profile", "import"].includes(act) });
+  closeDrawer();
   if (b.dataset.tourReplay) { if (app.setup) { toast("Finish setting up first, then take a tour."); return; } app.startTour(b.dataset.tourReplay); return; }
   if (b.dataset.switch) { if (app.household && b.dataset.switch === app.household.id) return; app.switchHousehold(b.dataset.switch); return; }
   if (act === "csv") exportCSV();

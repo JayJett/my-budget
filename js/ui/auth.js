@@ -160,7 +160,6 @@ let recovering = false, entering = null;
 let householdOpen = 0, authEpoch = 0, appliedAuthEpoch = 0, observedUser = null;
 export function showAuth(mode, msg, kind) {
   document.body.classList.add("signed-out"); const el = $("#auth"); el.hidden = false; el.classList.add("im");
-  setThemeColour(true);
   if (mode === "signin" && !msg && !remembered() && !welcomeSeen()) mode = "welcome";
   const m = `<div class="msg ${kind || "err"}" id="authMsg">${msg ? esc(msg) : ""}</div>`;
   const tabs = `<div class="auth-tabs"><button type="button" data-auth="signin" aria-pressed="${mode === "signin"}">Sign in</button><button type="button" data-auth="signup" aria-pressed="${mode === "signup"}">Create account</button></div>`;
@@ -239,13 +238,6 @@ export function showAuth(mode, msg, kind) {
   if (mode === "verify") tickResend(); // a wait from an earlier "send a new code" carries on after a refresh
 }
 /** Safari's toolbar colour matches the dark screens while they're showing. */
-const LIGHT_BAR = "#FFFFFF", IM_BAR = "#123F36";
-export function setThemeColour(dark) {
-  document.querySelectorAll('meta[name="theme-color"]').forEach(m => {
-    if (!m.dataset.orig) m.dataset.orig = m.getAttribute("content") || LIGHT_BAR;
-    m.setAttribute("content", dark ? IM_BAR : m.dataset.orig);
-  });
-}
 /** The welcome slides: swipe (or use the dots, or the arrow keys); the dots follow along. */
 function initWelcome(el) {
   const track = el.querySelector("#wlTrack"), dots = [...el.querySelectorAll("[data-wl]")];
@@ -386,7 +378,7 @@ async function openHH(id) {
   hh.role = role; app.role = role; app.canWrite = canWrite;
   app.members = membership.members; app.personLinks = membership.personLinks;
   try { localStorage.setItem(lastHHKey(), hh.id); } catch (_) {}
-  document.body.classList.remove("signed-out"); $("#auth").hidden = true; setThemeColour(false);
+  document.body.classList.remove("signed-out"); $("#auth").hidden = true;
   app.loaded = true;
   app.offline = loaded.offline;
   saveOfflineProfile();

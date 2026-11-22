@@ -16,7 +16,7 @@ const friendly = e => app.friendly ? app.friendly(e) : (e && e.message) || "Some
 
 function open(title, html) {
   const d = $("#sheet");
-  d.innerHTML = `<div class="sheet-head"><h3 tabindex="-1" autofocus>${esc(title)}</h3><button class="btn icon" type="button" data-sheet="close" aria-label="Close">✕</button></div><div class="sheet-body">${html}</div>`;
+  d.innerHTML = `<div class="sheet-head"><h3 tabindex="-1" autofocus>${esc(title)}</h3><button class="btn icon" type="button" data-sheet="close" aria-label="Close">✕</button></div><div class="sheet-body ind-settings">${html}</div>`;
   if (!d.open) d.showModal();
 }
 const msg = (id, text, kind = "err") => { const m = $("#" + id); if (m) { m.className = "msg " + kind; m.textContent = text; } };
@@ -31,13 +31,15 @@ const PREVIEW = `<div class="ap-prev" aria-hidden="true"><div class="ap-prev-car
 export function openAppearance() {
   const vib = canVibrate();
   open("Appearance", `
-    ${PREVIEW}
+    <p class="ind-sub">Your appearance is personal to your account.</p>
+    <section class="set"><h4>Theme</h4>${lookSeg("theme", THEMES, "Light or dark")}<p class="set-note">Auto follows your phone, and changes when it does.</p></section>
     <section class="set"><h4>Your colour</h4>${accentPickerHTML()}<p class="set-note">Just for you: everyone in the household picks their own. People’s colours, your allocations’ colours and money colours (like over budget) don’t change.</p></section>
-    <section class="set"><h4>Light or dark</h4>${lookSeg("theme", THEMES, "Light or dark")}<p class="set-note">Auto follows your phone, and changes when it does.</p></section>
-    <section class="set"><h4>Spacing</h4>${lookSeg("density", DENSITIES, "Spacing")}<p class="set-note">Compact fits a little more on screen.</p></section>
+    <details class="ind-card ind-detail ap-display"><summary>Spacing, motion and feedback</summary><section class="set"><h4>Spacing</h4>${lookSeg("density", DENSITIES, "Spacing")}<p class="set-note">Compact fits a little more on screen.</p></section>
     <section class="set"><h4>Motion</h4>${lookSeg("motion", MOTIONS, "Motion")}<p class="set-note">Auto follows your phone’s Reduce Motion setting. Reduced keeps everything still.</p></section>
     ${vib ? `<section class="set"><h4>Touch feedback</h4>${lookSeg("feedback", FEEDBACKS, "Touch feedback")}<p class="set-note">A tiny vibration when you choose something or reach a goal.</p></section>` : ""}
-    <section class="set"><h4>Also yours to change</h4><div class="ap-links">
+    </details>
+    <details class="ind-card ind-detail"><summary>Preview appearance</summary>${PREVIEW}</details>
+    <section class="set"><h4>Household and item colours</h4><div class="ap-links">
       ${app.household ? `<button class="dr-row" type="button" data-ap-go="household"><span>Household look<small>Its colour, icon or photo, in Household settings</small></span></button>` : ""}
       <button class="dr-row" type="button" data-ap-go="people"><span>People’s colours<small>On the Budget tab: tap a person</small></span></button>
       <p class="set-note">Each allocation, account, goal and expense has its own colour and icon too: open it and look for Appearance.</p></div></section>
@@ -64,12 +66,12 @@ export function openProfile() {
     </section>
     <section class="set"><h4>Your name</h4><form id="setName" class="set-row"><input type="text" name="name" value="${esc(name)}" autocomplete="given-name" required aria-label="Your name" maxlength="60"><button class="btn primary" type="submit">Save</button></form><div class="msg" id="mName"></div>
       <p class="set-note">How you appear to other people in your households.</p></section>
-    <section class="set"><h4>Email</h4><form id="setEmail" class="set-row"><input type="email" name="email" value="${esc(u.email || "")}" autocomplete="email" required aria-label="Email"><button class="btn primary" type="submit">Change</button></form><div class="msg" id="mEmail"></div>
+    <details class="ind-card ind-detail" id="profileSecurity"><summary>Security and sign-in</summary><section class="set"><h4>Email</h4><form id="setEmail" class="set-row"><input type="email" name="email" value="${esc(u.email || "")}" autocomplete="email" required aria-label="Email"><button class="btn primary" type="submit">Change</button></form><div class="msg" id="mEmail"></div>
       <p class="set-note">We’ll email a confirmation link. The change happens once you open it.</p></section>
-    <section class="set"><h4>Password</h4><form id="setPass" class="set-row"><input type="password" name="password" minlength="8" autocomplete="new-password" required placeholder="New password (8+ characters)" aria-label="New password"><button class="btn primary" type="submit">Change</button></form><div class="msg" id="mPass"></div></section>
-    <section class="set"><h4>Your data</h4><p class="set-note">Download everything we store about you: your account details, every household you’re in, their budgets, backups and change history.</p><button class="btn" type="button" data-sheet="download">Download all my data</button><div class="msg" id="mDl"></div></section>
+    <section class="set"><h4>Password</h4><form id="setPass" class="set-row"><input type="password" name="password" minlength="8" autocomplete="new-password" required placeholder="New password (8+ characters)" aria-label="New password"><button class="btn primary" type="submit">Change</button></form><div class="msg" id="mPass"></div></section></details>
+    <details class="ind-card ind-detail" id="profileData"><summary>Personal data</summary><section class="set"><h4>Download your data</h4><p class="set-note">Download everything we store about you: your account details, every household you’re in, their budgets, backups and change history.</p><button class="btn" type="button" data-sheet="download">Download all my data</button><div class="msg" id="mDl"></div></section>
     <section class="set danger-zone"><h4>Delete my account</h4><div id="delPlan" class="set-note">Working out what would happen…</div>
-      <form id="setDelete" class="set-row"><input type="text" name="confirm" autocomplete="off" placeholder="Type DELETE to confirm" aria-label="Type DELETE to confirm"><button class="btn danger" type="submit">Delete my account</button></form><div class="msg" id="mDel"></div></section>`);
+      <form id="setDelete" class="set-row"><input type="text" name="confirm" autocomplete="off" placeholder="Type DELETE to confirm" aria-label="Type DELETE to confirm"><button class="btn danger" type="submit">Delete my account</button></form><div class="msg" id="mDel"></div></section></details>`);
   explainDelete();
 }
 async function profileAction(act, btn) {
@@ -158,9 +160,7 @@ export async function openHouseholdSettings() {
   open("Household settings", `
     <section class="set"><h4>Name</h4>${isOwner ? `<form id="setHHName" class="set-row"><input type="text" name="name" value="${esc(hh.name)}" required aria-label="Household name"><button class="btn primary" type="submit">Rename</button></form><div class="msg" id="mHH"></div>` : `<p>${esc(hh.name)}</p>`}
       <p class="set-note">You’re ${role === "owner" ? "an owner" : role === "editor" ? "an editor" : "a viewer"} here: ${esc(ROLE_HELP[role].toLowerCase())}.</p></section>
-    ${lookSection()}
-    ${app.hasData ? modeSection() + combineLink() : ""}
-    <section class="set"><h4>People</h4><ul class="hh-list">${app.members.map(m => `<li><span>${esc(m.display_name || m.email)}${m.user_id === app.meId ? " (you)" : ""}<small>${esc(m.email)}</small></span>
+    <section class="set"><h4>Members</h4><ul class="hh-list">${app.members.map(m => `<li><span>${esc(m.display_name || m.email)}${m.user_id === app.meId ? " (you)" : ""}<small>${esc(m.email)}</small></span>
       <span class="hh-acts">${isOwner && m.user_id !== app.meId ? `${roleSel(m)}<button class="btn small" type="button" data-remove="${esc(m.user_id)}" data-name="${esc(m.display_name || m.email)}">Remove</button>` : `<span class="chip ${m.role === "owner" ? "ok" : ""}" title="${esc(ROLE_HELP[m.role] || "")}">${ROLE_LABEL[m.role] || m.role}</span>`}</span></li>`).join("")}</ul>
       <div class="msg" id="mPeople"></div>
       <p class="set-note">Owners can do everything. Editors can change the budget and invite people. Viewers can look but not change anything.</p></section>
@@ -168,6 +168,8 @@ export async function openHouseholdSettings() {
       <select class="cell" name="role" aria-label="Their role"><option value="editor">Editor</option><option value="viewer">Viewer</option></select><button class="btn primary" type="submit">Invite</button></form><div class="msg" id="mInv"></div>
       <p class="set-note">They create an account with that exact email, confirm it, and join as soon as they sign in.</p>
       <ul class="hh-list" ${(inv || []).length ? "" : "hidden"}>${(inv || []).map(i => `<li><span>${esc(i.email)}<small>Invited as ${ROLE_LABEL[i.role] || "Editor"}. Waiting for them to sign up</small></span><button class="btn small" type="button" data-uninvite="${esc(i.id)}">Cancel</button></li>`).join("")}</ul></section>` : ""}
+    ${lookSection()}
+    ${app.hasData ? modeSection() + combineLink() : ""}
     <section class="set"><h4>Other households</h4><p class="set-note">One login can be in several households, for example if you help someone with theirs. Switch between them by tapping the household’s name at the top.</p>
       <form id="setNewHH" class="set-row"><input type="text" name="name" placeholder="e.g. Mum’s budget" required aria-label="New household name"><button class="btn" type="submit">Create a household</button></form><div class="msg" id="mNew"></div></section>
     <section class="set danger-zone"><h4>Leave this household</h4><p class="set-note">${leaveText()}</p><button class="btn danger" type="button" data-sheet="leave">Leave ${esc(hh.name)}</button><div class="msg" id="mLeave"></div></section>`);
