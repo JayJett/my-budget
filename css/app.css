@@ -1781,6 +1781,7 @@ body.setting-up::before, body.signed-out::before{ background:var(--bg); }   /* t
 .im {
   --bg:var(--ind-canvas); --surface:var(--ind-surface); --surface-2:var(--ind-canvas); --surface-3:var(--ind-soft);
   --ink:var(--ind-ink); --muted:var(--ind-muted); --line:var(--ind-line);
+  --ok:var(--ind-good); --bad:var(--ind-warn);
   --glass:var(--ind-surface); --glass-line:var(--ind-line);
   color:var(--ind-ink); font-family:var(--ind-font);
 }

@@ -111,7 +111,8 @@ test("offline: Progress shows the copy saved on this device", { skip }, async ()
   await goTab(page, "progress");
   await page.waitForSelector("#pgNet svg circle");
   assert.equal(await page.locator('[data-snap="save"]').first().isDisabled(), true);
-  assert.match(await page.textContent(".pg-save"), /needs a connection/);
+  assert.match(await page.textContent(".pg-hl"), /needs a connection/);
+  assert.equal(await page.getByRole("status").filter({ hasText: "Showing the copy saved on this device." }).isVisible(), true);
   await page.screenshot({ path: join(SHOTS, "phone-progress-offline.png"), fullPage: true });
   assert.deepEqual(errors.filter(e => !/ERR_INTERNET_DISCONNECTED|Failed to fetch/.test(e)), []);
   await ctx.close();

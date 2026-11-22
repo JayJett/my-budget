@@ -125,9 +125,9 @@ test("header: your avatar opens the account menu (the ⋯ button is gone); long 
     assert.ok(r.name.right <= r.right.left + 1 && r.av.left >= r.right.left && r.av.right <= r.right.right + 1, `w=${w}: header pieces overlap`);
     await btn.click();
     await page.waitForSelector("#drawer:not([hidden])");
-    for (const a of ["profile", "history", "appearance", "tours", "data", "signout"])
+    for (const a of ["profile", "household", "history", "appearance", "reminders", "tours", "data", "signout"])
       assert.equal(await page.locator(`#drawer [data-act="${a}"]`).count(), 1, `menu still has ${a}`);
-    assert.equal(await page.locator('#drawer [data-switch], #drawer [data-act="household"]').count(), 0, "households now live in the household menu (Phase 9A)");
+    assert.equal(await page.locator('#drawer [data-switch]').count(), 0, "household switching lives in the header menu");
     if (w === 390) await page.screenshot({ path: join(SHOTS, "p7d1-header-menu.png") });
     await page.keyboard.press("Escape");
     await page.waitForSelector("#drawer", { state: "hidden" });

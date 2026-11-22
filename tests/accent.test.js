@@ -7,11 +7,12 @@ import { ACCENTS, NEW_USER_ACCENT, DEFAULT_ACCENT } from "../js/ui/accent-list.j
 const css = readFileSync(new URL("../css/app.css", import.meta.url), "utf8");
 const indigo = readFileSync(new URL("../css/indigo.css", import.meta.url), "utf8");
 const lum = hex => {
-  const c = hex.replace("#", "").match(/../g).map(x => parseInt(x, 16) / 255).map(v => v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+  const digits = hex.replace("#", "");
+  const c = (digits.length === 3 ? digits.replace(/./g, "$&$&") : digits).match(/../g).map(x => parseInt(x, 16) / 255).map(v => v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
   return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
 };
 const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
-const vars = block => Object.fromEntries([...block.matchAll(/--([\w-]+):\s*(#[0-9A-Fa-f]{6})/g)].map(m => [m[1], m[2]]));
+const vars = block => Object.fromEntries([...block.matchAll(/--([\w-]+):\s*(#[0-9A-Fa-f]{6}|#[0-9A-Fa-f]{3})(?![0-9A-Fa-f])/g)].map(m => [m[1], m[2]]));
 const tokens = sel => { const text = sel.includes('data-accent="indigo"') ? indigo : css; const i = Math.max(text.indexOf(sel + "{"), text.indexOf(sel + " {")); assert.ok(i >= 0, `missing ${sel}`); return vars(text.slice(i, text.indexOf("}", i))); };
 const base = { light: tokens(":root"), dark: tokens(':root[data-theme="dark"]') };
 
@@ -44,7 +45,7 @@ test("accents never touch member, status or chart colours", () => {
   }
 });
 
-test("the dark hero cards and the dark setup screens are readable (Phase 7C redesign)", () => {
+test("legacy dark hero card tokens remain readable", () => {
   const block = sel => { const i = css.indexOf(sel); assert.ok(i >= 0, `missing ${sel}`); return vars(css.slice(i, css.indexOf("}", css.indexOf("{", i)))); };
   for (const mode of ["light", "dark"]) {
     const hero = base[mode].hero, h = block(":is(.b-income, .nw-hero, .sp-sum, .gl-sum, .iv-hero, .pg-hero).card{");
@@ -59,13 +60,25 @@ test("the dark hero cards and the dark setup screens are readable (Phase 7C rede
     assert.ok(ratio(a, hero) >= 4.5, `accent ${a} on the hero card is ${ratio(a, hero).toFixed(2)}:1`);
     assert.ok(ratio(on, a) >= 4.5, `text on ${a} buttons`);
   }
-  const im = block(".im{");
-  for (const k of ["ink", "muted", "accent", "bad", "ok"]) assert.ok(ratio(im[k], im.bg) >= 4.5 && ratio(im[k], im["surface-2"]) >= 4.5, `setup screens: ${k}`);
-  assert.ok(ratio(im["on-accent"], im.accent) >= 4.5);
-  // Phase 8: a colour picked on setup step 1 shows on these screens too
-  for (const [a, on] of accD) {
-    assert.ok(ratio(a, im.bg) >= 4.5 && ratio(a, im["surface-2"]) >= 4.5, `accent ${a} on the setup screens`);
-    assert.ok(ratio(on, a) >= 4.5);
+});
+
+test("Indigo setup surfaces keep text, status and all accents readable in both themes", () => {
+  const light = vars(indigo.slice(indigo.indexOf("{"), indigo.indexOf("}")));
+  const darkStart = indigo.indexOf("--ind-dark-canvas");
+  const dark = vars(indigo.slice(darkStart, indigo.indexOf("}", darkStart)));
+  for (const [mode, palette, prefix] of [["light", light, "ind-"], ["dark", dark, "ind-dark-"]]) {
+    const backgrounds = ["canvas", "surface", "soft"].map(k => palette[prefix + k]);
+    const foregrounds = ["ink", "muted", "warn", "good"].map(k => palette[prefix + k]);
+    for (const colour of foregrounds)
+      for (const bg of backgrounds)
+        assert.ok(ratio(colour, bg) >= 4.5, `${mode}: ${colour} on ${bg} is ${ratio(colour, bg).toFixed(2)}:1`);
+    for (const { key, label } of ACCENTS) {
+      const scope = mode === "dark" ? ':root[data-theme="dark"]' : ":root";
+      const t = tokens(`${scope}[data-accent="${key}"]`);
+      for (const bg of backgrounds)
+        assert.ok(ratio(t.accent, bg) >= 4.5, `${label} ${mode}: accent on ${bg} is ${ratio(t.accent, bg).toFixed(2)}:1`);
+      assert.ok(ratio(t["on-accent"], t.accent) >= 4.5, `${label} ${mode}: text on the accent button`);
+    }
   }
 });
 
