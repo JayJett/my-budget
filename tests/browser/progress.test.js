@@ -60,6 +60,7 @@ test("trends: net worth chart, the mix, goals, and plain-language notes", { skip
   assert.match(notes, /Net worth is up \$440 since/);
   assert.match(notes, /You’ve paid \$200 off your debts since/);
   assert.equal(await page.locator("#pgNet circle").count(), 5, "4 months + today");
+  await page.click("#pgDetails > summary");
   await page.click("#pgMixBox summary");
   await page.waitForSelector("#pgMix rect");
   assert.ok(await page.locator("#pgMix rect").count() >= 10, "stacked bars for each month");
@@ -94,8 +95,7 @@ test("viewers can see progress but not save snapshots", { skip }, async () => {
   const { page, errors, ctx } = await open(null, { init: withHistory("viewer") });
   await goTab(page, "progress");
   await page.waitForSelector("#pgNet svg");
-  assert.equal(await page.locator('[data-snap="save"]').first().isDisabled(), true);
-  assert.match(await page.textContent(".pg-save"), /Only owners and editors/);
+  assert.equal(await page.locator('[data-snap="save"]').count(), 0);
   assert.deepEqual(errors, []);
   await ctx.close();
 });

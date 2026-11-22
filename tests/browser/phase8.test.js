@@ -358,6 +358,8 @@ test("Appearance: a live preview, eleven colours plus your own, motion, and a re
   const noVibrate = () => { try { delete Navigator.prototype.vibrate; } catch (_) {} };
   const { page, errors, ctx } = await open(null, { ...phone(), storage: ALL_DONE, init: { ...TWO(), meta: { accent: "rose", theme: "dark", motion: "reduce" } }, initScript: noVibrate });
   await page.click("#menuBtn"); await page.waitForSelector("#drawer:not([hidden])"); await page.click('#drawer [data-act="appearance"]');
+  assert.equal(await page.isVisible("#sheet .ap-prev"), false);
+  await page.getByText("Preview appearance", {exact:true}).click();
   await page.waitForSelector("#sheet .ap-prev");
   assert.equal(await page.locator("#sheet [data-accent-pick]").count(), 11);
   assert.equal(await page.getAttribute('#sheet [data-look="motion"][data-v="reduce"]', "aria-checked"), "true");
@@ -378,7 +380,7 @@ test("Appearance: a live preview, eleven colours plus your own, motion, and a re
   // no vibration on this browser: no Touch feedback switch promising one
   assert.equal(await page.locator('#sheet [data-look="feedback"]').count(), 0);
   await page.click("#sheet [data-ap-reset]"); await page.click("#dlgYes");
-  await page.waitForSelector("#sheet .ap-prev");
+  await page.waitForSelector("#sheet [data-ap-reset]");
   assert.equal(await page.evaluate(() => [document.documentElement.dataset.accent, document.documentElement.dataset.theme, document.documentElement.dataset.motion].join("|")), "||");
   // (quick changes are sent together, so this may be one save or several)
   await page.waitForFunction(() => { const u = window.__fake.authCalls.filter(c => c.name === "updateUser"); return u.length && (u[u.length - 1].data || {}).accent === "mint"; }, null, { timeout: 3000 });
@@ -398,6 +400,7 @@ test("touch feedback: a short buzz for choices on phones that can vibrate, never
   await page.click('[data-viewas="fortnight"]'); await page.waitForTimeout(150);
   assert.equal(await page.evaluate(() => window.__buzz.length), 2, "tapping what's already chosen: nothing");
   await page.click("#menuBtn"); await page.waitForSelector("#drawer:not([hidden])"); await page.click('#drawer [data-act="appearance"]');
+  await page.click("#sheet .ap-display > summary");
   await page.waitForSelector('#sheet [data-look="feedback"]');
   await page.click('#sheet [data-look="feedback"][data-v="off"]');
   const n = await page.evaluate(() => window.__buzz.length);
@@ -412,7 +415,7 @@ test("iPhone-like browser (no vibration): everything works, nothing breaks, visu
   assert.equal(await page.evaluate(() => typeof navigator.vibrate), "undefined");
   await page.click('[data-viewas="week"]'); await page.click('[data-tab="goals"]');
   await page.click("#menuBtn"); await page.waitForSelector("#drawer:not([hidden])"); await page.click('#drawer [data-act="appearance"]');
-  await page.waitForSelector("#sheet .ap-prev");
+  await page.waitForSelector("#sheet .ap-display");
   assert.equal(await page.locator('#sheet [data-look="feedback"]').count(), 0);
   assert.deepEqual(errors, []); await ctx.close();
 });

@@ -72,6 +72,7 @@ test("switching household: Progress shows the new household's history, never the
   await settle(page); await goTab(page, "progress");
   await page.waitForSelector(".pg-hl .pg-list li");
   assert.equal(await page.locator(".pg-hl .pg-list li").count(), 2);
+  await page.click("#pgCompare > summary");
   await page.selectOption("#pgCmpSel", "2");
   await page.click("#hhBtn"); await page.click('#hhPop [data-switch="hh-2"]');
   await page.waitForFunction(() => /Mum/.test(document.querySelector("#brandNames").textContent));
@@ -86,9 +87,9 @@ test("phone: help dots, fold-outs and sheet buttons are at least 44px to tap", {
   const { page, errors, ctx } = await open(V4, { device: devices["iPhone 13"] });
   await settle(page); await goTab(page, "networth");
   const hit = sel => page.$eval(sel, el => { const a = getComputedStyle(el, "::after"), r = el.getBoundingClientRect(); return a.content === "none" ? [r.width, r.height] : [r.width - 2 * parseFloat(a.left), r.height - 2 * parseFloat(a.top)]; });
-  const [w, h] = await hit(".qi"); assert.ok(w >= 44 && h >= 44, `help dot touch area ${w}×${h}`);
   assert.ok((await page.locator("details.help summary").boundingBox()).height >= 44);
   await page.click("[data-edit-nw]"); await page.waitForSelector("#sheet[open]");
+  const [w, h] = await hit("#sheet .qi"); assert.ok(w >= 44 && h >= 44, `help dot touch area ${w}×${h}`);
   assert.ok((await page.locator('#sheet [data-sheet="close"]').boundingBox()).height >= 44);
   assert.deepEqual(errors, []); await ctx.close();
 });

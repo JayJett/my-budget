@@ -129,9 +129,11 @@ test("account settings: name, password, download my data, delete account", { ski
   await page.waitForSelector("#mName.ok");
   assert.ok(await fake(page, () => window.__fake.authCalls.some(c => c.name === "updateUser" && c.data && c.data.name === "Jay")));
   assert.ok(await fake(page, () => window.__fake.rpcCalls.filter(c => c.name === "sync_my_profile").length >= 2), "names synced to households");
+  await page.click("#profileSecurity > summary");
   await page.fill('#setPass input', "a-new-password");
   await page.click("#setPass button");
   await page.waitForSelector("#mPass.ok");
+  await page.click("#profileData > summary");
   const [dl] = await Promise.all([page.waitForEvent("download"), page.click('[data-sheet="download"]')]);
   const data = JSON.parse(await (await import("node:fs/promises")).readFile(await dl.path(), "utf8"));
   assert.equal(data.account.email, "jarden@example.com");
