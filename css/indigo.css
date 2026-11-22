@@ -453,6 +453,14 @@ html:has(#app .ind-wealth) { scroll-padding-block:68px calc(88px + env(safe-area
 .im .ob-done .ob-done-art .ob-done-ic { position:static; width:42px; height:42px; border-radius:12px; color:var(--accent); background:var(--accent-soft); box-shadow:none; animation:none; }
 .im .ob-done-acts { padding-top:6px; }
 .im .ob-auth .ob-art { display:none; }
+.im .ob-slot > :is(.ob-name,.ob-join) { margin:0; }
+@media (max-height:700px) {
+  .im .ob-in-wrap:has(.st-2) .ob-top { margin-bottom:8px; }
+  .im .ob-card.st-2 h2 { margin-top:10px; font-size:1.75rem; }
+  .im .ob-card.st-2 .lead { margin-bottom:10px; }
+  .im .ob-card.st-2 .ob-pay { padding:10px; margin-bottom:8px; }
+  .im .ob-card.st-2 .ob-nav { margin-top:8px; padding-top:6px; }
+}
 
 /* Sheets and drawers share the signed-in surfaces, while their scopes stay distinct. */
 .drawer, .hh-pop { --surface:var(--ind-surface); --surface-2:var(--ind-soft); --ink:var(--ind-ink); --muted:var(--ind-muted); --line:var(--ind-line); font-family:var(--ind-font); }

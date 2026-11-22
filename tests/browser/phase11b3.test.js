@@ -49,7 +49,7 @@ test("Wealth keyboard navigation retains focus and identifies the selected panel
   await page.locator("#sheet[open]").waitFor();
   await page.keyboard.press("Escape");
   await page.locator("#sheet").waitFor({ state: "hidden" });
-  assert.equal(await page.getByRole("button", { name: "Edit assumptions" }).evaluate(el => el === document.activeElement), true);
+  await page.waitForFunction(() => document.activeElement?.matches("[data-iv-edit]"));
   assert.deepEqual(errors, []);
   await ctx.close();
 });

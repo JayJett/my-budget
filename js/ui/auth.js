@@ -223,7 +223,7 @@ export function showAuth(mode, msg, kind) {
     body = `<div class="ob-art" aria-hidden="true">${HERO.together()}</div><h2 id="obTitle" tabindex="-1">Let’s make this yours</h2><p class="lead">${nm ? `Hi ${esc(nm)}! ` : ""}Are you budgeting on your own or with someone?</p>${m}
     <form id="fHousehold" data-suggest="${esc(nm ? nm + "’s budget" : "My budget")}">${modeChoices(null, true)}
       <div class="ob-slot"><div class="ob-name"><label class="field"><span>Household name <em>(you can change it later)</em></span><input type="text" name="name" value="${esc(nm ? nm + "’s budget" : "My budget")}" autocomplete="off" required></label></div>
-      <div class="ob-join" hidden><p class="ob-note">Ask whoever set it up to invite <b>${esc(email)}</b> from Household settings, then check here.</p></div></div>
+      <div class="ob-join" hidden><p class="ob-note">Ask the household owner to invite <b>${esc(email)}</b> from Household settings.</p></div></div>
       <button class="btn primary block" type="submit" disabled>Continue</button>
       <button class="btn primary block ob-join-act" type="button" data-auth="recheck" hidden>Check for my invitation</button></form>`;
   }
