@@ -33,9 +33,9 @@ export const TOURS = {
     invite: "See how your pay is planned, dollar by dollar.",
     stops: [
       { sel: ["#app .viewas"], title: "Pick your period", text: "Every amount can be shown per week, fortnight or month. It doesn’t change the plan, just how you see it." },
-      { sel: ["#app .b-income"], title: "Income", text: "Everyone’s take-home pay, added up. Tap a person to change their pay, how often it arrives, or their colour." },
-      { sel: ["#allocStatus"], title: "Where things stand", text: "Whether all your pay has a job, whether your expenses are covered, and your next payday. If something needs doing, it shows here." },
-      { sel: ["#app .b-allocs", "#app .alloc-list"], title: "Your allocations", text: "Where the pay goes, account by account. Tap one to change its share of pay. Add one with + Add; Manage has Rebalance and Reorder." },
+      { sel: ["#app .b-income"], title: "Income", text: "Everyone’s take-home pay, added up. Open Pay details and tap a person to change their pay, how often it arrives, or their colour." },
+      { sel: ["#allocStatus"], title: "Where things stand", text: "See which pay is allocated and whether expenses are covered. An expense shortfall can still need attention when pay is fully allocated." },
+      { sel: ["#app .b-allocs", "#app .alloc-list"], title: "Your allocations", text: "Where the pay goes, account by account. Tap one to change its share of pay. Use Add allocation to create one, Rebalance in the header to adjust shares, or Reorder allocations to change the list order." },
       { sel: ["#tabs"], title: "Getting around", text: "Home is your overview. Expenses is where the bills money goes, Goals is what you’re saving for, and Wealth has your accounts, investments and history." },
       { sel: ["#menuBtn"], title: "Your settings", text: "Tap your initial for your profile, appearance, reminders and tours. Tap the household’s name to switch or manage households." },
     ],
@@ -52,8 +52,8 @@ export const TOURS = {
   spending: {
     invite: "See how your planned expenses fit within your budget.",
     stops: [
-      { sel: ["#spHead", "#app .sp-sum"], title: "Your spending budget", text: "The money the Budget tab sets aside for bills and spending. It’s a plan for what’s coming up, not a list of what you’ve bought." },
-      { sel: ["#app .sp-figs"], title: "Planned and budget", text: "Planned is what your expenses add up to; Budget is what’s set aside for them. The bar shows how much is used, and warns if it’s not enough." },
+      { sel: ["#app .sp-sum"], title: "Your spending budget", text: "The money the Budget tab sets aside for bills and spending. It’s a plan for what’s coming up, not a list of what you’ve bought." },
+      { sel: ["#app .ind-sp-funding"], title: "Planned and budget", text: "Planned is what your expenses add up to; Budget is what’s set aside for them. The summary shows the remaining funding or how much is short." },
       { sel: ["#app .sp-page .sp-list", "#app .sp-empty"], title: () => has("#app .sp-empty") ? "Add your first expense" : "Your expenses",
         text: () => has("#app .sp-empty") ? "Add what this budget pays for: rent, groceries, the yearly car rego. Each one is fixed, flexible or sinking." : "Fixed bills, flexible spending, and sinking costs (a yearly bill, saved for a little each pay). Tap one to change it." },
     ],
@@ -61,12 +61,12 @@ export const TOURS = {
   goals: {
     invite: "See how saving for goals works here.",
     stops: [
-      { sel: ["#app .gl-sum .gl-hero-top", "#app .gl-sum"], title: "Your goals at a glance", text: "What’s saved so far across your goals, and how much the Budget tab sends to goals each pay." },
-      { sel: ["#app .gl-group.ef"], title: "Emergency fund", text: "A safety net for surprises. Set a target, and update Saved as you put money aside." },
-      { sel: ["#app .gl-group.joint"], title: () => (isShared(app.state) ? "Joint goals" : "Your goals"),
-        text: () => has("#app .gl-group.joint .gl-none") ? "Create your first goal here: a holiday, a car, a house deposit. Each goal gets a share of the money going to goals." : "Each goal gets a share of the money going to goals, and shows how close it is. Higher in the list is funded first." },
+      { sel: ["#app .gl-sum"], title: "Your goals at a glance", text: "See what’s saved across your goals. Open Funding overview to check planned contributions." },
+      { sel: ["#app .gl-group.ef", "#app .gl-ef-setup"], title: "Emergency fund", text: "A safety net for surprises. Set a target, and update Saved as you put money aside." },
+      { sel: ["#app .gl-group.joint", "#app .gl-first"], title: () => (isShared(app.state) ? "Joint goals" : "Your goals"),
+        text: () => has("#app .gl-first") ? "Create your first goal here: a holiday, a car, a house deposit. Each goal gets a share of the money going to goals." : "Each goal gets a share of the money going to goals, and shows how close it is. Higher in the list is funded first." },
       { sel: ["#app .gl-group:not(.ef):not(.joint)"], title: "Personal goals", text: "Each person’s own goals, funded from their own share of pay." },
-      { sel: ["#app .gl-main > .add-row"], title: "Adding a goal", text: "Saved is money you’ve already put aside. Choosing which account it’s in doesn’t move any money, and it’s never counted twice." },
+      { sel: ["#app .ind-page-head [data-goal-new]"], title: "Adding a goal", text: "Saved is money you’ve already put aside. Choosing which account it’s in doesn’t move any money, and it’s never counted twice." },
     ],
   },
   invest: {

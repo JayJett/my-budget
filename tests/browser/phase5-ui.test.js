@@ -55,7 +55,7 @@ test("appearance: your login's look wins; another person's look on this device i
 test("goal icons: chosen in the goal sheet, saved on the goal for the household, back to default any time", { skip }, async () => {
   const { page, errors, ctx } = await open(RICH, { width: 390 });
   await settle(page); await goTab(page, "goals");
-  const card = () => page.$eval('[data-edit-goal="gj"][data-i="g2"]', el => [".gl-name", ".gl-amt", ".gl-foot", ".gl-pc"].map(s => el.querySelector(s).textContent));
+  const card = () => page.$eval('[data-edit-goal="gj"][data-i="g2"]', el => [".gl-name", ".gl-amt"].map(s => el.querySelector(s).textContent));
   const figures = await card();
   await editGoal(page, "gj", "g2");
   await page.click("#sheet .ico-box summary");

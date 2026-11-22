@@ -24,7 +24,8 @@ function solo(spend, shares = { spending: 0.5, emergency: 0.1, goals: 0.15, inve
 }
 
 test("Expenses: mark an expense essential; the Essentials card and Home follow; nothing else changes", { skip }, async () => {
-  const { page, errors, ctx } = await open(solo([["Rent", "Fixed", 700], ["Takeaways", "Flexible", 100]]), { ...phone(), storage: ALL_DONE, hash: "expenses", waitFor: "#spEss" });
+  const { page, errors, ctx } = await open(solo([["Rent", "Fixed", 700], ["Takeaways", "Flexible", 100]]), { ...phone(), storage: ALL_DONE, hash: "expenses", waitFor: ".sp-page" });
+  await page.click(".sp-detail > summary");
   assert.match(await page.textContent("#spEss"), /Not marked\s*\$800\/fn/);
   assert.match(await page.textContent("#spEss"), /2 expenses aren’t marked yet/);
   const before = await budgetOf(page);
@@ -60,7 +61,7 @@ test("Budget: one finding about expenses; where pay goes and room to adjust behi
   // Phase 9B.1: income card first, the expense check right under it, no visible "Plan check" title
   // (Phase 10A: the check is now inside the status card, which comes straight after income)
   const order = await page.$$eval(".budget > .b-col > *, .budget > *:not(.b-col)", els => els.filter(e => e.offsetParent).sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top).map(e => e.className.split(" ").find(c => c.startsWith("b-")) || e.id));
-  assert.deepEqual(order.slice(0, 2), ["b-income", "b-status"]);
+  assert.deepEqual(order.filter(Boolean).slice(0, 2), ["b-income", "b-status"]);
   assert.equal(await page.locator("#allocStatus #planCheck").count(), 1);
   assert.doesNotMatch(await pc(), /Plan check/);
   assert.equal(await page.getAttribute("#planCheck", "aria-label"), "Expense check");
@@ -74,12 +75,12 @@ test("Budget: one finding about expenses; where pay goes and room to adjust behi
   assert.match(await pc(), /Pay with no plan yet\s*\$300\/fn/);
   assert.match(await pc(), /Room to adjust\s*up to \$400\/fn/, "300 unplanned + 100 of bills not assigned");
   assert.doesNotMatch(await pc(), /Marked adjustable/, "nothing is assumed adjustable, not even investing");
-  assert.match(await page.textContent('[data-k="acc.js.cov"]'), /Covers your entered expenses/);
+  assert.match(await page.textContent("#planCheck"), /expenses are covered/i);
   const keys = await page.$$eval("#planCheck .ib-key li span", e => e.map(x => x.textContent));
   assert.deepEqual(keys, ["Essential expenses", "Bills budget not yet assigned", "Saving & investing", "No plan yet"]);
   await page.$eval("#planCheck", e => e.scrollIntoView()); await shot(page, "check-open");
   // mark Investments adjustable; the breakdown stays open across the redraw
-  await page.click('[data-edit-acc="ji"]'); await page.waitForSelector('#sheet [data-f="adjustable"]');
+  await page.click('[data-edit-acc="ji"]'); await page.click("#sheet .ind-sheet-details summary"); await page.waitForSelector('#sheet [data-f="adjustable"]', {state:"attached"});
   await page.check('#sheet input[data-f="adjustable"][value="yes"]', { force: true }); await settle(page);
   assert.equal((await budgetOf(page)).accounts.ji.adjustable, "yes");
   await page.click('#sheet .sheet-head [data-sheet="close"]'); await page.waitForSelector("#sheet", { state: "hidden" });
@@ -101,7 +102,7 @@ test("a shortfall is a problem everywhere, the same amount; it leads the Budget 
   assert.match(await page.textContent("#planCheck .pc-main"), /Expenses are over budget\s*\$120\/fn short/);
   assert.equal(await page.getAttribute("#planCheck .pc-main", "data-insight"), "short");
   assert.doesNotMatch(await page.textContent("#planCheck"), /Every dollar of pay has a plan/, "100% allocated isn't repeated here");
-  assert.match(await page.textContent('[data-k="acc.js.cov"]'), /Short of expenses by \$120\/fn/);
+  assert.match(await page.textContent("#planCheck"), /short/);
   assert.equal(await page.locator("#planCheck .ib-bar").count(), 0, "no combined bar when the parts can't add up");
   await expand(page);
   assert.match(await page.textContent("#planCheck"), /Less expenses over budget\s*−\$120\/fn/);

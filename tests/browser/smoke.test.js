@@ -25,7 +25,9 @@ test("your live budget upgrades itself, with a backup, and shows both people", {
   assert.equal(await page.textContent("#brandNames small"), "Jarden and Madi");
   assert.equal(await page.locator("[data-edit-person]").count(), 2);
   // Joint Investments gets 50% of Jarden's $1,000 = $500 a fortnight
-  assert.equal((await page.textContent('[data-k="acc.ji.part.j"]')).trim(), "Jarden $500");
+  await editAccount(page, "ji");
+  assert.equal((await page.textContent('#sheet [data-k="acc.ji.v.j"]')).trim(), "$500");
+  await closeSheet(page);
   await page.screenshot({ path: join(SHOTS, "budget-live.png"), fullPage: true });
   assert.deepEqual(errors, []);
   await ctx.close();
@@ -75,12 +77,17 @@ test("a remote update shows up on screen", { skip }, async () => {
 test("'show amounts per' switches every figure between week, fortnight and month", { skip }, async () => {
   const { page, errors, ctx } = await open(LIVE_V3);
   await settle(page);
-  const inv = () => page.textContent('[data-k="acc.ji.part.j"]');
-  assert.equal((await inv()).trim(), "Jarden $500");
+  const inv = async () => {
+    await editAccount(page, "ji");
+    const text = await page.textContent('#sheet [data-k="acc.ji.v.j"]');
+    await closeSheet(page);
+    return text.trim();
+  };
+  assert.equal(await inv(), "$500");
   await page.click('[data-viewas="week"]');
-  assert.equal((await inv()).trim(), "Jarden $250");
+  assert.equal(await inv(), "$250");
   await page.click('[data-viewas="month"]');
-  assert.equal((await inv()).trim(), "Jarden $1,083.33");               // $13,000 a year ÷ 12
+  assert.equal(await inv(), "$1,083.33");               // $13,000 a year ÷ 12
   assert.equal(await page.getAttribute('[data-viewas="month"]', "aria-pressed"), "true");
   assert.match(await page.textContent(".b-income .per"), /per month/);
   await settle(page);
@@ -151,7 +158,7 @@ test("a brand-new household opens the setup guide; skipping it gives one person 
   assert.equal(await page.locator(".tab", { hasText: "Expenses" }).count(), 1);
   const calls = await fake(page, () => window.__fake.rpcCalls.filter(c => c.name === "apply_budget_ops"));
   assert.equal(calls.length, 0, "nothing is saved until you change something");
-  await page.click("[data-edit-person]");
+  if (!(await page.isVisible("#incMore"))) await page.click("[data-inc-more]"); await page.click("[data-edit-person]");
   await setField(page, '#sheet [data-l="pp"][data-f="pay"]', "3000");
   await settle(page);
   assert.equal(Object.values((await fake(page, () => window.__fake.budget)).people)[0].pay, 3000);

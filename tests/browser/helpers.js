@@ -83,6 +83,11 @@ export async function goTab(page, tab) {
 }
 /** Type into a box the way a person does: click in, select what's there, type over it. */
 export async function setField(page, sel, v) {
+  const field = page.locator(sel).first();
+  if (sel.startsWith("#sheet ") && !await field.isVisible() && await field.count()) {
+    const detail = field.locator("xpath=ancestor::details[not(@open)][1]");
+    if (await detail.count()) await detail.locator(":scope > summary").click();
+  }
   await page.click(sel);
   await page.$eval(sel, el => el.select());
   if (v === "") await page.keyboard.press("Backspace"); else await page.keyboard.type(v);
@@ -91,8 +96,7 @@ export async function setField(page, sel, v) {
 
 /* Phase 10A: Budget's Rebalance and Reorder live in its "Manage" menu; adding a person is under "Pay details". */
 export async function budgetManage(page, which) {
-  await page.click("[data-b-manage]");
-  await page.click(`#pop [data-mg="${which}"]`);
+  await page.click(which === "rebalance" ? '.ind-page-head [data-rb-open]' : '.b-col > [data-reorder]');
   if (which === "reorder") await page.waitForSelector(".alloc-list.reordering");
 }
 export async function addPersonBtn(page) {
@@ -102,7 +106,7 @@ export async function addPersonBtn(page) {
 
 /* Budget tab (UI phase 1): pay and allocations are edited in a sheet. */
 export async function editPerson(page, id) {
-  await page.click(`[data-edit-person="${id}"]`);
+  if (!(await page.isVisible("#incMore"))) await page.click("[data-inc-more]"); await page.click(`[data-edit-person="${id}"]`);
   await page.waitForSelector(`#sheet .bsheet [data-l="pp"][data-i="${id}"][data-f="name"]`);
 }
 export async function editAccount(page, id) {
