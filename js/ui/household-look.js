@@ -11,6 +11,7 @@
      from its id, so each household still looks different.
    - Separate from your own profile picture (the menu button) and from people's colours in charts. */
 import { app, readOnly } from "./ctx.js";
+import { settingsScope, settingsStorage } from "./settings-scope.js";
 import { $, esc, toast, confirmDel } from "./dom.js";
 import { OBJECT_COLOURS, isObjectColour } from "./palette.js";
 import { ITEM_ICONS, itemIcon } from "./icons.js";
@@ -18,7 +19,7 @@ import { checkFile, loadImage, cropper } from "./profile.js";
 
 export const HH_BUCKET = "household-photos";
 const HH_ICONS = ["home", "family", "heart", "paw", "building", "key", "star", "sun", "plane", "piggy", "sprout", "gift"];
-const KEY = id => `mb-hhphoto-${id}`;
+const KEY = id => `mb-hhphoto-${app.meId}-${id}`;
 const read = id => { try { return JSON.parse(localStorage.getItem(KEY(id)) || "null"); } catch (_) { return null; } };
 const write = (id, v) => { try { if (v) localStorage.setItem(KEY(id), JSON.stringify(v)); else localStorage.removeItem(KEY(id)); } catch (_) {} };
 
@@ -41,16 +42,20 @@ function photoSrc(h) {
   fetchLink(h, path);
   return c && c.path === path && c.copy ? c.copy : null;
 }
-const fetching = new Set();
+const fetching = new WeakMap();
 async function fetchLink(h, path) {
-  if (fetching.has(path) || !app.sb || !app.sb.storage || (app.session && app.session.offline)) return;
-  fetching.add(path);
+  const store = app.store;
+  if (!store?.isActive()) return;
+  if (!fetching.has(store)) fetching.set(store, new Set());
+  const paths = fetching.get(store);
+  if (paths.has(path)) return;
+  paths.add(path);
   try {
-    const { data, error } = await app.sb.storage.from(HH_BUCKET).createSignedUrl(path, 60 * 60 * 24 * 7);
-    if (error || !data || !data.signedUrl) return;
+    const { data, error } = await store.withSession(token => settingsStorage(token).from(HH_BUCKET).createSignedUrl(path, 60 * 60 * 24 * 7));
+    if (!store.isActive() || lookOf(h).photo !== path || error || !data?.signedUrl) return;
     write(h.id, { ...(read(h.id) || {}), path, src: data.signedUrl, exp: Date.now() + 6.5 * 864e5 });
     refreshHouseholdAvatars();
-  } finally { fetching.delete(path); }
+  } finally { paths.delete(path); }
 }
 
 /** A household's avatar: its photo, else its icon, else its initial; always on its colour. */
@@ -70,9 +75,9 @@ export function refreshHouseholdAvatars() {
 
 /* ---------- Household settings: "How it looks" ---------- */
 const canEdit = () => !readOnly() && ["owner", "editor"].includes(app.role);
-export function lookSection() {
+export function lookSection(ed = canEdit()) {
   const h = app.household; if (!h) return "";
-  const L = lookOf(h), ed = canEdit(), dis = ed ? "" : " disabled", cur = colourOf(h);
+  const L = lookOf(h), dis = ed ? "" : " disabled", cur = colourOf(h);
   const sw = c => `<button type="button" role="radio" class="oc-sw" data-hh-oc="${c.key}" data-oc="${c.key}" aria-checked="${cur === c.key}" aria-label="${esc(c.label)}"${dis}></button>`;
   const ib = (k, inner, label) => `<button type="button" role="radio" data-hh-icon="${esc(k)}" aria-checked="${(L.icon || "") === k}" aria-label="${esc(label)}"${dis}>${inner}</button>`;
   return `<section class="set hh-look" id="hhLookSec"><h4>How it looks</h4>
@@ -94,98 +99,129 @@ const msg = (text, kind = "err") => { const m = $("#mHHLook"); if (m) { m.classN
 const notReady = e => /PGRST202|Could not find the function|does not exist|schema cache/i.test(`${e && e.code} ${e && e.message}`);
 const NOT_READY = "Household looks need a quick database update first (see the Phase 8 notes). Everything else still works.";
 
-/* Saving: the newest choice wins. Tapping through colours quickly sends one save at a time, and only
-   the last one counts; if a save fails, the look goes back to what was last saved. */
-let saved = null, want = null, busy = false;
-async function saveLook(next) {
-  const h = app.household; if (!h || !canEdit()) return;
-  if (saved === null) saved = { ...lookOf(h) };
-  want = next; setLook(h, next);
-  if (busy) return;
-  busy = true;
-  try {
-    while (want) {
-      const send = want; want = null;
-      const { data, error } = await app.sb.rpc("set_household_appearance", { p_household: h.id, p_appearance: send });
-      if (error) { want = null; setLook(h, saved); msg(notReady(error) ? NOT_READY : (app.friendly ? app.friendly(error) : error.message)); return false; }
-      saved = { ...(data || send) };
-      if (!want) setLook(h, saved);
-    }
-    if (app.saveOfflineProfile) app.saveOfflineProfile();
-    msg("Saved.", "ok"); return true;
-  } finally { busy = false; }
-}
-/** Show a look everywhere: the open household and its entry in the switcher list stay the same. */
-function setLook(h, L) {
-  h.look = { ...L }; const e = (app.households || []).find(x => x.id === h.id); if (e) e.look = { ...L };
-  refreshHouseholdAvatars(); syncControls();
-}
-function syncControls() {
-  const h = app.household, L = lookOf(h), k = colourOf(h);
-  document.querySelectorAll("[data-hh-oc]").forEach(b => b.setAttribute("aria-checked", String(b.dataset.hhOc === k)));
-  document.querySelectorAll("[data-hh-icon]").forEach(b => b.setAttribute("aria-checked", String((L.icon || "") === b.dataset.hhIcon)));
+/* Serialize saves for this store so rapid colour and icon choices compose in order. */
+const pending = new WeakMap();
+function queueLook(scope, action) {
+  const { store, current } = scope;
+  const task = (pending.get(store) || Promise.resolve()).then(async () => {
+    if (!current()) return;
+    try { await action(); }
+    catch (error) { if (current()) msg(app.friendly ? app.friendly(error) : error.message); }
+  });
+  pending.set(store, task);
+  return task;
 }
 
-/* ---------- the photo ---------- */
-let crop = null;
-async function savePhoto(blob) {
-  const h = app.household; if (!h || !app.sb) throw new Error("You need to be signed in.");
+async function saveLook(scope, next) {
+  const h = scope.household;
+  const { data, error } = await scope.rpc("set_household_appearance", { p_appearance: next });
+  if (!scope.current()) return false;
+  if (error) { msg(notReady(error) ? NOT_READY : (app.friendly ? app.friendly(error) : error.message)); return false; }
+  h.look = { ...(data || next) };
+  const entry = app.households.find(x => x.id === h.id);
+  if (entry) entry.look = { ...h.look };
+  refreshHouseholdAvatars();
+  const L = lookOf(h), k = colourOf(h);
+  scope.body.querySelectorAll("[data-hh-oc]").forEach(b => b.setAttribute("aria-checked", String(b.dataset.hhOc === k)));
+  scope.body.querySelectorAll("[data-hh-icon]").forEach(b => b.setAttribute("aria-checked", String((L.icon || "") === b.dataset.hhIcon)));
+  app.saveOfflineProfile?.();
+  msg("Saved.", "ok");
+  return true;
+}
+
+const crops = new WeakMap();
+const storage = (scope, action) => scope.store.withSession(token => action(settingsStorage(token).from(HH_BUCKET)), scope.current);
+const redraw = scope => { scope.body.querySelector("#hhLookSec").outerHTML = lookSection(); };
+
+async function savePhoto(scope, blob) {
   if (!blob || blob.size > 512 * 1024) throw new Error("That picture is too big to save. Try zooming in a little.");
-  const old = lookOf(h).photo, path = `${h.id}/${Date.now()}.jpg`, bucket = app.sb.storage.from(HH_BUCKET);
-  const up = await bucket.upload(path, blob, { contentType: "image/jpeg", upsert: false, cacheControl: "3600" });
-  if (up.error) throw new Error(/not found|bucket/i.test(up.error.message || "") ? NOT_READY : /row-level security/i.test(up.error.message || "") ? "Only owners and editors can change the household photo." : (app.friendly ? app.friendly(up.error) : up.error.message));
-  const ok = await saveLook({ ...lookOf(h), photo: path });
-  if (!ok) { await bucket.remove([path]); throw new Error("We couldn’t save the photo."); }
-  const copy = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.onerror = () => r(null); fr.readAsDataURL(blob); });
+  const h = scope.household, old = lookOf(h).photo;
+  const path = `${h.id}/${Date.now()}.jpg`;
+  const { error } = await storage(scope, bucket => bucket.upload(path, blob, { contentType: "image/jpeg", upsert: false, cacheControl: "3600" }));
+  if (!scope.current()) return;
+  if (error) throw new Error(/not found|bucket/i.test(error.message || "") ? NOT_READY : error.message);
+  const ok = await saveLook(scope, { ...lookOf(h), photo: path });
+  if (!scope.current()) return;
+  if (!ok) { await storage(scope, bucket => bucket.remove([path])); return; }
+  const copy = await new Promise(r => {
+    const fr = new FileReader();
+    fr.onload = () => r(fr.result);
+    fr.onerror = () => r(null);
+    fr.readAsDataURL(blob);
+  });
+  if (!scope.current()) return;
   write(h.id, { path, copy, src: copy, exp: 0 });
-  if (old && old !== path && old.startsWith(h.id + "/")) bucket.remove([old]); // only this household's folder
+  if (old && old !== path && old.startsWith(h.id + "/")) await storage(scope, bucket => bucket.remove([old]));
+  if (!scope.current()) return;
   refreshHouseholdAvatars();
+  crops.delete(scope);
+  toast("Household photo saved", "ok");
+  redraw(scope);
 }
-async function removePhoto() {
-  const h = app.household, old = lookOf(h).photo; if (!old) return;
-  const { photo, ...rest } = lookOf(h);
-  const ok = await saveLook(rest); if (!ok) return;
+
+async function removePhoto(scope) {
+  const h = scope.household, { photo, ...rest } = lookOf(h);
+  if (!photo || !await saveLook(scope, rest) || !scope.current()) return;
   write(h.id, null);
-  if (old.startsWith(h.id + "/")) app.sb.storage.from(HH_BUCKET).remove([old]);
+  if (photo.startsWith(h.id + "/")) await storage(scope, bucket => bucket.remove([photo]));
+  if (!scope.current()) return;
   refreshHouseholdAvatars();
+  toast("Household photo removed");
+  redraw(scope);
 }
-function redrawSection() { const s = $("#hhLookSec"); if (s) s.outerHTML = lookSection(); saved = null; }
 
 export function initHouseholdLook() {
   document.addEventListener("click", async e => {
-    const c = e.target.closest("[data-hh-oc]");
-    if (c && !c.disabled) { const h = app.household; if (colourOf(h) === c.dataset.hhOc && isObjectColour(lookOf(h).colour)) return; saveLook({ ...lookOf(h), colour: c.dataset.hhOc }); return; }
-    const i = e.target.closest("[data-hh-icon]");
-    if (i && !i.disabled) { const h = app.household, L = { ...lookOf(h) }; if ((L.icon || "") === i.dataset.hhIcon) return; if (i.dataset.hhIcon) L.icon = i.dataset.hhIcon; else delete L.icon; saveLook(L); return; }
-    const p = e.target.closest("[data-hh-photo]"); if (!p || p.disabled) return;
-    const act = p.dataset.hhPhoto, box = $("#hhCropBox");
-    if (act === "pick") { $("[data-hh-file]").click(); return; }
-    if (act === "cancel") { crop = null; box.hidden = true; msg("", "info"); return; }
-    if (act === "save") {
+    const b = e.target.closest("[data-hh-oc], [data-hh-icon], [data-hh-photo]");
+    if (!b || b.disabled) return;
+    const scope = settingsScope(b);
+    if (!scope || !canEdit()) return;
+    const { hhOc, hhIcon, hhPhoto } = b.dataset;
+    if (hhOc) return queueLook(scope, () => {
+      const L = lookOf(scope.household);
+      if (L.colour !== hhOc) return saveLook(scope, { ...L, colour: hhOc });
+    });
+    if (hhIcon !== undefined) return queueLook(scope, () => {
+      const { icon, ...rest } = lookOf(scope.household);
+      if ((icon || "") !== hhIcon) return saveLook(scope, hhIcon ? { ...rest, icon: hhIcon } : rest);
+    });
+    if (hhPhoto === "pick") { scope.body.querySelector("[data-hh-file]").click(); return; }
+    if (hhPhoto === "cancel") {
+      crops.delete(scope); scope.body.querySelector("#hhCropBox").hidden = true; msg("", "info"); return;
+    }
+    if (hhPhoto === "save") {
+      const crop = crops.get(scope);
       if (!crop) return;
-      p.disabled = true; p.textContent = "Saving…"; msg("", "info");
-      try { await savePhoto(await crop.blob()); crop = null; toast("Household photo saved", "ok"); redrawSection(); }
-      catch (err) { msg(`${err.message} The household’s look hasn’t changed.`); p.disabled = false; p.textContent = "Try again"; }
+      b.disabled = true; b.textContent = "Saving…"; msg("", "info");
+      await queueLook(scope, async () => {
+        const blob = await crop.blob();
+        if (scope.current()) await savePhoto(scope, blob);
+      });
+      if (scope.current() && b.isConnected) { b.disabled = false; b.textContent = "Try again"; }
       return;
     }
-    if (act === "remove") {
-      if (!(await confirmDel("Remove the household photo?", "Its icon or initial shows instead. You can add a photo again any time.", "Remove"))) return;
-      await removePhoto(); toast("Household photo removed"); redrawSection();
+    if (hhPhoto === "remove" && await confirmDel("Remove the household photo?", "Its icon or initial shows instead. You can add a photo again any time.", "Remove") && scope.current()) {
+      await queueLook(scope, () => removePhoto(scope));
     }
   });
   document.addEventListener("change", async e => {
-    if (!e.target.matches || !e.target.matches("[data-hh-file]")) return;
-    const f = e.target.files && e.target.files[0]; e.target.value = "";
+    const input = e.target;
+    if (!input.matches("[data-hh-file]")) return;
+    const scope = settingsScope(input);
+    if (!scope || !canEdit()) return;
+    const f = input.files && input.files[0]; input.value = "";
     const bad = checkFile(f); if (bad) { msg(bad); return; }
     try {
-      const img = await loadImage(f), box = $("#hhCropBox");
-      crop = cropper(img).mount(box); box.hidden = false; msg("Drag to position, zoom if you like, then save.", "info");
+      const img = await loadImage(f);
+      if (!scope.current() || !input.isConnected) return;
+      const box = scope.body.querySelector("#hhCropBox");
+      crops.set(scope, cropper(img).mount(box));
+      box.hidden = false; msg("Drag to position, zoom if you like, then save.", "info");
       box.querySelector("canvas").focus({ preventScroll: true });
-    } catch (err) { msg(err.message); }
+    } catch (err) { if (scope.current()) msg(err.message); }
   });
-  // an expired link: fetch a fresh one
   document.addEventListener("error", e => {
-    if (!e.target || !e.target.matches || !e.target.matches("[data-hh-img]")) return;
+    if (!e.target?.matches?.("[data-hh-img]")) return;
     const id = e.target.dataset.hhImg, c = read(id); if (c) write(id, { ...c, src: null, exp: 0 });
   }, true);
 }

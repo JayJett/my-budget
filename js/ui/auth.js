@@ -2,7 +2,7 @@
 import { app } from "./ctx.js";
 import { $, esc, toast, closePop, openPop } from "./dom.js";
 import { render } from "./render.js";
-import { createStore, isNetworkError, clearDeviceCopies, hasLegacyBudgetDraft, hasDeviceBudgetDrafts } from "../sync/store.js";
+import { createStore, sessionIdentity, isNetworkError, clearDeviceCopies, hasLegacyBudgetDraft, hasDeviceBudgetDrafts } from "../sync/store.js";
 import { blankBudget } from "../model/schema.js";
 import { startSetup, endSetup, obHeader, modeChoices, rememberMode, pendingAccounts, resumeAccounts, hasLegacyAccountDraft } from "./onboarding.js";
 import { HERO } from "./hero-art.js";
@@ -157,7 +157,8 @@ function applyRemoteView(meta) {
 
 /* ---------- sign-in screens ---------- */
 let recovering = false, entering = null;
-let householdOpen = 0, authEpoch = 0, appliedAuthEpoch = 0, observedUser = null;
+let householdOpen = 0, authEpoch = 0, appliedAuthEpoch = 0, observedUser = null, observedSession = null;
+
 export function showAuth(mode, msg, kind) {
   document.body.classList.add("signed-out"); const el = $("#auth"); el.hidden = false; el.classList.add("im");
   if (mode === "signin" && !msg && !remembered() && !welcomeSeen()) mode = "welcome";
@@ -279,12 +280,18 @@ async function loadMembers(householdId, userId) {
   if (error && (!isNetworkError(error) || prof?.user.id !== userId)) throw error;
   return { members: error ? prof.members?.[householdId] || [] : data || [], personLinks };
 }
-async function loadHouseholds() {
+async function loadHouseholds(scope) {
   const userId = app.meId, epoch = authEpoch;
   // Phase 8: each household's look comes too. Until the database has it, ask for the name alone.
-  let { data, error } = await app.sb.from("household_members").select("household_id, role, households(name, appearance)").eq("user_id", userId).order("joined_at");
-  if (error && /appearance|42703|column/i.test(`${error.code} ${error.message}`)) ({ data, error } = await app.sb.from("household_members").select("household_id, role, households(name)").eq("user_id", userId).order("joined_at"));
-  if (epoch !== authEpoch || userId !== app.meId) return null;
+  const current = () => epoch === authEpoch && userId === app.meId && (!scope || scope.current());
+  const read = fields => {
+    const query = sb => sb.from("household_members").select(fields).eq("user_id", userId).order("joined_at");
+    return scope ? scope.request(query) : query(app.sb);
+  };
+  let { data, error } = await read("household_id, role, households(name, appearance)");
+  if (!current()) return null;
+  if (error && /appearance|42703|column/i.test(`${error.code} ${error.message}`)) ({ data, error } = await read("household_id, role, households(name)"));
+  if (!current()) return null;
   if (error) {
     const prof = offlineProfile();
     if (isNetworkError(error) && prof && prof.user.id === app.meId && prof.households) { app.households = prof.households; return app.households; }
@@ -342,7 +349,7 @@ async function openHH(id) {
   const canWrite = role === "editor" || role === "owner";
   const current = () => stillOpening() && app.store === store;
   const store = createStore({
-    sb: app.sb, userId, householdId: hh.id, canWrite, isCurrent: current,
+    sb: app.sb, userId, householdId: hh.id, sessionId: sessionIdentity(app.session), canWrite, isCurrent: current,
     setState: s => { app.state = s; },
     onStatus: (st, info) => {
       app.saveStatus = st;
@@ -445,9 +452,9 @@ function refreshLive() { if (app.saveStatus === "saved" || !app.saveStatus) show
 function reconnectLive() { if (livePaused && app.household && navigator.onLine !== false) liveSubscribe(); }
 
 /** Re-read which households you're in (after creating, leaving or being removed), then open one. */
-async function reloadHouseholds(preferId) {
-  const list = await loadHouseholds();
-  if (!list) return false;
+async function reloadHouseholds(preferId, scope) {
+  const list = await loadHouseholds(scope);
+  if (!list || (scope && !scope.current())) return false;
   if (!list.length) { closeHousehold(); showAuth("household"); return false; }
   return openHH(pickHousehold(list, preferId));
 }
@@ -732,7 +739,12 @@ export function initAuth(sb) {
   sb.auth.onAuthStateChange((event, s) => {
     // Invalidate the old identity synchronously. Auth API calls and UI work stay outside the SDK callback.
     const next = s?.user.id || null;
-    if (event === "SIGNED_OUT" || (s && next !== observedUser)) { observedUser = next; authEpoch++; }
+    const sessionId = s && sessionIdentity(s);
+    if (event === "SIGNED_OUT" || (s && (next !== observedUser || (sessionId && sessionId !== observedSession)))) {
+      observedUser = next;
+      observedSession = sessionId;
+      authEpoch++;
+    }
     const epoch = authEpoch;
     setTimeout(() => {
       if (epoch !== authEpoch) return;

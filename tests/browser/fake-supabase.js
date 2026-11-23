@@ -79,12 +79,22 @@
     .map(h => ({ seq: 0, backups: [], invites: [], snapshots: [], changes: [], reminders: [], remPrefs: null, ...copy(h), members: h.members ? copy(h.members) : [meMember(h.role || "owner")] }));
   const user = { id: ME, email: "jarden@example.com", user_metadata: { name: init.myName || "Jarden", ...(init.accent ? { accent: init.accent } : {}), ...(init.meta || {}) }, created_at: "2026-01-01T00:00:00Z" };
   let authCb = null, session = null;
-  const signIn = () => ({ user, access_token: "test-token" });
+  const signIn = (who = user, id = "initial") => ({ user: who, access_token: "header." + btoa(JSON.stringify({ session_id: id, sub: who.id })).replace(/=+$/, "") + ".signature" });
   const emitAuth = (event, next) => { session = next; if (authCb) authCb(event, next); };
 
   const fake = window.__fake = {
     households, rpcCalls: [], authCalls: [], backups: [], remUpdates: [], prefSaves: [], devices: copy(init.devices || []), fnCalls: [],
     pushKey: init.pushKey === undefined ? "BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4" : init.pushKey, listeners: [], failNext: 0, checks: {}, noPersonLinks: !!init.noPersonLinks, liveCb: null, liveDown: false, live(st) { if (this.liveCb) this.liveCb(st); }, files: copy(init.files || {}), storageCalls: [], failUpload: 0, storageOn: init.storageOn !== false, noLook: !!init.noLook, deleted: false, createMode: init.createMode || null, invite: init.invite || null, failMembers: init.failMembers || 0, createDelay: init.createDelay || 0, resendWait: init.resendWait || 0,
+    requests: [], responseGates: new Map(),
+    authAs(id, generation) {
+      emitAuth(id ? "SIGNED_IN" : "SIGNED_OUT", id ? signIn({ ...user, id }, generation) : null);
+    },
+    holdResponse(key, match, before = false) {
+      let release;
+      const wait = new Promise(resolve => { release = resolve; });
+      this.responseGates.set(key, { match, before, wait, release, started: false });
+    },
+    releaseResponse(key) { this.responseGates.get(key).release(); },
     holdNextSave() {
       fake.saveGate = new Promise(resolve => { fake.finishSave = resolve; });
     },
@@ -99,8 +109,9 @@
       fake.listeners.filter(l => l.id === id).forEach(l => l.fn({ new: row }));
     },
   };
-  const mine = () => households.filter(h => h.members.some(m => m.user_id === ME));
-  const roleIn = id => { const h = fake.hh(id); const m = h && h.members.find(x => x.user_id === ME); return m ? m.role : null; };
+  const signedInId = () => session?.user.id;
+  const mine = (userId = signedInId()) => households.filter(h => h.members.some(m => m.user_id === userId));
+  const roleIn = (id, userId = signedInId()) => { const h = fake.hh(id); const m = h && h.members.find(x => x.user_id === userId); return m ? m.role : null; };
   const err = message => ({ data: null, error: { message } });
   // Snapshots, like the database's _snapshot_data / _nz_month
   const nzMonth = () => { const p = new Intl.DateTimeFormat("en-CA", { timeZone: "Pacific/Auckland", year: "numeric", month: "2-digit" }).format(new Date()); return p.slice(0, 7) + "-01"; };
@@ -110,27 +121,41 @@
   const offline = () => navigator.onLine === false;
   const NET = { data: null, error: { message: "TypeError: Failed to fetch" } };
 
+  async function respond(call, run) {
+    fake.requests.push(copy(call));
+    const gate = [...fake.responseGates.values()].find(g => !g.started && g.match(call));
+    if (!gate) return run();
+    gate.started = true;
+    if (gate.before) await gate.wait;
+    const result = await run();
+    if (!gate.before) await gate.wait;
+    return result;
+  }
+
+  const requestUser = bearer => bearer ? JSON.parse(atob(bearer.split(".")[1])).sub : signedInId();
+
   function query(table) {
     const q = { eq: {}, is: {}, lt: {}, gt: {}, in: {}, limit: Infinity, desc: false, update: null, upsert: null, del: false, cols: "" };
     const run = () => {
       if (offline()) return NET;
+      const caller = requestUser(q.bearer), role = id => roleIn(id, caller);
       const hid = q.eq.household_id || q.eq.id;
       if (table === "household_members" && fake.failMembers > 0) { fake.failMembers--; return { data: null, error: { message: "Failed to fetch" } }; }
       if (table === "household_members") {
-        if (q.eq.user_id === ME) {
+        if (q.eq.user_id && q.eq.user_id === caller) {
           // Phase 8: a household's look comes along with its name, once the database has the column
           if (/appearance/.test(q.cols) && fake.noLook) return { data: null, error: { code: "42703", message: "column households_1.appearance does not exist" } };
-          return { data: mine().map(h => ({ household_id: h.id, role: roleIn(h.id), joined_at: "2026-01-01", households: /appearance/.test(q.cols) ? { name: h.name, appearance: copy(h.appearance || {}) } : { name: h.name } })), error: null };
+          return { data: mine(caller).map(h => ({ household_id: h.id, role: role(h.id), joined_at: "2026-01-01", households: /appearance/.test(q.cols) ? { name: h.name, appearance: copy(h.appearance || {}) } : { name: h.name } })), error: null };
         }
         // Phase 10: who's who (person_id), once the database has the column
         if (/person_id/.test(q.cols) && fake.noPersonLinks) return { data: null, error: { code: "42703", message: "column household_members.person_id does not exist" } };
-        return { data: copy((fake.hh(hid) || { members: [] }).members).map(m => /person_id/.test(q.cols) ? { person_id: null, ...m } : (({ person_id, ...r }) => r)(m)), error: null };
+        return { data: copy(role(hid) ? fake.hh(hid).members : []).map(m => /person_id/.test(q.cols) ? { person_id: null, ...m } : (({ person_id, ...r }) => r)(m)), error: null };
       }
       if (table === "households" && q.update) {
-        const h = fake.hh(hid); if (!h || roleIn(hid) !== "owner") return { data: [], error: null };
+        const h = fake.hh(hid); if (!h || role(hid) !== "owner") return { data: [], error: null };
         Object.assign(h, q.update); return { data: [{ name: h.name }], error: null };
       }
-      if (table === "budgets") { const h = fake.hh(hid); return { data: h && roleIn(hid) ? { state: copy(h.budget), seq: h.seq, updated_by: ME, updated_at: new Date().toISOString() } : null, error: null }; }
+      if (table === "budgets") { const h = fake.hh(hid); return { data: h && role(hid) ? { state: copy(h.budget), seq: h.seq, updated_by: ME, updated_at: new Date().toISOString() } : null, error: null }; }
       if (table === "budget_snapshots") return { data: copy((fake.hh(hid) || { snapshots: [] }).snapshots), error: null };
       if (table === "push_subscriptions") {
         if (q.del) { fake.devices = fake.devices.filter(d => d.id !== q.eq.id); return { data: null, error: null }; }
@@ -153,8 +178,13 @@
       }
       if (table === "budget_backups") return { data: copy((fake.hh(hid) || { backups: [] }).backups), error: null };
       if (table === "household_invites") {
-        if (q.del) { households.forEach(h => { h.invites = h.invites.filter(i => i.id !== q.eq.id); }); return { data: null, error: null }; }
-        return { data: copy((fake.hh(hid) || { invites: [] }).invites), error: null };
+        if (q.del) {
+          if (!["owner", "editor"].includes(role(hid))) return { data: [], error: null };
+          const h = fake.hh(hid), removed = h.invites.filter(i => i.id === q.eq.id);
+          h.invites = h.invites.filter(i => i.id !== q.eq.id);
+          return { data: copy(removed), error: null };
+        }
+        return { data: copy(["owner", "editor"].includes(role(hid)) ? fake.hh(hid).invites : []), error: null };
       }
       return { data: [], error: null };
     };
@@ -162,8 +192,8 @@
       select(cols) { q.cols = cols || ""; return b; }, eq(k, v) { q.eq[k] = v; return b; }, is(k, v) { q.is[k] = v; return b; },
       order(_c, o) { q.desc = !!(o && o.ascending === false); return b; }, lt(k, v) { q.lt[k] = Number(v); return b; }, gt(k, v) { q.gt[k] = Number(v); return b; }, limit(n) { q.limit = n; return b; },
       in(k, v) { q.in[k] = v; return b; }, upsert(v) { q.upsert = v; return b; },
-      update(v) { q.update = v; return b; }, delete() { q.del = true; return b; }, maybeSingle() { return b; }, setHeader() { return b; }, abortSignal() { return b; },
-      then(res, rej) { return Promise.resolve(run()).then(res, rej); },
+      update(v) { q.update = v; return b; }, delete() { q.del = true; return b; }, maybeSingle() { return b; }, setHeader(name, value) { if (name === "Authorization") q.bearer = value; return b; }, abortSignal() { return b; },
+      then(res, rej) { return respond({ table, ...q }, run).then(res, rej); },
     };
     return b;
   }
@@ -171,7 +201,8 @@
   const folder = path => String(path).split("/")[0];
   const mayRead = (bucket, path) => bucket === "household-photos" ? !!roleIn(folder(path)) : path.startsWith(ME + "/");
   const mayWrite = (bucket, path) => bucket === "household-photos" ? ["owner", "editor"].includes(roleIn(folder(path))) : path.startsWith(ME + "/");
-  async function rpc(name, a) {
+  async function rpc(name, a, caller) {
+    const role = id => roleIn(id, caller);
     await new Promise(r => setTimeout(r, 30));
     if (offline()) return NET;
     fake.rpcCalls.push({ name, args: copy(a) });
@@ -181,7 +212,7 @@
       // Phase 10: the same rules as the database functions (supabase/migrations/..._payday_playbook.sql)
       case "link_budget_person": {
         if (fake.failNext > 0) { fake.failNext--; return err("Failed to fetch"); }
-        const hh = fake.hh(id); if (!roleIn(id)) return err("Not a member of this household");
+        const hh = fake.hh(id); if (!role(id)) return err("Not a member of this household");
         const mem = hh.members.find(m => m.user_id === ME);
         if (a.p_person === null) { mem.person_id = null; return { data: null, error: null }; }
         if (!hh.budget.people || !hh.budget.people[a.p_person]) return err("That person isn't in this budget");
@@ -190,7 +221,7 @@
       }
       case "payday_check_get": case "payday_check_mark": case "payday_check_replan": {
         if (fake.failNext > 0) { fake.failNext--; return err("Failed to fetch"); }
-        const hh = fake.hh(id); if (!roleIn(id)) return err("Not a member of this household");
+        const hh = fake.hh(id); if (!role(id)) return err("Not a member of this household");
         if (!hh.members.some(m => m.user_id === ME && m.person_id === a.p_person)) return err("This checklist is for someone else");
         const k = `${id}|${ME}|${a.p_person}|${a.p_payday}`, row = fake.checks[k];
         const out = r => r ? { payday: a.p_payday, plan: copy(r.plan), done: copy(r.done), updated_at: new Date().toISOString() } : null;
@@ -207,7 +238,7 @@
       }
       case "set_household_appearance": { // like the database function: owners and editors, known keys only
         if (fake.noLook) return { data: null, error: { code: "PGRST202", message: "Could not find the function public.set_household_appearance(p_appearance, p_household) in the schema cache" } };
-        const h = fake.hh(a.p_household), r = roleIn(a.p_household);
+        const h = fake.hh(a.p_household), r = role(a.p_household);
         if (!h || !r) return { data: null, error: { message: "Not a member of this household" } };
         if (r === "viewer") return { data: null, error: { message: "Only owners and editors can change how the household looks" } };
         const v = a.p_appearance || {}, clean = {};
@@ -230,7 +261,7 @@
       }
       case "forget_push_subscription": fake.devices = fake.devices.filter(d => d.endpoint !== a.p_endpoint); return { data: null, error: null };
       case "ensure_monthly_snapshot": {
-        const hh = fake.hh(id); if (!roleIn(id)) return err("Not a member of this household");
+        const hh = fake.hh(id); if (!role(id)) return err("Not a member of this household");
         const d = snapData(hh.budget), m = nzMonth();
         if (init.noAutoSnapshot || !d || hh.snapshots.some(x => x.kind === "monthly" && x.month === m)) return { data: false, error: null };
         hh.snapshots.push({ id: ++snapId, month: m, kind: "monthly", taken_at: new Date().toISOString(), taken_by: null, data: d });
@@ -238,7 +269,7 @@
       }
       case "save_snapshot_now": {
         if (fake.failNext > 0) { fake.failNext--; return err("Failed to fetch"); }
-        if (!["owner", "editor"].includes(roleIn(id))) return err("Only owners and editors can save a snapshot");
+        if (!["owner", "editor"].includes(role(id))) return err("Only owners and editors can save a snapshot");
         const hh = fake.hh(id), d = snapData(hh.budget);
         if (!d) return err("There’s nothing to save yet: set up the budget first");
         const row = { id: ++snapId, month: nzMonth(), kind: "manual", taken_at: new Date().toISOString(), taken_by: ME, data: d };
@@ -251,15 +282,15 @@
         const gate = fake.saveGate; fake.saveGate = null;
         if (gate) await gate;
         if (fake.failNext > 0) { fake.failNext--; return err("Failed to fetch"); }
-        if (!roleIn(id)) return err("Not a member of this household");
-        if (roleIn(id) === "viewer") return err("You have view-only access to this budget");
+        if (!role(id)) return err("Not a member of this household");
+        if (role(id) === "viewer") return err("You have view-only access to this budget");
         const hh = fake.hh(id), before = copy(hh.budget); hh.budget = applyOps(hh, a.p_ops); hh.seq++;
         const rep = a.p_ops.find(o => o.op === "replace");
         const change_id = record(hh, before, hh.budget, ME, rep ? "replace" : "edit", rep ? rep.reason || "Replaced" : "");
         return { data: { state: copy(hh.budget), seq: hh.seq, updated_at: new Date().toISOString(), updated_by: ME, change_id }, error: null };
       }
       case "undo_budget_change": {
-        if (!["owner", "editor"].includes(roleIn(id))) return err("Only owners and editors can undo changes");
+        if (!["owner", "editor"].includes(role(id))) return err("Only owners and editors can undo changes");
         const hh = fake.hh(id), r = hh.changes.find(x => x.id === Number(a.p_change_id));
         if (!r) return err("That change is no longer in the history");
         if (r.undone_at) return err("That change has already been undone");
@@ -276,7 +307,7 @@
         return { data: { state: copy(s), seq: hh.seq, updated_at: new Date().toISOString(), updated_by: ME, change_id, skipped }, error: null };
       }
       case "restore_budget_version": {
-        if (!["owner", "editor"].includes(roleIn(id))) return err("Only owners and editors can restore an earlier version");
+        if (!["owner", "editor"].includes(role(id))) return err("Only owners and editors can restore an earlier version");
         const hh = fake.hh(id), r = hh.changes.find(x => x.id === Number(a.p_change_id));
         if (!r) return err("That version is no longer in the history");
         const before = copy(hh.budget);
@@ -298,20 +329,20 @@
         return { data: h.id, error: null };
       }
       case "invite_member":
-        if (!["owner", "editor"].includes(roleIn(id))) return err("Only owners and editors can invite people");
+        if (!["owner", "editor"].includes(role(id))) return err("Only owners and editors can invite people");
         fake.hh(id).invites.push({ id: "inv-" + Date.now(), email: a.p_email, role: a.p_role || "editor" }); return { data: null, error: null };
       case "set_member_role": {
-        if (roleIn(id) !== "owner") return err("Only an owner can change roles");
+        if (role(id) !== "owner") return err("Only an owner can change roles");
         const h = fake.hh(id), m = h.members.find(x => x.user_id === a.p_user);
         if (m.role === "owner" && a.p_role !== "owner" && h.members.filter(x => x.role === "owner").length === 1) return err("A household needs at least one owner. Make someone else an owner first.");
         m.role = a.p_role; return { data: null, error: null };
       }
       case "remove_member": {
-        if (roleIn(id) !== "owner") return err("Only an owner can remove people");
+        if (role(id) !== "owner") return err("Only an owner can remove people");
         const h = fake.hh(id); h.members = h.members.filter(x => x.user_id !== a.p_user); return { data: null, error: null };
       }
       case "leave_household": {
-        const h = fake.hh(id), was = roleIn(id);
+        const h = fake.hh(id), was = role(id);
         h.members = h.members.filter(x => x.user_id !== ME);
         if (!h.members.length) { households.splice(households.indexOf(h), 1); return { data: "household deleted", error: null }; }
         if (was === "owner" && !h.members.some(x => x.role === "owner")) { h.members[0].role = "owner"; return { data: "ownership passed on", error: null }; }
@@ -333,7 +364,7 @@
         auth: {
           // Like the real client: with no connection and an expired sign-in, there's no session to give.
           onAuthStateChange(cb) { authCb = cb; setTimeout(() => emitAuth("INITIAL_SESSION", init.signedOut || offline() ? null : signIn()), 0); return { data: { subscription: { unsubscribe() {} } } }; },
-          async getSession() { return { data: { session }, error: null }; },
+          async getSession() { return respond({ auth: "getSession" }, () => ({ data: { session }, error: null })); },
           async signOut() { fake.authCalls.push({ name: "signOut" }); setTimeout(() => emitAuth("SIGNED_OUT", null), 0); return { error: null }; },
           // Phase 7A: sign-up with an email code, sign-in codes, resending, Google/Apple
           async signUp(c) { fake.authCalls.push({ name: "signUp", email: c.email, data: copy(c.options && c.options.data), redirect: c.options && c.options.emailRedirectTo }); return { data: { user: { id: "new" }, session: null }, error: null }; },
@@ -379,7 +410,8 @@
           async createSignedUrl(path) { fake.storageCalls.push({ op: "sign", bucket, path }); const u = mayRead(bucket, path) && fake.files[path]; return u ? { data: { signedUrl: u }, error: null } : { data: null, error: { message: "Object not found" } }; },
         }; } },
         rpc(name, args) {
-          const b = { setHeader() { return b; }, abortSignal() { return b; }, then(resolve, reject) { return rpc(name, args).then(resolve, reject); } };
+          const call = { rpc: name, args };
+          const b = { setHeader(name, value) { if (name === "Authorization") call.bearer = value; return b; }, abortSignal() { return b; }, then(resolve, reject) { return respond(call, () => rpc(name, args, requestUser(call.bearer))).then(resolve, reject); } };
           return b;
         },
         // Edge Functions: the reminders function's "public key" and "send a test" jobs
