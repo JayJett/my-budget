@@ -144,7 +144,7 @@ export function drawFlow(C, col, spendLabel) {
 }
 
 function niceMax(v) { if (v <= 0) return 1000; const e = Math.pow(10, Math.floor(Math.log10(v))), f = v / e; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * e; }
-const short = v => v >= 1e6 ? "$" + (v / 1e6).toFixed(v >= 1e7 ? 0 : 1).replace(/\.0$/, "") + "M" : v >= 1e3 ? "$" + Math.round(v / 1e3) + "k" : "$" + Math.round(v);
+const short = v => v >= 1e12 ? "$" + +(v / 1e12).toFixed(1) + "T" : v >= 1e9 ? "$" + +(v / 1e9).toFixed(1) + "B" : v >= 1e6 ? "$" + (v / 1e6).toFixed(v >= 1e7 ? 0 : 1).replace(/\.0$/, "") + "M" : v >= 1e3 ? "$" + Math.round(v / 1e3) + "k" : "$" + Math.round(v);
 
 export function drawCurve(C) {
   const el = $("#curve"); if (!el) return;
@@ -278,12 +278,12 @@ function pickable(el, svg, count, xOf, sel, onPick) {
   };
 }
 
-/** The forecast: projected balance (filled) over money contributed (dashed), year 0 to `horizon`.
+/** The forecast balance from year 0 to `horizon`.
     years: C.inv.years as worked out by projectInvestments. sel: the picked year. */
 export function drawGrowth(el, years, horizon, selYear, onPick) {
   if (!el) return;
   const { W, H } = chartSize(el), pl = 50, pr = 14, pt = 14, pb = 28, Y = years.slice(0, horizon + 1), n = Y.length - 1;
-  const max = niceMax(Math.max(...Y.map(d => Math.max(d.bal, d.contrib))));
+  const max = niceMax(Math.max(...Y.map(d => d.bal)));
   const x = i => pl + (n ? i / n : 0) * (W - pl - pr), yv = v => pt + (1 - Math.max(0, v) / max) * (H - pt - pb);
   const path = k => Y.map((d, i) => (i ? "L" : "M") + x(i).toFixed(1) + " " + yv(d[k]).toFixed(1)).join("");
   let grid = "";
@@ -294,10 +294,8 @@ export function drawGrowth(el, years, horizon, selYear, onPick) {
   el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" class="ichart" aria-hidden="true">
     <g class="axis">${grid}</g>
     <path d="${path("bal")} L${x(n)} ${yv(0)} L${x(0)} ${yv(0)}Z" style="fill:var(--invest);opacity:.13"/>
-    <path d="${path("contrib")}" fill="none" style="stroke:var(--muted)" stroke-width="2" stroke-dasharray="5 4"/>
     <path d="${path("bal")}" fill="none" style="stroke:var(--invest)" stroke-width="2.75" stroke-linejoin="round" stroke-linecap="round"/>
     <line x1="${x(s)}" x2="${x(s)}" y1="${pt}" y2="${H - pb}" class="ich-sel"/>
-    <circle cx="${x(s)}" cy="${yv(d.contrib)}" r="4.5" style="fill:var(--surface);stroke:var(--muted)" stroke-width="2"/>
     <circle cx="${x(s)}" cy="${yv(d.bal)}" r="6" style="fill:var(--invest);stroke:var(--surface)" stroke-width="2.5"/></svg>`;
   pickable(el, $("svg", el), n + 1, x, { i: s }, onPick);
 }

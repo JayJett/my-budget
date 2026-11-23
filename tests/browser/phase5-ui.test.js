@@ -21,6 +21,7 @@ test("appearance: colour, light/dark and spacing in one sheet, saved to your log
   await appearance(page);
   await page.screenshot({ path: join(SHOTS, "appearance-390.png") });
   await page.click('[data-look="theme"][data-v="dark"]');
+  await page.click("#sheet .ap-display > summary");
   await page.click('[data-look="density"][data-v="compact"]');
   await page.click('[data-accent-pick="amber"]');
   assert.deepEqual(await look(page), { theme: "dark", compact: true, accent: "amber" }, "changes straight away");

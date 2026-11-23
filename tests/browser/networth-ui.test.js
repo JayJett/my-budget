@@ -31,11 +31,13 @@ test("the hero leads with net worth; accounts are grouped, tappable rows with no
   assert.equal(await text(page, "nw.net"), "$29,650.25");
   assert.equal(await text(page, "nw.assets"), "$35,850.50"); assert.equal(await text(page, "nw.debt"), "$6,200.25");
   // Phase 9C.1: a small doughnut (its text equivalent in percentages) with the amounts listed beside it
+  assert.equal(await page.isVisible("#nwBar"), false, "the account list leads, with the chart in details");
+  await page.click("#nwBreakdown > summary");
   assert.match(await page.getAttribute("#nwBar svg", "aria-label"), /^What you own: Everyday 7%, Savings 29%, Investments 1%, Super 63%$/);
   assert.equal((await page.textContent("#nwKey")).replace(/\s+/g, " ").trim(), "Everyday$2,450.50Savings$10,600Investments$300Super$22,500");
   assert.deepEqual(await page.$$eval(".ex-gh h3", els => els.map(e => e.textContent)), ["Cash", "Investments and super", "Debt"]);
   assert.equal(await text(page, "nw.grp.cash"), "$13,050.50"); assert.equal(await text(page, "nw.grp.long"), "$22,800");
-  assert.equal(await page.locator("#app .nw-main input, #app .nw-main select").count(), 0, "no form fields in the account list");
+  assert.equal(await page.locator("#app .sp-list input, #app .sp-list select").count(), 0, "no form fields in the account list");
   assert.equal(await page.locator(".viewas").count(), 0, "no period switch: balances aren't per fortnight");
   // rows: type, goal money, warnings that matter, and debt shown as owed
   assert.equal(await text(page, "nw.a2.sub"), "Savings · $7,500 for goals");
@@ -129,6 +131,7 @@ test("add: from a group it starts with that type; closing a blank one leaves not
 test("review: shows when balances were last checked, and 'Reviewed today' still works", { skip }, async () => {
   const { page, errors, ctx } = await nwTab(CASES.mixed);
   assert.match(await text(page, "nw.rev.when"), /^Last reviewed 20 Feb( 2026)? · \d+ days ago$/);
+  await page.click("#nwReview > summary");
   await page.click("#revToday"); await settle(page);
   assert.equal(await text(page, "nw.rev.when"), "Last reviewed " + await page.evaluate(() => { const d = new Date(); return `${d.getDate()} ${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][d.getMonth()]}`; }) + " · today");
   assert.equal(await text(page, "nw.rev"), "Recently reviewed");

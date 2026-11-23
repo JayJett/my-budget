@@ -45,10 +45,13 @@ test("payday card: different days stay apart, each with its own date; no payday 
   assert.deepEqual(errors, []); await ctx.close();
 });
 
-test("your menu has no Reminders; the bell still opens them, with Reminder settings", { skip }, async () => {
+test("Settings and the bell both lead to notification preferences", { skip }, async () => {
   const { page, errors, ctx } = await open(RICH, { ...phone(), storage: ALL_DONE });
   await page.click("#menuBtn"); await page.waitForSelector("#drawer:not([hidden])");
-  assert.equal(await page.locator('#drawer [data-act="reminders"]').count(), 0);
+  await page.click('#drawer [data-act="reminders"]');
+  await page.waitForSelector("#sheet .rem-switches");
+  await page.click('#sheet [data-sheet="close"]');
+  await page.click("#menuBtn");
   for (const a of ["profile", "history", "appearance", "tours", "data", "signout"]) assert.equal(await page.locator(`#drawer [data-act="${a}"]`).count(), 1, a);
   await page.keyboard.press("Escape"); await page.waitForSelector("#drawer", { state: "hidden" });
   await page.click("#bellBtn"); await page.waitForSelector('#drawer [data-rem="settings"]');

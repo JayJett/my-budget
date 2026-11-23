@@ -43,6 +43,10 @@ export function applyUI() {
   const t = app.ui.theme;
   if (t === "auto") delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t;
   document.body.classList.toggle("compact", app.ui.density === "compact");
+  document.querySelectorAll('meta[name="theme-color"]').forEach(meta => {
+    const dark = t === "dark" || (t === "auto" && meta.media.includes("dark"));
+    meta.content = dark ? "#101626" : "#F2F4FB";
+  });
 }
 
 const initial = p => (p.name || "?").trim().charAt(0).toUpperCase() || "?";
@@ -75,7 +79,7 @@ const viewAsBar = () => {
 };
 
 /** Wealth's three sections, as a segmented switch at the top of each (Phase 9A). */
-const wealthNav = () => `<nav class="wl-nav" aria-label="Wealth"><div class="seg wl-seg" role="tablist">${WEALTH_TABS.map(([k, l]) => `<button type="button" role="tab" class="wl-t" data-tab="${k}" aria-selected="${k === app.tab}"><span>${esc(l)}</span><span class="mark" data-mark="${k}"></span></button>`).join("")}</div></nav>`;
+const wealthNav = () => `<div class="ind-page-head"><h2 class="ind-title">Wealth</h2></div><nav class="wl-nav" aria-label="Wealth"><div class="seg wl-seg" role="tablist" aria-label="Wealth views">${WEALTH_TABS.map(([k, l]) => `<button type="button" role="tab" class="wl-t" id="wealth-tab-${k}" data-tab="${k}" aria-selected="${k === app.tab}" aria-controls="wealthPanel" tabindex="${k === app.tab ? 0 : -1}"><span>${esc(l)}</span><span class="mark" data-mark="${k}"></span></button>`).join("")}</div></nav>`;
 
 const welcomeBox = () => `<div class="welcome"><h3>Start your budget</h3><p>Nothing’s saved yet. Add your pay below, let the setup guide build a starting plan, or bring in a file you saved earlier.</p><button class="btn primary" type="button" data-act="setup">Use the setup guide</button> <button class="btn soft" type="button" data-act="import">Import a saved file</button></div>`;
 
@@ -90,7 +94,7 @@ export function render() {
   $("#tabs").innerHTML = NAV.map(([k, l]) => `<button class="tab" role="tab" type="button" data-tab="${k}" aria-selected="${navOn(k)}"><span class="ti" aria-hidden="true">${ICONS[k]}</span><span class="tl">${esc(l)}</span><span class="ts">${esc(SHORT[k])}</span><span class="mark" data-mark="${k}" aria-hidden="true"></span></button>`).join("");
   const note = !app.canWrite && app.household ? `<div class="welcome ro-note"><h3>You’re viewing ${esc(app.household.name)}</h3><p>You can look around, but changes are switched off. An owner can make you an editor in Household settings.</p></div>` : "";
   // (Budget and Spending have their own period switch, in their top card.)
-  $("#app").innerHTML = note + (app.loaded && !app.hasData && app.canWrite && app.tab === "budget" ? welcomeBox() : "") + (WEALTH.includes(app.tab) ? wealthNav() : "") + VIEWS_BY_TAB[app.tab].view();
+  $("#app").innerHTML = note + (app.loaded && !app.hasData && app.canWrite && app.tab === "budget" ? welcomeBox() : "") + (WEALTH.includes(app.tab) ? `<div class="ind-wealth">${wealthNav()}<div id="wealthPanel" role="tabpanel" aria-labelledby="wealth-tab-${app.tab}">${VIEWS_BY_TAB[app.tab].view()}</div></div>` : VIEWS_BY_TAB[app.tab].view());
   if (app.beforeRefresh) app.beforeRefresh(); // e.g. an open editing sheet redraws itself from the new state
   refresh();
   const ro = readOnly();

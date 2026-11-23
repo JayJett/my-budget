@@ -39,9 +39,11 @@ test("the avatar opens a drawer from the left; page still, dimmed and in place; 
   assert.equal(await page.getAttribute("#menuBtn", "aria-expanded"), "true");
   assert.equal(await locked(page), true); assert.equal(await page.evaluate(() => document.querySelector("#app").inert), true);
   assert.equal(await page.isVisible(".dr-back.on"), true, "the page behind is dimmed");
-  // short labels with icons; no long descriptions on the main list
-  assert.equal(await page.locator("#drawer .dr-row .mi").count(), await page.locator("#drawer .dr-row").count());
-  assert.equal(await page.locator("#drawer .dr-row small").count(), 0);
+  // Household role is the only supporting detail on a row.
+  const ordinaryRows = page.locator('#drawer .dr-row:not([data-act="household"])');
+  assert.equal(await ordinaryRows.locator(".mi").count(), await ordinaryRows.count());
+  assert.equal(await ordinaryRows.locator("small").count(), 0);
+  assert.match(await page.locator('#drawer [data-act="household"] small').textContent(), /Owner/i);
   await shot(page, "drawer");
   // a small swipe left settles back; a real one closes
   await swipe(page, "#drawer", -40); await page.waitForTimeout(300);

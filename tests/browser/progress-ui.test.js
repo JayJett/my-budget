@@ -26,7 +26,8 @@ function past(k, savings, carLoan, couchSaved) {
 const LONG = [past(9, 8000, 8000, 0), past(3, 10000, 7000, 0), past(2, 11000, 6500, 0), past(1, 11760, 6200, 100)];
 const init = (snaps, budget = V4, role = "owner") => ({ noAutoSnapshot: true, households: [{ id: "hh-1", name: "Test household", role, budget, snapshots: snaps,
   members: [{ user_id: "u-me", display_name: "Jarden", email: "j@example.com", role, joined_at: "2026-01-01" }] }] });
-const pgTab = async (snaps, o = {}) => { const r = await open(null, { init: init(snaps, o.budget), width: o.width || 1280 }); await settle(r.page); await goTab(r.page, "progress"); await r.page.waitForSelector(".pg-hero"); return r; };
+const seenHistory = { "mb-tours-u-me": JSON.stringify({ tabs: { progress: "done" } }) };
+const pgTab = async (snaps, o = {}) => { const r = await open(null, { init: init(snaps, o.budget), width: o.width || 1280, storage: seenHistory }); await settle(r.page); await goTab(r.page, "progress"); await r.page.waitForSelector(".pg-hero"); return r; };
 const stored = page => fake(page, () => JSON.stringify(window.__fake.hh("hh-1").snapshots));
 
 test("history chart: one dot per recorded month plus today; ranges only filter; picking and filtering never write", { skip }, async () => {
@@ -45,9 +46,12 @@ test("history chart: one dot per recorded month plus today; ranges only filter; 
   assert.deepEqual(errors, []); await ctx.close();
 });
 
-test("the top: net worth today, the change since last month with words, and debt changes worded the right way round", { skip }, async () => {
+test("recorded history leads; current net worth and debt comparison remain available", { skip }, async () => {
   let o = await pgTab(LONG);
-  assert.match(await o.page.textContent(".pg-hero .sp-head"), /\$45,500\s*net worth today/);
+  assert.match(await o.page.textContent(".pg-summary"), /Change in recorded net worth.*\+\$1,060/s);
+  assert.equal(await o.page.isVisible(".pg-delta"), false);
+  await o.page.click("#pgDetails > summary");
+  assert.match(await o.page.textContent("#pgDetails .sp-head"), /\$45,500\s*net worth today/);
   assert.match(await o.page.textContent(".pg-delta"), /\+\$440\s*since/);
   assert.equal(await o.page.locator(".pg-delta .chip.ok").count(), 1);
   const debt = o.page.locator(".pg-rows li", { hasText: "Debt" });
@@ -81,7 +85,8 @@ test("sparse history: no snapshots, then one: no trend line is drawn from a sing
 test("compare: pick a snapshot; both sides are labelled; a goal deleted since still shows its recorded amount", { skip }, async () => {
   const b = clone(V4); delete b.goals.joint.g3;
   const { page, errors, ctx } = await pgTab(LONG, { budget: b });
-  await page.selectOption("#pgCmpSel", "102");
+  await page.click("#pgCompare > summary");
+    await page.selectOption("#pgCmpSel", "102");
   await page.waitForSelector(".pg-cmp-l");
   assert.match(await page.textContent(".pg-cmp-h"), /Then[\s\S]*Now\s*Today/);
   const row = label => page.locator(".pg-cmp-l li", { has: page.locator(".pg-cmp-n b", { hasText: label }) }).first();
@@ -95,14 +100,14 @@ test("compare: pick a snapshot; both sides are labelled; a goal deleted since st
 test("saving: one snapshot per tap even if tapped twice; a failure says so and saves nothing", { skip }, async () => {
   const { page, errors, ctx } = await pgTab(LONG);
   const count = () => fake(page, () => window.__fake.hh("hh-1").snapshots.length);
-  await page.locator('.pg-hero [data-snap="save"]').dblclick();
+  await page.locator('.pg-hl [data-snap="save"]').dblclick();
   await page.waitForSelector("text=Snapshot saved");
   assert.equal(await count(), 5, "just one new snapshot");
   await fake(page, () => { window.__fake.failNext = 1; });
-  await page.click('.pg-hero [data-snap="save"]');
+  await page.click('.pg-hl [data-snap="save"]');
   await page.waitForFunction(() => /Failed to fetch|connection|Couldn’t/i.test(document.querySelector("#toast")?.textContent || ""));
   assert.equal(await count(), 5, "nothing saved");
-  assert.equal(await page.locator('.pg-hero [data-snap="save"]').isDisabled(), false, "ready to try again");
+  assert.equal(await page.locator('.pg-hl [data-snap="save"]').isDisabled(), false, "ready to try again");
   assert.deepEqual(errors, []); await ctx.close();
 });
 
@@ -112,7 +117,7 @@ test("history stays as recorded: changing today's balances only changes Today", 
   await goTab(page, "networth");
   await editNetWorth(page, "n2"); await setField(page, '#sheet [data-f="balance"]', "20000"); await closeSheet(page); await settle(page);
   await goTab(page, "progress");
-  assert.match(await page.textContent(".pg-hero .sp-head"), /\$53,500/);
+  assert.match(await page.textContent("#pgDetails .sp-head"), /\$53,500/);
   assert.equal(await stored(page), before, "snapshots untouched");
   assert.equal(await page.textContent(".pg-hl .pg-list"), listBefore);
   assert.deepEqual(errors, []); await ctx.close();
@@ -122,7 +127,9 @@ for (const width of [320, 375, 390, 430, 768, 1280]) {
   test(`${width}px wide: nothing sideways, figures not clipped (big and negative values)`, { skip }, async () => {
     const b = clone(V4); b.nw.accounts.n5.balance = 1250000;                         // net worth well below zero
     const { page, errors, ctx } = await pgTab(LONG, { budget: b, width });
+    await page.click("#pgCompare > summary");
     await page.selectOption("#pgCmpSel", "101");
+    await page.click("#pgDetails > summary");
     await page.click("#pgMixBox summary");
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
     const clipped = await page.$$eval(".sp-head .amt, .pg-rows b, .pg-g-v, .pg-nw", els => els.filter(e => e.scrollWidth > e.clientWidth + 1).map(e => e.textContent));

@@ -123,7 +123,7 @@ test("doughnuts: honest parts with a text equivalent; Home is calmer; payday car
   assert.equal([...inc.matchAll(/(\d+)%/g)].reduce((s, m) => s + Number(m[1]), 0), 100);
   assert.equal(await page.locator(".alloc .a-part").count(), 0, "no member dots on allocation rows");
   await shot(page, "budget");
-  await page.evaluate(() => { location.hash = "#wealth/accounts"; }); await page.waitForSelector("#nwBar svg");
+  await page.evaluate(() => { location.hash = "#wealth/accounts"; }); await page.click("#nwBreakdown > summary"); await page.waitForSelector("#nwBar svg");
   const nw = await page.getAttribute("#nwBar svg", "aria-label");
   assert.match(nw, /^What you own: /); assert.doesNotMatch(nw, /Debt|owed/i, "what's owed is never a slice");
   await shot(page, "wealth");

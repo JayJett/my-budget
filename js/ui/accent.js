@@ -168,7 +168,7 @@ export function resetLook() {
 const TICK = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5l3 3 6-7"/></svg>';
 export function accentPickerHTML({ custom = true } = {}) {
   const cur = currentAccent(), hex = shown.accentHex;
-  const tile = (key, label) => `<button type="button" class="acc-sw" role="radio" data-accent-pick="${key}" aria-checked="${key === cur}" aria-label="${esc(label)}">
+  const tile = (key, label) => `<button type="button" class="acc-sw" role="radio" data-accent-pick="${key}" aria-checked="${key === cur}" aria-label="${esc(label)}"${key === CUSTOM_ACCENT ? ` style="--acc-stored:${hex}"` : ""}>
     <span class="acc-prev" aria-hidden="true"><span class="acc-pill"></span><span class="acc-bar"><i></i></span></span>
     <span class="acc-name"><span class="acc-dot" aria-hidden="true">${TICK}</span>${esc(label)}</span></button>`;
   return `<div class="acc-picker" role="radiogroup" aria-label="Accent colour">${ACCENTS.map(a => tile(a.key, a.label)).join("")}${custom && isHex(hex) ? tile(CUSTOM_ACCENT, "Yours") : ""}</div>
@@ -208,6 +208,8 @@ export function initAccent() {
     chooseLook("accentHex", e.target.value.toUpperCase()); chooseLook("accent", CUSTOM_ACCENT);
     const g = document.querySelector(".acc-picker");
     if (g && !g.querySelector('[data-accent-pick="custom"]')) { const tmp = document.createElement("div"); tmp.innerHTML = accentPickerHTML(); g.replaceWith(tmp.firstElementChild); }
+    const customTile = document.querySelector('.acc-picker [data-accent-pick="custom"]');
+    customTile?.style.setProperty("--acc-stored", e.target.value);
     document.querySelectorAll("[data-accent-pick]").forEach(x => x.setAttribute("aria-checked", String(x.dataset.accentPick === CUSTOM_ACCENT)));
   });
   window.addEventListener("online", () => { const u = app.session && app.session.user; if (u && Object.keys(dirtyOf(read(u.id))).length) save(u.id); });

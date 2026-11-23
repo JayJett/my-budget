@@ -1777,24 +1777,16 @@ body.setting-up::before, body.signed-out::before{ background:var(--bg); }   /* t
 .gl-first p{ margin:0 0 12px; color:var(--muted); font-size:var(--fs-sm); }
 .iv-empty .empty-art{ width:min(180px, 60%); }
 
-/* =====================================================================
-   PHASE 7C REDESIGN, part 1: the dark, immersive welcome, sign-in and setup
-   Always dark, whatever the phone's light/dark setting: a deep forest-green to teal gradient, big
-   pictures (js/ui/hero-art.js), headline at the top, buttons at the bottom.
-   The screen is pinned to the visible screen and only its own content scrolls, and only when it
-   really doesn't fit. So a screen that fits can't be dragged up and down into empty space.
-   ===================================================================== */
-.im{
-  --bg:#0B2621; --surface:#15382F; --surface-2:#19413A; --surface-3:#204A41; --ink:#F2F8F5; --muted:#A9C4B9; --faint:#76968A;
-  --line:#24473E; --line-strong:#356055;
-  --accent:#8FE0B9; --accent-hover:#A9E8C9; --accent-soft:#1E4A3E; --on-accent:#08201A;
-  --ok:#8FD3A6; --ok-soft:#173A2C; --warn:#E9B86A; --warn-soft:#3A3020; --bad:#F6A396; --bad-soft:#45282A;
-  --c-blue:#8AB7EA; --c-gold:#E5B85E; --c-coral:#EC9A7A; --c-rose:#E592BC; --c-slate:#9BB6C4; --joint:#6CC4A6; --invest:#B59EE0; --c-teal:#74CFC5; --c-purple:#C9A6EE; --c-green:#A7D17E;
-  --unalloc:#2B4A42; --shadow:none; color-scheme:dark; color:var(--ink);
-  --glass:rgba(255,255,255,.065); --glass-line:rgba(255,255,255,.15);
+/* First-run and sign-in layouts use the same surfaces as the signed-in app. */
+.im {
+  --bg:var(--ind-canvas); --surface:var(--ind-surface); --surface-2:var(--ind-canvas); --surface-3:var(--ind-soft);
+  --ink:var(--ind-ink); --muted:var(--ind-muted); --line:var(--ind-line);
+  --ok:var(--ind-good); --bad:var(--ind-warn);
+  --glass:var(--ind-surface); --glass-line:var(--ind-line);
+  color:var(--ind-ink); font-family:var(--ind-font);
 }
 #auth.im, .ob.im{ position:fixed; inset:0; z-index:20; overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain; -webkit-overflow-scrolling:touch;
-  background:radial-gradient(130% 75% at 50% -5%, #22695A 0%, #134239 38%, #0A2620 70%, #061612 100%) #0A2620; }
+  background:var(--ind-canvas); }
 #auth.im{ display:block; min-height:0; padding:0; }
 #auth.im[hidden]{ display:none; }
 .ob.im{ max-width:none; margin:0; padding:0; min-height:0; display:block; }
@@ -1823,43 +1815,43 @@ body.setting-up::before, body.signed-out::before{ background:transparent; }
 .im .ob-brand{ color:var(--ink); }
 .im .logo{ background:var(--accent); color:var(--on-accent); }
 .im .ob-stage{ color:var(--muted); } .im .ob-stage b{ color:var(--accent); }
-.im .ob-prog{ background:rgba(255,255,255,.14); height:5px; }
+.im .ob-prog{ background:var(--ind-soft); height:5px; }
 .im .linkish, .im .ob-later{ color:var(--accent); }
 
-/* buttons: white pill first, outline pill second (like the welcome) */
-.im .btn{ border-radius:99px; min-height:52px; justify-content:center; font-weight:650; background:transparent; color:var(--ink); border:1.5px solid rgba(255,255,255,.4); }
-.im .btn.primary{ background:#fff; color:#0B2621; border-color:#fff; font-weight:700; }
-.im .btn.primary:hover{ background:#EAF6F0; }
-.im .btn.primary:disabled, .im .btn.primary[disabled]{ background:rgba(255,255,255,.2); border-color:transparent; color:rgba(255,255,255,.62); opacity:1; }
+/* Setup controls */
+.im .btn{ border-radius:12px; min-height:52px; justify-content:center; font-weight:650; background:transparent; color:var(--ink); border:1px solid var(--line-strong); }
+.im .btn.primary{ background:var(--accent); color:var(--on-accent); border-color:var(--accent); font-weight:700; }
+.im .btn.primary:hover{ background:var(--accent-hover); }
+.im .btn.primary:disabled, .im .btn.primary[disabled]{ background:var(--ind-soft); border-color:transparent; color:var(--ind-muted); opacity:1; }
 .im .btn.ghost{ border-color:transparent; color:var(--accent); }
-.im .btn.small{ min-height:40px; }
+.im .btn.small{ min-height:44px; }
 .im .btn:focus-visible{ outline:2px solid var(--accent); outline-offset:3px; }
 
-/* glass surfaces: choice cards, boxes, inputs */
+/* Form and choice surfaces */
 .im .ob-opt{ background:var(--glass); border-color:var(--glass-line); border-radius:20px; min-height:68px; }
-.im .ob-opt-ic{ background:rgba(255,255,255,.1); color:var(--accent); }
-.im .ob-opt:has(input:checked){ background:rgba(143,224,185,.13); border-color:var(--accent); box-shadow:0 10px 28px -18px rgba(143,224,185,.6); }
+.im .ob-opt-ic{ background:var(--ind-soft); color:var(--accent); }
+.im .ob-opt:has(input:checked){ background:var(--accent-soft); border-color:var(--accent); }
 .im .ob-opt:has(input:checked) .ob-opt-ic{ background:var(--accent); color:var(--on-accent); }
-.im .ob-tick{ border-color:rgba(255,255,255,.3); }
+.im .ob-tick{ border-color:var(--line-strong); }
 .im .ob-opt:has(input:checked) .ob-tick{ background:var(--accent); border-color:var(--accent); color:var(--on-accent); }
 .im .ob-note, .im .ob-pay, .im .ob-sum > div, .im .ob-buckets{ background:var(--glass); border-color:var(--glass-line); }
-.im .field input, .im .ob-field input[type=text], .im .ob-field input[type=date], .im .bs-in{ background:rgba(255,255,255,.07); border:1.5px solid rgba(255,255,255,.18); color:var(--ink); border-radius:14px; min-height:50px; font-size:16px; }
-.im .field input:focus, .im .ob-field input:focus{ border-color:var(--accent); background:rgba(255,255,255,.1); }
+.im .field input, .im .ob-field input[type=text], .im .ob-field input[type=date], .im .bs-in{ background:var(--surface); border:1.5px solid var(--line-strong); color:var(--ink); border-radius:14px; min-height:50px; font-size:16px; }
+.im .field input:focus, .im .ob-field input:focus{ border-color:var(--accent); background:var(--ind-soft); }
 .im .field span, .im .ob-field span{ color:var(--muted); }
-.im .ob-amount{ background:rgba(255,255,255,.07); border-color:rgba(255,255,255,.18); }
-.im .ob-amount:focus-within{ border-color:var(--accent); background:rgba(255,255,255,.1); box-shadow:0 0 0 4px rgba(143,224,185,.16); }
-.im .unit.ob-pct{ background:rgba(255,255,255,.08); }
-.im .seg-radio{ background:rgba(255,255,255,.07); }
-.im .seg-radio input:checked + span{ background:rgba(255,255,255,.18); color:var(--ink); box-shadow:none; }
-.im .auth-tabs{ background:rgba(255,255,255,.07); border-color:var(--glass-line); border-radius:99px; }
-.im .auth-tabs button{ border-radius:99px; }
-.im .auth-tabs button[aria-pressed="true"]{ background:#fff; color:#0B2621; box-shadow:none; }
-.im .auth-or{ color:var(--muted); } .im .auth-or::before, .im .auth-or::after{ background:rgba(255,255,255,.18); }
+.im .ob-amount{ background:var(--surface); border-color:var(--line-strong); }
+.im .ob-amount:focus-within{ border-color:var(--accent); background:var(--ind-soft); box-shadow:0 0 0 4px var(--accent-soft); }
+.im .unit.ob-pct{ background:var(--ind-soft); }
+.im .seg-radio{ background:var(--surface); }
+.im .seg-radio input:checked + span{ background:var(--ind-surface); color:var(--accent); box-shadow:none; }
+.im .auth-tabs{ background:var(--surface); border-color:var(--glass-line); border-radius:12px; }
+.im .auth-tabs button{ border-radius:12px; }
+.im .auth-tabs button[aria-pressed="true"]{ background:var(--surface); color:var(--accent); box-shadow:none; }
+.im .auth-or{ color:var(--muted); } .im .auth-or::before, .im .auth-or::after{ background:var(--line-strong); }
 .im .msg.err{ background:var(--bad-soft); color:var(--bad); }
-.im .ob-b-dot{ box-shadow:0 0 0 2px rgba(255,255,255,.1); }
-.im .ob-foot{ background:linear-gradient(to bottom, rgba(7,26,22,0), #081E19 22px); margin:auto -20px 0; padding:14px 20px calc(10px + env(safe-area-inset-bottom,0px)); }
+.im .ob-b-dot{ box-shadow:0 0 0 2px var(--ind-soft); }
+.im .ob-foot{ background:var(--ind-canvas); margin:auto -20px 0; padding:14px 20px calc(10px + env(safe-area-inset-bottom,0px)); }
 .ob-in-wrap:has(.st-3) .ob-top{ position:sticky; top:0; z-index:6; margin:calc(-8px - env(safe-area-inset-top,0px)) -20px 6px; padding:calc(8px + env(safe-area-inset-top,0px)) 20px 10px;
-  background:rgba(17,60,52,.92); -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px); }
+  background:var(--ind-canvas); -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px); }
 
 /* big pictures: as large as the room allows (svh: steady while Safari's toolbars come and go) */
 /* The picture takes only the space left over on the screen (flex), up to a maximum; when what's left is
@@ -2283,7 +2275,6 @@ dialog.sheet::backdrop{ animation:fade-in .24s var(--ease); }
 .ob-card.look-open .ob-art{ display:none; }
 /* Phase 8: the colour you pick on setup step 1 shows on the setup screens straight away (each accent's
    light version, checked against these dark screens in tests/accent.test.js) */
-:root[data-accent] .im{ --accent:var(--acc-d); --accent-hover:var(--acc-d); --accent-soft:color-mix(in srgb, var(--acc-d) 22%, #0B2621); --on-accent:var(--on-acc-d); }
 /* Phase 8: with the icon tile, narrow phones let an allocation's name wrap to two lines instead of cutting it off */
 @media (max-width:380px){
   .alloc-row .a-name{ white-space:normal; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; overflow-wrap:anywhere; }
@@ -2668,7 +2659,7 @@ details.help{ margin-top:20px; border-top:0; padding-top:0; }
 .ob-payday input[type=date]{ -webkit-appearance:none; appearance:none; width:100%; min-width:0; max-width:100%; box-sizing:border-box; min-height:46px; font-size:16px; }
 .ob-payday.bad input{ border-color:var(--bad); }
 .ob-err{ margin:6px 0 0; color:var(--bad); font-size:var(--fs-sm); font-weight:600; }
-.im .ob-err{ color:#F6A396; }
+.im .ob-err{ color:var(--bad); }
 
 /* ============ Phase 10: Payday Playbook ============ */
 .ho-pb{ display:flex; align-items:center; justify-content:space-between; gap:8px; width:100%; min-height:44px; margin-top:14px; padding:0; border:0; border-top:1px solid rgba(255,255,255,.12); padding-top:12px;

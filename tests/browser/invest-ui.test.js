@@ -39,6 +39,7 @@ test("the forecast leads; years ahead and milestones show the same figure as the
   assert.equal(await text(page, "iv.h.bal"), await text(page, "iv.m10"));
   assert.equal(await text(page, "iv.h.bal"), await text(page, "iv.y10.b"));
   assert.match(await page.textContent("#ivRead"), /^Year 10/);
+  await page.click("#ivDetails > summary");
   await page.click('.iv-m[data-iv-h="20"]');
   assert.equal(await text(page, "iv.h.bal"), await text(page, "iv.m20"));
   assert.equal(await page.getAttribute('.iv-h [data-iv-h="20"]', "aria-pressed"), "true");
@@ -84,6 +85,7 @@ test("starting balance comes from Net worth and the amount going in from Budget"
   const { page, errors, ctx } = await ivTab(CASES.rich);
   assert.equal(await text(page, "iv.start"), "$8,000");
   const per = await text(page, "iv.per");
+  await page.click("#ivDetails > summary");
   await page.click('.iv-src-i[data-tab="networth"]');
   await page.waitForSelector('[data-tab="networth"][aria-selected="true"]');
   await editNetWorth(page, "n3"); await setField(page, '#sheet [data-f="balance"]', "10000"); await closeSheet(page);
@@ -113,7 +115,10 @@ test("edge cases: nothing invested, a falling market, very large balances: never
     else await page.click("#ivYears summary");
     assert.doesNotMatch(await page.textContent("#app"), /NaN|Infinity|undefined/, name);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false, name);
-    if (name === "negative") assert.match(await text(page, "iv.h.g"), /^−\$/, "growth can be negative and says so");
+    if (name === "negative") {
+      await page.click("#ivDetails > summary");
+      assert.match(await text(page, "iv.h.g"), /^−\$/, "growth can be negative and says so");
+    }
     if (name === "nothing") assert.equal(await text(page, "iv.h.bal"), "$0");
     assert.deepEqual(errors, [], name); await ctx.close();
   }
@@ -130,7 +135,7 @@ test("series colours never follow the accent; viewers can look at the assumption
   o = await open(null, { init });
   await o.page.waitForFunction(() => document.querySelector("#saveText").textContent === "View only");
   await goTab(o.page, "invest");
-  assert.equal(await o.page.textContent("[data-iv-edit]"), "View");
+  assert.equal(await o.page.textContent("[data-iv-edit]"), "View assumptions");
   await o.page.click("[data-iv-edit]");
   assert.equal(await o.page.isDisabled('#sheet [data-f="invest.rate"]'), true);
   assert.deepEqual(o.errors, []); await o.ctx.close();

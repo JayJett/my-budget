@@ -38,7 +38,7 @@ test("setup: short steps fit the screen exactly; long ones scroll and every butt
   o = await open({}, { waitFor: ".ob", ...PHONE });
   const { page, errors, ctx } = o;
   f = await fits(page); assert.ok(f.h <= f.vh, `step 2 fits (${f.h} ≤ ${f.vh})`);
-  assert.equal(await page.isVisible(".ob-art svg"), true, "a picture, when there's room for one");
+  assert.ok(await page.isVisible(".ob-pay-label"), "the take-home pay field has a visible label");
   await shot(page, "2-income");
   // the progress bar is kept between steps (so it can glide), not redrawn
   await page.evaluate(() => { window.__bar = document.querySelector(".ob-prog span"); });
@@ -243,7 +243,7 @@ test("welcome: three swipeable slides, buttons always there, shown once per devi
   assert.equal(await page.isVisible('.wl-acts [data-auth="signup"]'), true);
   assert.equal(await page.isVisible('.wl-acts [data-auth="signin"]'), true);
   let f = await fits(page); assert.ok(f.h <= f.vh && f.page, `the welcome fits (${f.h} ≤ ${f.vh})`);
-  assert.equal(await page.getAttribute('meta[name="theme-color"]', "content"), "#123F36", "Safari's toolbar matches");
+  assert.equal(await page.getAttribute('meta[name="theme-color"]', "content"), "#F2F4FB", "Safari's toolbar matches Indigo light");
   await shot(page, "welcome-1");
   // swipe (scroll the track) and the dots follow; the dots also move the slides
   await page.$eval("#wlTrack", el => el.scrollTo({ left: el.clientWidth * 2 }));

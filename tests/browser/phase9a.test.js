@@ -94,7 +94,8 @@ test("Home for a brand-new solo budget: no made-up balances or dates; next steps
   await page.fill('[data-ob="people.0.pay"]', "2000"); await page.fill('[data-ob="people.0.payday"]', "2026-11-05"); await page.click('[data-obact="next"]'); await page.click('[data-obact="next"]');
   await page.waitForSelector('[data-obact="acc-skip"]'); await page.click('[data-obact="acc-skip"]');
   await page.waitForSelector(".ob-done");
-  assert.match(await page.textContent(".ob-done"), /Add your accounts any time in Wealth/);
+  assert.match(await page.textContent(".ob-done .lead"), /Your plan is saved/);
+  assert.equal(await page.locator('.ob-done [data-obact="tour"].primary').textContent(), "Show me around");
   await page.click('[data-obact="finish"]'); await page.waitForSelector("#app .home");
   assert.equal(await hash(page), "#home");
   // Phase 9C.2: setup asks for the last payday, so the payday card counts down from the start
@@ -124,7 +125,12 @@ test("Home with huge numbers at 320px: nothing overflows", { skip }, async () =>
 test("household menu: your avatar still opens your menu; the household opens a small anchored dropdown", { skip }, async () => {
   const { page, errors, ctx } = await open(null, { ...phone(320, 640), storage: ALL_DONE, init: TWO() });
   await page.click("#menuBtn"); await page.waitForSelector("#drawer:not([hidden])");
-  assert.equal(await page.locator('#drawer [data-act="household"], #drawer [data-switch]').count(), 0, "household things moved out of your menu");
+  assert.equal(await page.locator('#drawer [data-switch]').count(), 0, "switching uses the header menu");
+  await page.click('#drawer [data-act="household"]');
+  await page.waitForSelector("#sheet #hhLookSec");
+  await page.click('#sheet [data-sheet="close"]');
+  await page.waitForSelector("#sheet", { state: "hidden" });
+  await page.click("#menuBtn"); await page.waitForSelector("#drawer:not([hidden])");
   for (const a of ["profile", "history", "appearance", "tours", "data", "signout"]) assert.equal(await page.locator(`#drawer [data-act="${a}"]`).count(), 1, a);
   await page.keyboard.press("Escape"); await page.waitForSelector("#drawer", { state: "hidden" });
   await page.click("#hhBtn"); await page.waitForSelector("#hhPop");
