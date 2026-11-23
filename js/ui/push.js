@@ -5,6 +5,7 @@
    The daily reminders function sends there (see supabase/functions/send-reminders), and sw.js shows it.
    The public half of the app's signing key comes from that function, so there's nothing to configure here. */
 import { app } from "./ctx.js";
+import { sessionIdentity } from "../sync/store.js";
 
 const FN = "send-reminders";
 const isIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
@@ -44,20 +45,74 @@ async function fnError(error) {
 }
 const b64ToBytes = s => { const t = s.replace(/-/g, "+").replace(/_/g, "/"); const bin = atob(t + "=".repeat((4 - t.length % 4) % 4)); return Uint8Array.from(bin, c => c.charCodeAt(0)); };
 
+// Push is per account, even when the household changes. Pin follow-up RPCs to
+// the authenticated session that opened the permission/subscription workflow.
+function pushContext() {
+  const { sb, session } = app;
+  const user = session?.user.id, id = sessionIdentity(session);
+  const current = () => !!user && app.sb === sb && app.session?.user.id === user &&
+    sessionIdentity(app.session) === id;
+  const check = () => { if (!current()) throw new Error("Your sign-in changed. Open Reminder settings and try again."); };
+  async function rpc(name, params) {
+    check();
+    const { data, error } = await sb.auth.getSession();
+    check();
+    if (error || data.session?.user.id !== user || !data.session.access_token ||
+        sessionIdentity(data.session) !== id) throw new Error("Your sign-in changed. Open Reminder settings and try again.");
+    return sb.rpc(name, params).setHeader("Authorization", "Bearer " + data.session.access_token);
+  }
+  return { sb, current, check, rpc };
+}
+
+export function sameDeviceEndpoint(a, b) {
+  const displayKey = value => {
+    try {
+      const url = new URL(value);
+      if (url.hostname === "fcm.googleapis.com" && url.pathname.startsWith("/fcm/send/")) {
+        url.pathname = "/wp/" + url.pathname.slice("/fcm/send/".length);
+      }
+      return url.href.replace(/%[a-f0-9]{2}/gi, s => s.toUpperCase());
+    } catch (_) { return value; }
+  };
+  return !!a && !!b && displayKey(a) === displayKey(b);
+}
+
 /** Turn notifications on for this device. Throws a friendly message if it can't. */
 export async function enablePush() {
   const s = pushSupport(); if (!s.ok) throw new Error(s.why === "denied" ? "Notifications are blocked for this app in your settings." : "This device can’t get notifications here.");
-  const { data, error } = await app.sb.functions.invoke(FN, { body: { publicKey: true } });
+  const context = pushContext();
+  const { data, error } = await context.sb.functions.invoke(FN, { body: { publicKey: true } });
+  context.check();
   if (error || !data || !data.publicKey) throw new Error(error ? await fnError(error) : "Phone notifications aren’t set up yet.");
   const permission = await Notification.requestPermission();
   if (permission !== "granted") throw new Error(permission === "denied" ? "Notifications were blocked. To turn them on later, allow them for this app in your device or browser settings." : "Notifications weren’t allowed, so nothing changed.");
   const reg = await ready();
   let sub = await reg.pushManager.getSubscription();
-  if (sub && !sameKey(sub, data.publicKey)) { await sub.unsubscribe(); sub = null; } // made with an old key
+  context.check();
+  if (sub && !sameKey(sub, data.publicKey)) { await sub.unsubscribe(); context.check(); sub = null; } // made with an old key
   if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(data.publicKey) });
+  context.check();
   const j = sub.toJSON();
-  const { error: e2 } = await app.sb.rpc("save_push_subscription", { p_endpoint: j.endpoint, p_p256dh: j.keys.p256dh, p_auth: j.keys.auth, p_label: deviceLabel() });
-  if (e2) throw new Error(app.friendly ? app.friendly(e2) : e2.message);
+  const { error: savedError } = await context.rpc("save_push_subscription", {
+    p_endpoint: j.endpoint, p_p256dh: j.keys.p256dh, p_auth: j.keys.auth, p_label: deviceLabel(),
+  });
+  context.check();
+  if (!savedError) return;
+  if (savedError.code === "PT409") {
+    let released = false;
+    try { released = await sub.unsubscribe(); } catch (_) {}
+    context.check();
+    throw new Error(released
+      ? "This browser’s old subscription was disconnected. Tap “Turn on for this device” again to register it for this account."
+      : "This browser couldn’t disconnect its old subscription. Turn it off from the previous account, then try again.");
+  }
+  if (savedError.code === "PT429") throw new Error("Device registration limit reached. Try again later.");
+  if (savedError.code === "PT422") throw new Error(
+    savedError.message === "You have 10 registered devices. Remove one before adding another."
+      ? savedError.message : "This push provider isn’t supported on this device. Your reminders still appear under the bell.",
+  );
+  if (savedError.code === "PT400") throw new Error("This device’s notification details are invalid. Turn notifications off and on again.");
+  throw new Error("Couldn’t register notifications. Check your connection and try again.");
 }
 function sameKey(sub, publicKey) {
   try {
@@ -69,8 +124,11 @@ function sameKey(sub, publicKey) {
 
 /** Turn notifications off for this device (also used when signing out, so the next person doesn't get yours). */
 export async function disablePush() {
-  const sub = await currentSubscription(); if (!sub) return;
-  try { if (app.sb && app.session && !app.session.offline) await app.sb.rpc("forget_push_subscription", { p_endpoint: sub.endpoint }); } catch (_) {}
+  const context = pushContext();
+  const sub = await currentSubscription();
+  if (!sub || !context.current()) return;
+  try { if (!app.session.offline) await context.rpc("forget_push_subscription", { p_endpoint: sub.endpoint }); } catch (_) {}
+  if (!context.current()) return;
   try { await sub.unsubscribe(); } catch (_) {}
 }
 
@@ -89,6 +147,7 @@ export async function removeDevice(id) {
 export async function sendTest() {
   const { data, error } = await app.sb.functions.invoke(FN, { body: { test: true } });
   if (error) throw new Error(await fnError(error));
+  if (!data.sent && data.suppressed) return "This device registration can’t receive notifications. Turn notifications off and on again. Your reminders still appear under the bell.";
   if (!data.sent) return data.gone ? "That device is no longer reachable, so it was removed. Turn notifications on again." : "The test didn’t go through. Try again in a minute.";
   return `Test sent to ${data.sent === 1 ? "your device" : `${data.sent} devices`}. It should arrive in a few seconds.`;
 }

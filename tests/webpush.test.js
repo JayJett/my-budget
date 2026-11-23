@@ -1,6 +1,9 @@
 /* Phone and computer notifications: encryption, signing and grouping (supabase/functions/send-reminders). */
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { ENDPOINT_SYNTAX, PROVIDER_SYNTAX, pushEndpoint } from "../supabase/functions/send-reminders/push-policy.js";
+import { sendBatch } from "../supabase/functions/send-reminders/delivery.js";
 import { encrypt, vapidHeader, sendPush, publicKeyFromJwk, b64u } from "../supabase/functions/send-reminders/webpush.js";
 import { notificationFor, deliver } from "../supabase/functions/send-reminders/run.js";
 
@@ -61,10 +64,114 @@ test("one notification per person: a single reminder as it is, several as 'N new
 
 test("delivery: each person's devices get their own notification; gone devices are reported", async () => {
   const pushes = [{ user_id: "ana", title: "A1" }, { user_id: "ana", title: "A2" }, { user_id: "ben", title: "B1" }];
-  const devices = [{ id: 1, user_id: "ana" }, { id: 2, user_id: "ana" }, { id: 3, user_id: "ben" }, { id: 4, user_id: "cat" }];
+  const devices = [{ id: 1, user_id: "ana" }, { id: 2, user_id: "ana" }, { id: 3, user_id: "ben" }, { id: 4, user_id: "cat" }].map(d => ({ ...d, endpoint: "https://fcm.googleapis.com/wp/d" + d.id }));
   const calls = [];
   const send = async (d, msg) => { calls.push([d.id, msg.title]); return d.id === 2 ? { ok: false, gone: true } : { ok: true }; };
   const r = await deliver(pushes, devices, { send });
   assert.deepEqual(calls, [[1, "2 new reminders"], [2, "2 new reminders"], [3, "B1"]], "Cat has no new reminders: nothing sent");
-  assert.deepEqual(r, { sent: [1, 3], gone: [2], failed: 0 });
+  assert.deepEqual(r, { sent: [1, 3], gone: [2], failed: 0, suppressed: 0 });
+});
+
+const point = "BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4";
+const auth = "BTBZMqHH6r4Tts7J_aSIgg";
+const synthetic = endpoint => ({ endpoint, p256dh: point, auth });
+const APPROVED = [
+  "https://web.push.apple.com/synthetic-dev",
+  "https://fcm.googleapis.com/wp/synthetic-dev",
+  "https://fcm.googleapis.com/fcm/send/synthetic-dev",
+  "https://updates.push.services.mozilla.com/wpush/v1/synthetic-dev",
+  "https://updates.push.services.mozilla.com/wpush/v2/synthetic-dev",
+  "https://wns2-test.notify.windows.com/?token=synthetic%2Fvalue%3D",
+];
+
+test("only reviewed provider routes resolve to a canonical HTTPS destination", () => {
+  for (const ep of APPROVED) assert.equal(pushEndpoint(ep), ep);
+  assert.equal(pushEndpoint("https://FCM.googleapis.com:443/wp/synthetic-dev"), APPROVED[1]);
+  assert.equal(pushEndpoint("https://wns2-test.notify.windows.com/?token=synthetic%2fvalue%3d"), APPROVED.at(-1));
+  for (const ep of [
+    "https://unapproved.example/test",
+    "https://192.0.2.1/test",
+    "https://localhost/test",
+    "https://fcm.googleapis.com.example.test/wp/synthetic-dev",
+    "https://fcm.googleapis.com/another-service",
+    "http://fcm.googleapis.com/wp/synthetic-dev",
+    "https://web.push.apple.com:444/synthetic-dev",
+    "https://demo:pass@web.push.apple.com/synthetic-dev",
+    "https://web.push.apple.com/./synthetic-dev",
+    "https://web.push.apple.com/synthetic-dev#part",
+    "https://web.push.apple.com/" + "a".repeat(1000),
+  ]) assert.equal(pushEndpoint(ep), null);
+});
+
+test("the registration migration and Edge use the same provider expressions", () => {
+  const sql = readFileSync(new URL("../supabase/migrations/20261123022923_push_destination_security.sql", import.meta.url), "utf8");
+  assert.ok(sql.includes("$endpoint$" + ENDPOINT_SYNTAX + "$endpoint$"));
+  assert.ok(sql.includes("$provider$" + PROVIDER_SYNTAX + "$provider$"));
+});
+
+test("unapproved endpoints and malformed subscription keys never reach transport", async () => {
+  const jwk = await newKey();
+  let fetches = 0;
+  const opts = { jwk, subject: "https://example.test/", fetchFn: async () => { fetches++; return { status: 201 }; } };
+  const bad = [
+    synthetic("https://unapproved.example/test"),
+    { ...synthetic(APPROVED[0]), p256dh: "BA" + "A".repeat(85) },
+    { ...synthetic(APPROVED[0]), auth: auth.slice(0, -1) + "h" },
+    { ...synthetic(APPROVED[0]), auth: auth + "AA" },
+    { ...synthetic(APPROVED[0]), p256dh: "A".repeat(4096) },
+  ];
+  for (const s of bad) assert.equal((await sendPush(s, {}, opts)).suppressed, true);
+  assert.equal(fetches, 0);
+});
+
+test("the transport rejects redirects and treats transient provider responses as failures", async () => {
+  const jwk = await newKey(), sub = synthetic(APPROVED[1]);
+  const status = async (result, redirected = false) => sendPush(sub, {}, {
+    jwk, subject: "https://example.test/",
+    fetchFn: async (url, init) => {
+      assert.equal(url, sub.endpoint);
+      assert.equal(init.redirect, "error");
+      return { status: result, redirected };
+    },
+  });
+  assert.deepEqual(await status(307), { ok: false, gone: false, status: 307 });
+  assert.deepEqual(await status(410, true), { ok: false, gone: false, status: 410 });
+  for (const code of [429, 500, 503]) assert.deepEqual(await status(code), { ok: false, gone: false, status: code });
+});
+
+test("network timeout aborts one request and never automatically resends", async () => {
+  const jwk = await newKey();
+  let calls = 0, aborted = false;
+  const result = await sendPush(synthetic(APPROVED[0]), {}, {
+    jwk, subject: "https://example.test/", timeoutMs: 1,
+    fetchFn: (_url, { signal }) => new Promise((_accept, reject) => {
+      calls++;
+      signal.addEventListener("abort", () => { aborted = true; reject(new Error("internal provider diagnostics")); }, { once: true });
+    }),
+  });
+  assert.equal(aborted, true);
+  assert.equal(calls, 1);
+  assert.deepEqual(result, { ok: false, gone: false, status: null });
+});
+
+test("batch concurrency is bounded and aliases do not create extra sends", async () => {
+  const calls = [], gates = [];
+  let started;
+  const filled = new Promise(resolve => { started = resolve; });
+  const pending = sendBatch([
+    ...Array.from({ length: 6 }, (_, i) => ({ id: i, user_id: "one", endpoint: "https://fcm.googleapis.com/wp/device-" + i })),
+    { id: 9, user_id: "one", endpoint: "https://fcm.googleapis.com/fcm/send/device-0" },
+    { id: 10, user_id: "two", endpoint: "https://unapproved.example/device" },
+  ], () => ({}), { send: d => {
+    calls.push(d.id);
+    if (calls.length <= 4) return new Promise(resolve => {
+      gates.push(resolve);
+      if (gates.length === 4) started();
+    });
+    return { ok: true };
+  } });
+  await filled;
+  assert.deepEqual(calls, [0, 1, 2, 3]);
+  for (const resolve of gates) resolve({ ok: true });
+  assert.deepEqual(await pending, { sent: [0,1,2,3,4,5], gone: [], failed: 0, suppressed: 2 });
 });

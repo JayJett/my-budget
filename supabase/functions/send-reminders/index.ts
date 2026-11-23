@@ -8,7 +8,8 @@
 // (made by tools/make-push-keys.html). Without it, everything works except notifications.
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { runReminders } from "./run.js";
-import { sendPush, publicKeyFromJwk, b64u } from "./webpush.js";
+import { publicKeyFromJwk, b64u } from "./webpush.js";
+import { sendBatch } from "./delivery.js";
 
 const SUBJECT = "https://jayjett.github.io/my-budget/"; // who's sending, for Apple and Google
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
@@ -26,7 +27,10 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
   if (req.method !== "POST") return json({ error: "Use POST" }, 405);
   let body: Record<string, unknown> = {};
-  try { body = await req.json(); } catch (_) { /* no body */ }
+  try {
+    const parsed = await req.json();
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) body = parsed;
+  } catch (_) { /* no body */ }
   const url = Deno.env.get("SUPABASE_URL")!, anon = Deno.env.get("SUPABASE_ANON_KEY")!;
   const jwk = pushKey();
 
@@ -40,15 +44,16 @@ Deno.serve(async (req) => {
     const auth = req.headers.get("Authorization") || "";
     const sb = createClient(url, anon, { auth: { persistSession: false }, global: { headers: { Authorization: auth } } });
     const { data: devices, error } = await sb.rpc("push_test_targets"); // checks you're signed in, and the once-a-minute limit
-    if (error) return json({ error: error.message }, 400);
-    const message = { title: "🔔 Test from Moni Money", body: "Notifications are working on this device. Reminders arrive around 8:30am.", url: "./#budget", tag: "mb-test" };
-    let sent = 0, failed = 0; const gone: number[] = [];
-    for (const d of devices || []) {
-      try { const r = await sendPush(d, message, { jwk, subject: SUBJECT }); if (r.ok) sent++; else if (r.gone) gone.push(d.id); else failed++; }
-      catch (_) { failed++; }
+    if (error) {
+      if (error.code === "PT429" || error.message === "You just sent a test. Wait a minute before sending another.") {
+        return json({ error: "Test limit reached. Wait a minute, or try again later." }, 429);
+      }
+      return json({ error: "Could not send a test. Check that you’re signed in." }, 400);
     }
+    const message = { title: "🔔 Test from Moni Money", body: "Notifications are working on this device. Reminders arrive around 8:30am.", url: "./#budget", tag: "mb-test" };
+    const { sent, failed, gone, suppressed } = await sendBatch(devices, () => message, { jwk, subject: SUBJECT });
     if (gone.length) await sb.from("push_subscriptions").delete().in("id", gone);
-    return json({ sent, failed, gone: gone.length });
+    return json({ sent: sent.length, failed, gone: gone.length, suppressed });
   }
 
   const token = String(body.token || "");
@@ -56,7 +61,7 @@ Deno.serve(async (req) => {
   const sb = createClient(url, anon, { auth: { persistSession: false } });
   try {
     return json(await runReminders(sb, token, { jwk, subject: SUBJECT }));
-  } catch (e) {
-    return json({ error: String((e as Error).message || e) }, 400);
+  } catch (_) {
+    return json({ error: "Could not run reminders" }, 400);
   }
 });
