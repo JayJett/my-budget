@@ -20,6 +20,7 @@ if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("Invali
 
 const root = new URL("../", import.meta.url);
 const client = "vendor/supabase-js-2.45.4/supabase.js";
+const clientAssets = new Set([client, "vendor/supabase-js-2.45.4/591.supabase.js"]);
 const fake = await readFile(new URL("tests/browser/fake-supabase.js", root), "utf8");
 const now = new Date();
 const sample = structuredClone(RICH_V3);
@@ -53,7 +54,7 @@ async function handle(req, res) {
   res.setHeader("Cache-Control", "no-cache");
   if (req.method !== "GET" && req.method !== "HEAD") { res.writeHead(405).end(); return; }
   const file = (req.url || "").split("?")[0].slice(1) || "index.html";
-  if (!/^(?:index\.html|sw\.js|manifest\.webmanifest|(?:css|icons|js)\/(?:[\w-]+\/)*[\w-]+\.(?:css|svg|png|js))$/.test(file) && file !== client) {
+  if (!/^(?:index\.html|sw\.js|manifest\.webmanifest|(?:css|icons|js)\/(?:[\w-]+\/)*[\w-]+\.(?:css|svg|png|js))$/.test(file) && !clientAssets.has(file)) {
     res.writeHead(404).end(); return;
   }
   try {
