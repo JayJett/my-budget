@@ -136,7 +136,7 @@ test("the run's hand-over is useless without a valid pass", { skip }, () => {
 });
 
 test("the H1 migration can run twice and preserves registrations", { skip }, () => {
-  psql(readFileSync(new URL(MIGRATION, dir), "utf8"));
+  psql(readFileSync(new URL("20261123022923_push_destination_security.sql", dir), "utf8"));
   assert.doesNotThrow(() => as(null, `select public.ping()`));
   assert.equal(as(ANA, `select count(*) from push_subscriptions`), "1");
 });
