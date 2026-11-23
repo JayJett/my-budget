@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { RICH_V3 } from "../fixtures.js";
 import { migrate } from "../../js/model/migrate.js";
 import { toStored } from "../../js/model/schema.js";
+import { ACCENTS } from "../../js/ui/accent-list.js";
 import { open, setup, skip, skipAccounts } from "./helpers.js";
 
 setup();
@@ -106,9 +107,18 @@ test("all Wealth views and the account editor fit at six widths with enlarged te
 
 test("onboarding labels the required payday and offers the same optional setup and tour", { skip }, async () => {
   const { page, errors, ctx } = await open({}, { waitFor: ".ob", storage, clock: date, device: device(390, "light") });
+  assert.match(await page.locator(".st-2 .lead").textContent(), /leave income blank for now/);
+  assert.match(await page.locator("#obPd0help").textContent(), /required if you enter a pay amount/);
+  await page.locator('[data-obact="next"]').click();
+  await page.locator(".ob-card.st-3").waitFor();
+  await page.getByRole("button", { name: "Add income", exact: true }).click();
+  await page.locator(".ob-card.st-2").waitFor();
   await page.fill('[data-ob="people.0.pay"]', "2480");
   await page.locator('[data-obact="next"]').click();
   assert.equal(await page.locator("#obPd0").getAttribute("aria-invalid"), "true");
+  await page.fill("#obPd0", "2026-11-24");
+  await page.locator('[data-obact="next"]').click();
+  assert.match(await page.locator("#obPd0e").textContent(), /today or earlier/);
   await page.fill("#obPd0", "2026-11-12");
   await page.locator('[data-obact="next"]').click();
   await page.locator(".ob-card.st-3").waitFor();
@@ -121,6 +131,65 @@ test("onboarding labels the required payday and offers the same optional setup a
   assert.equal(await tour.evaluate(el => el.classList.contains("primary")), true);
   assert.ok(await page.getByRole("button", { name: "Open Moni Money" }).isVisible());
   assert.equal(await fits(page), true);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test("accent names, selection and focus stay usable on phones at up to 200% text", { skip }, async () => {
+  for (const width of [320, 375, 390, 430]) {
+    const { page, errors, ctx } = await signedIn("home", ".home", width);
+    await page.locator("#menuBtn").click();
+    await page.getByRole("button", { name: "Appearance" }).click();
+    const picker = page.getByRole("radiogroup", { name: "Accent colour" });
+    const colour = name => picker.getByRole("radio", { name, exact: true });
+    const names = ACCENTS.map(a => a.label).concat("Yours");
+    for (const [mode, accent, scale] of [["light", "Indigo", 100], ["dark", "Lavender", 150], ["light", "Yours", 200]]) {
+      await page.evaluate(size => { document.documentElement.style.fontSize = size + "%"; }, scale);
+      await page.locator(`[data-look="theme"][data-v="${mode}"]`).click();
+      await colour(accent).click();
+      assert.equal(await page.locator("html").getAttribute("data-theme"), mode);
+      assert.equal(await colour(accent).getAttribute("aria-checked"), "true");
+      assert.equal(await picker.locator('[aria-checked="true"]').count(), 1);
+      assert.notEqual(await colour("Yours").locator(".acc-pill").evaluate(el => getComputedStyle(el).backgroundColor), "rgba(0, 0, 0, 0)");
+      for (const name of names) {
+        const geometry = await colour(name).evaluate(tile => {
+          const label = tile.querySelector(".acc-name"), text = new Range();
+          text.selectNode(label.lastChild);
+          const box = tile.getBoundingClientRect(), rects = [...text.getClientRects()];
+          return { lines: rects.length, fits: rects.every(r => r.left >= box.left && r.right <= box.right), target: box.height >= 44 && box.width >= 44 };
+        });
+        assert.deepEqual(geometry, { lines: 1, fits: true, target: true }, `${name}, ${width}px, ${scale}%`);
+      }
+      assert.equal(await page.locator("#sheet").evaluate(sheet => sheet.scrollWidth <= sheet.clientWidth + 1), true);
+    }
+    assert.ok(await page.getByLabel("Choose your own accent colour").isVisible());
+    await colour("Indigo").focus();
+    await page.keyboard.press("ArrowRight");
+    assert.equal(await colour("Mint").getAttribute("aria-checked"), "true");
+    assert.equal(await colour("Mint").evaluate(el => el.matches(":focus-visible")), true);
+    assert.deepEqual(errors, []);
+    await ctx.close();
+  }
+});
+
+test("at narrow widths with enlarged text, navigation labels remain whole and the chart keeps keyboard focus", { skip }, async () => {
+  const budget = structuredClone(household);
+  budget.nw.accounts.n3.balance = 12_345_678_912.34;
+  const { page, errors, ctx } = await signedIn("wealth/investments", "#ivChart svg", 320, budget);
+  await page.evaluate(() => { document.documentElement.style.fontSize = "150%"; });
+  assert.deepEqual(await page.locator("#tabs .tl, .wl-t span:first-child").evaluateAll(labels => labels.flatMap(label => {
+    const range = new Range(); range.selectNodeContents(label);
+    const tile = label.closest("button").getBoundingClientRect();
+    const rects = [...range.getClientRects()];
+    return rects.length === 1 && rects[0].left >= tile.left && rects[0].right <= tile.right ? [] : [label.textContent];
+  })), []);
+  assert.equal(await fits(page), true);
+  const tenYears = page.getByRole("button", { name: "10 years", exact: true });
+  await tenYears.focus();
+  await page.keyboard.press("Enter");
+  assert.equal(await tenYears.getAttribute("aria-pressed"), "true");
+  assert.equal(await tenYears.evaluate(button => button === document.activeElement), true);
+  assert.match(await page.locator("#ivChart .axis").textContent(), /\$\d+B/);
   assert.deepEqual(errors, []);
   await ctx.close();
 });

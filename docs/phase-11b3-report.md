@@ -1,5 +1,7 @@
 # Moni Money 2.0 · Phase 11B.3
 
+[Final QA comparisons and local iPhone preview](phase-11b3-final-qa.md)
+
 The draft starts from the live Phase 11B.2 merge, 6086889. The three Wealth sections, household setup and settings use the same Indigo tokens as Home, Budget, Expenses and Goals. The [post-merge baseline run](https://github.com/JayJett/my-budget/actions/runs/45079947239) passed before implementation.
 
 ## What the user sees

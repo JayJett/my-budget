@@ -267,11 +267,10 @@ function body() {
     <p class="ob-hint">${app.household ? `Your household: <b>${esc(app.household.name)}</b>. You can rename it or invite people in Household settings.` : ""}</p>
     ${nav("Continue", { back: false })}`;
 
-  if (stage === 2) return `<h2 id="obTitle" tabindex="-1">Let’s start with your income</h2><p class="lead">How much do you usually take home after tax?</p>
+  if (stage === 2) return `<h2 id="obTitle" tabindex="-1">Let’s start with your income</h2><p class="lead">Enter your take-home pay after tax, or leave income blank for now.</p>
     ${ans.needName ? `<label class="ob-field"><span>Your first name</span><input type="text" data-ob="people.0.name" value="${esc(P[0].name)}" autocomplete="given-name" placeholder="First name"></label>` : ""}
     ${P.map((p, i) => payBlock(p, i)).join("")}
     ${ans.mode === "with" && P.length < MAX_PEOPLE ? `<button class="add-row ob-add" type="button" data-obact="addperson">+ Add ${P.length > 1 ? "someone else’s" : "their"} pay too <small>optional</small></button>` : ""}
-    <p class="ob-hint">You can change this anytime, or leave it blank for now.</p>
     ${nav("Continue")}`;
 
   if (stage === 3) {
@@ -318,7 +317,7 @@ function payBlock(p, i) {
     ${(() => { const err = payErr[i], id = `obPd${i}`; // Phase 9C.2: with pay entered, the last payday is needed (it sets the payday plan)
       return `<label class="ob-field ob-payday${err ? " bad" : ""}"><span>${other ? "When were they last paid?" : "When were you last paid?"}</span>
       <input type="date" id="${id}" data-ob="people.${i}.payday" value="${esc(p.payday)}" max="${ymd(app.today)}"${n(p.pay) > 0 ? ` required aria-required="true"` : ""}${err ? ` aria-invalid="true" aria-describedby="${id}e"` : ` aria-describedby="${id}help"`}></label>
-      <small class="ob-pay-hint" id="${id}help">Required with regular pay.</small>
+      <small class="ob-pay-hint" id="${id}help">A payday date is required if you enter a pay amount.</small>
       ${err ? `<p class="ob-err" id="${id}e" role="alert">${esc(err)}</p>` : ""}`; })()}
   </section>`;
 }

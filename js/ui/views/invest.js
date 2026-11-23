@@ -104,7 +104,13 @@ export function draw(C) {
 export function initInvest() {
   document.addEventListener("click", e => {
     const hb = e.target.closest("[data-iv-h]");
-    if (hb) { app.ivH = Number(hb.dataset.ivH); app.ivSel = app.ivH; app.render(); return; }
+    if (hb) {
+      const selector = hb.classList.contains("iv-m") ? ".iv-m" : ".iv-h button";
+      const restoreFocus = document.activeElement === hb;
+      app.ivH = Number(hb.dataset.ivH); app.ivSel = app.ivH; app.render();
+      if (restoreFocus) document.querySelector(selector + '[data-iv-h="' + app.ivH + '"]')?.focus({ preventScroll: true });
+      return;
+    }
   });
   document.addEventListener("toggle", e => { if (e.target.id === "ivYears") app.ivYearsOpen = e.target.open; }, true);
   let t = null; // redraw the chart at the new width when the screen turns
