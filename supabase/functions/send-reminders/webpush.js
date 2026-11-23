@@ -1,3 +1,5 @@
+import { pushEndpoint } from "./push-policy.js";
+
 /* Sending a phone/computer notification ("web push"), using only the built-in Web Crypto API,
    so it runs the same in the Supabase function (Deno) and in the tests (Node). No outside library.
 
@@ -33,6 +35,12 @@ const concat = (...parts) => {
   for (const p of parts) { out.set(p, o); o += p.length; }
   return out;
 };
+function decodeKey(value, bytes) {
+  if (typeof value !== "string" || value.length !== Math.ceil(bytes * 4 / 3) || !/^[A-Za-z0-9_-]+$/.test(value)) return null;
+  const decoded = b64u.decode(value);
+  return decoded.length === bytes && b64u.encode(decoded) === value ? decoded : null;
+}
+
 async function hmac(key, data) {
   const k = await subtle.importKey("raw", key, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   return new Uint8Array(await subtle.sign("HMAC", k, data));
@@ -45,8 +53,8 @@ export function publicKeyFromJwk(jwk) {
 
 /** Encrypt a message for one subscription (RFC 8291). `opts` lets the tests fix the random parts. */
 export async function encrypt(payload, sub, opts = {}) {
-  const uaPublic = b64u.decode(sub.p256dh), authSecret = b64u.decode(sub.auth);
-  if (uaPublic.length !== 65 || authSecret.length < 16) throw new Error("This device's subscription keys look wrong");
+  const uaPublic = decodeKey(sub.p256dh, 65), authSecret = decodeKey(sub.auth, 16);
+  if (!uaPublic || uaPublic[0] !== 4 || !authSecret) throw new Error("This device's subscription keys look wrong");
   // A fresh, one-off key pair for this message
   const as = opts.asKeys || await subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]);
   const asPublic = new Uint8Array(await subtle.exportKey("raw", as.publicKey));
@@ -79,18 +87,32 @@ export async function vapidHeader(endpoint, jwk, subject, now = Date.now()) {
 
 /** Send one notification. Returns { ok, gone, status }: `gone` means the device has unsubscribed
     (or the app was removed), so its subscription should be forgotten. */
-export async function sendPush(sub, message, { jwk, subject, fetchFn = fetch, ttl = 86400 }) {
-  const body = await encrypt(JSON.stringify(message), sub);
-  const res = await fetchFn(sub.endpoint, {
-    method: "POST",
-    headers: {
-      Authorization: await vapidHeader(sub.endpoint, jwk, subject),
-      "Content-Encoding": "aes128gcm",
-      "Content-Type": "application/octet-stream",
-      TTL: String(ttl),
-      Urgency: "normal",
-    },
-    body,
-  });
-  return { ok: res.status >= 200 && res.status < 300, gone: res.status === 404 || res.status === 410, status: res.status };
+export async function sendPush(sub, message, { jwk, subject, fetchFn = fetch, ttl = 86400, timeoutMs = 8000 }) {
+  const endpoint = pushEndpoint(sub.endpoint);
+  if (!endpoint) return { ok: false, gone: false, suppressed: true };
+  let body, authorization;
+  try { body = await encrypt(JSON.stringify(message), sub); }
+  catch (_) { return { ok: false, gone: false, suppressed: true }; }
+  authorization = await vapidHeader(endpoint, jwk, subject);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetchFn(endpoint, {
+      method: "POST",
+      redirect: "error",
+      signal: controller.signal,
+      headers: {
+        Authorization: authorization,
+        "Content-Encoding": "aes128gcm",
+        "Content-Type": "application/octet-stream",
+        TTL: String(ttl),
+        Urgency: "normal",
+      },
+      body,
+    });
+    if (res.body) void res.body.cancel().catch(() => {});
+    if (res.redirected || (res.status >= 300 && res.status < 400)) return { ok: false, gone: false, status: res.status };
+    return { ok: res.status >= 200 && res.status < 300, gone: res.status === 404 || res.status === 410, status: res.status };
+  } catch (_) { return { ok: false, gone: false, status: null }; }
+  finally { clearTimeout(timer); }
 }

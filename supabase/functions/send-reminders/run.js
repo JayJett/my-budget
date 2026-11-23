@@ -7,7 +7,7 @@
    `sb` is a Supabase client signed in as nobody (the public anon key): the pass is what lets it in. */
 import { migrate } from "./model/migrate.js";
 import { remindersFor } from "./model/reminders.js";
-import { sendPush } from "./webpush.js";
+import { sendBatch } from "./delivery.js";
 
 /** Where each tab lives in the app (matches TAB_HASH in js/ui/ctx.js). */
 const TAB_HASH = { budget: "budget", networth: "net-worth", spending: "joint-spending", goals: "goals", invest: "investments", progress: "progress", payday: "payday" };
@@ -23,18 +23,16 @@ export function notificationFor(list) {
 }
 
 /** Send each person's new reminders to their devices. Returns { sent: [ids], gone: [ids], failed }. */
-export async function deliver(pushes, devices, { jwk, subject, send = sendPush }) {
-  const out = { sent: [], gone: [], failed: 0 };
+export async function deliver(pushes, devices, opts) {
   const byUser = new Map();
-  for (const p of pushes || []) { if (!byUser.has(p.user_id)) byUser.set(p.user_id, []); byUser.get(p.user_id).push(p); }
-  for (const d of devices || []) {
-    const list = byUser.get(d.user_id); if (!list) continue;
-    try {
-      const r = await send(d, notificationFor(list), { jwk, subject });
-      if (r.ok) out.sent.push(d.id); else if (r.gone) out.gone.push(d.id); else out.failed++;
-    } catch (_) { out.failed++; }
+  for (const p of pushes || []) {
+    if (!byUser.has(p.user_id)) byUser.set(p.user_id, []);
+    byUser.get(p.user_id).push(p);
   }
-  return out;
+  return sendBatch(devices, device => {
+    const list = byUser.get(device.user_id);
+    return list ? notificationFor(list) : null;
+  }, opts);
 }
 
 /** opts.jwk: the private key (from the VAPID_PRIVATE_KEY secret), or null if phone notifications aren't set up.
@@ -52,8 +50,8 @@ export async function runReminders(sb, token, opts = {}) {
       for (const p of h.people || []) {
         for (const r of remindersFor(S, p.prefs, today, { personId: p.person_id || null })) items.push({ ...r, user_id: p.user_id, household_id: h.id });
       }
-    } catch (e) {
-      problems.push(`${h.id}: ${e && e.message}`); // one odd budget shouldn't stop everyone else's reminders
+    } catch (_) {
+      problems.push("Skipped a budget that could not be read");
     }
   }
 
@@ -74,5 +72,5 @@ export async function runReminders(sb, token, opts = {}) {
   const { error: e3 } = await sb.rpc("reminder_run_finish", { p_token: token, p_gone: push.gone, p_sent: push.sent });
   if (e3) throw new Error(e3.message);
   return { households: (data.households || []).length, worked_out: items.length, created: saved.created, problems,
-    push: push.notSetUp ? "not set up" : { sent: push.sent.length, gone: push.gone.length, failed: push.failed } };
+    push: push.notSetUp ? "not set up" : { sent: push.sent.length, gone: push.gone.length, failed: push.failed, ...(push.suppressed ? { suppressed: push.suppressed } : {}) } };
 }

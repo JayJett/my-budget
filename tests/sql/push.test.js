@@ -2,10 +2,12 @@
    morning run handing over what to send (run with the real function code and a pretend push service). */
 import { test, before } from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
+import { promisify } from "node:util";
 import { readFileSync, readdirSync } from "node:fs";
 import { toStored } from "../../js/model/schema.js";
 import { migrate } from "../../js/model/migrate.js";
+import { pushEndpoint } from "../../supabase/functions/send-reminders/push-policy.js";
 import { runReminders } from "../../supabase/functions/send-reminders/run.js";
 import { RICH_V3 } from "../fixtures.js";
 
@@ -24,7 +26,7 @@ const dir = new URL("../../supabase/migrations/", import.meta.url);
 const files = readdirSync(dir).filter(f => f.endsWith(".sql")).sort();
 const V4 = toStored(migrate(RICH_V3));
 const P256 = "BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4", AUTH = "BTBZMqHH6r4Tts7J_aSIgg";
-const save = (user, ep, label = "iPhone · Safari") => as(user, `select public.save_push_subscription('https://push.example/${ep}', '${P256}', '${AUTH}', '${label}')`);
+const save = (user, ep, label = "iPhone · Safari") => as(user, `select public.save_push_subscription('https://fcm.googleapis.com/wp/${ep}', '${P256}', '${AUTH}', '${label}')`);
 let HH;
 
 const anonClient = { rpc: async (name, args) => {
@@ -53,29 +55,41 @@ test("turning notifications on for a device; each person sees only their own dev
   assert.throws(() => as(null, `select count(*) from push_subscriptions`), /permission denied/);
   assert.throws(() => as(ANA, `insert into push_subscriptions (user_id, endpoint, p256dh, auth) values ('${ANA}', 'https://x/y', '${P256}', '${AUTH}')`), /permission denied/);
   assert.throws(() => as(ANA, `update push_subscriptions set user_id = '${BEN}'`), /permission denied/);
-  assert.throws(() => as(ANA, `select public.save_push_subscription('http://not-secure/x', '${P256}', '${AUTH}')`), /check constraint/);
+  assert.throws(() => as(ANA, `select public.save_push_subscription('http://not-secure/x', '${P256}', '${AUTH}')`), /isn’t supported/);
 });
 
-test("a device follows whoever turns notifications on there; removing and signing out forget it", { skip }, () => {
-  save(EVE, "ana-laptop"); // Eve signs in on Ana's laptop and turns them on
-  assert.equal(as(ANA, `select count(*) from push_subscriptions`), "1");
-  assert.equal(as(EVE, `select count(*) from push_subscriptions`), "1");
-  as(EVE, `select public.forget_push_subscription('https://push.example/ana-laptop')`);
-  assert.equal(one(`select count(*) from push_subscriptions where endpoint like '%ana-laptop'`), "0");
-  as(BEN, `select public.forget_push_subscription('https://push.example/ana-phone')`); // not his: nothing happens
-  assert.equal(as(ANA, `select count(*) from push_subscriptions`), "1");
-  assert.equal(as(BEN, `delete from push_subscriptions where endpoint like '%ana-phone' returning 1`), "");
+test("owner-only updates keep the row ID and another account must register a fresh device", { skip }, () => {
+  const old = one("select id from push_subscriptions where endpoint like '%ana-laptop'");
+  assert.equal(save(ANA, "ana-laptop", "Updated Chrome label"), old);
+  assert.equal(save(ANA, "ana-laptop", "Updated Chrome label"), old);
+  assert.throws(() => as(EVE, "select public.save_push_subscription('https://FCM.googleapis.com:443/fcm/send/ana-laptop', '" + P256 + "', '" + AUTH + "')"), /enable them again/);
+  assert.equal(as(ANA, "select count(*) from push_subscriptions"), "2");
+  assert.equal(as(EVE, "select count(*) from push_subscriptions"), "0");
+  as(BEN, "select public.forget_push_subscription('https://fcm.googleapis.com/wp/ana-laptop')");
+  assert.equal(as(BEN, "delete from push_subscriptions where id = " + old + " returning 1"), "");
+  assert.equal(as(ANA, "select count(*) from push_subscriptions"), "2");
+  as(ANA, "select public.forget_push_subscription('https://fcm.googleapis.com/fcm/send/ana-laptop')");
+  const next = save(EVE, "new-browser-subscription");
+  assert.notEqual(next, old);
+  assert.equal(as(ANA, "select count(*) from push_subscriptions"), "1");
 });
 
-test("at most 10 devices per person (the oldest are forgotten)", { skip }, () => {
-  for (let i = 0; i < 12; i++) save(EVE, `eve-${i}`);
-  assert.equal(as(EVE, `select count(*) from push_subscriptions`), "10");
-  assert.equal(as(EVE, `select count(*) from push_subscriptions where endpoint like '%eve-0' or endpoint like '%eve-1'`), "0");
+test("device cap preserves existing registrations and mutable registrations have a rolling limit", { skip }, () => {
+  for (let i = 0; i < 9; i++) save(EVE, "eve-" + i);
+  assert.throws(() => save(EVE, "extra"), /10 registered devices/);
+  assert.equal(as(EVE, "select count(*) from push_subscriptions"), "10");
+  assert.equal(as(EVE, "select count(*) from push_subscriptions where endpoint like '%eve-0'"), "1");
+  for (let i = 0; i < 10; i++) save(EVE, "eve-0", "Label " + i);
+  const unchanged = save(EVE, "eve-0", "Label 9");
+  assert.ok(unchanged);
+  assert.throws(() => save(EVE, "eve-0", "Label over limit"), /registration limit/);
+  psql("update push_private.rate_limits set registrations = array[now() - interval '1 hour 1 second'] where user_id = '" + EVE + "'");
+  assert.equal(save(EVE, "eve-0", "Label after the window"), unchanged);
 });
 
 test("'Send a test': only your own devices, at most once a minute", { skip }, () => {
   const mine = JSON.parse(as(ANA, `select jsonb_agg(endpoint) from public.push_test_targets()`));
-  assert.deepEqual(mine, ["https://push.example/ana-phone"]);
+  assert.deepEqual(mine, ["https://fcm.googleapis.com/wp/ana-phone"]);
   assert.throws(() => as(ANA, `select count(*) from public.push_test_targets()`), /Wait a minute/);
   assert.throws(() => as(null, `select count(*) from public.push_test_targets()`), /permission denied/);
 });
@@ -83,13 +97,16 @@ test("'Send a test': only your own devices, at most once a minute", { skip }, ()
 test("morning run: new reminders go to the right people's devices; gone devices are forgotten", { skip }, async () => {
   as(ANA, `insert into reminder_prefs (user_id, household_id, goal_done) values ('${ANA}', '${HH}', true)`);
   as(BEN, `insert into reminder_prefs (user_id, household_id, review) values ('${BEN}', '${HH}', false)`); // nothing on
-  save(BEN, "ben-old"); psql(`update push_subscriptions set endpoint = 'https://push.example/ben-gone' where endpoint like '%ben-old'`);
+  save(BEN, "ben-old"); psql(`update push_subscriptions set endpoint = 'https://fcm.googleapis.com/wp/ben-gone' where endpoint like '%ben-old'`);
+  psql("insert into public.push_subscriptions(user_id, endpoint, p256dh, auth) values (\'" + ANA + "\', \'https://legacy.example/fixture\', \'" + P256 + "\', \'" + AUTH + "\')");
   const sent = [];
   const send = async (d, msg) => { sent.push([d.endpoint.split("/").pop(), msg.title]); return d.endpoint.includes("gone") ? { ok: false, gone: true } : { ok: true }; };
   const res = await runReminders(anonClient, one(`select public.start_reminder_run(true)`), { jwk: { d: "x" }, send });
   assert.equal(res.created, 2);
   assert.deepEqual(sent, [["ana-phone", "2 new reminders"]], "Ana: one notification for her two new reminders; Ben has none");
-  assert.deepEqual(res.push, { sent: 1, gone: 0, failed: 0 });
+  assert.deepEqual(res.push, { sent: 1, gone: 0, failed: 0, suppressed: 1 });
+  assert.equal(one("select count(*) from public.push_subscriptions where endpoint = \'https://legacy.example/fixture\'"), "1");
+  psql("delete from public.push_subscriptions where endpoint = \'https://legacy.example/fixture\'");
   assert.equal(one(`select last_sent_at is not null from push_subscriptions where endpoint like '%ana-phone'`), "t");
   assert.equal(one(`select finished_at is not null from reminder_runs order by id desc limit 1`), "t", "the pass is closed");
   // The same reminders tomorrow: nothing new, so no notifications
@@ -118,8 +135,66 @@ test("the run's hand-over is useless without a valid pass", { skip }, () => {
   assert.equal(one(`select count(*) > 0 from push_subscriptions where id = 1 or true`), "t");
 });
 
-test("the 4C step 2 migration can run twice, and ping still works", { skip }, () => {
-  psql(readFileSync(new URL("20261110000700_push.sql", dir), "utf8"));
+test("the H1 migration can run twice and preserves registrations", { skip }, () => {
+  psql(readFileSync(new URL(MIGRATION, dir), "utf8"));
   assert.doesNotThrow(() => as(null, `select public.ping()`));
   assert.equal(as(ANA, `select count(*) from push_subscriptions`), "1");
+});
+
+test("registration rejects non-provider addresses, malformed keys and oversized labels", { skip }, () => {
+  const invalidCurve = "BA" + "A".repeat(85);
+  const key = (p, auth = AUTH, label = "Laptop") => as(ANA, "select public.save_push_subscription('https://web.push.apple.com/probe', '" + p + "', '" + auth + "', '" + label + "')");
+  assert.throws(() => key(invalidCurve), /notification details are invalid/);
+  assert.throws(() => key(P256, AUTH.slice(0, -1)), /notification details are invalid/);
+  assert.throws(() => key(P256, AUTH.slice(0, -1) + "h"), /notification details are invalid/);
+  assert.throws(() => key(P256, AUTH, "A".repeat(61)), /notification details are invalid/);
+  assert.throws(() => as(ANA, "select public.save_push_subscription('https://unapproved.example/fixture', '" + P256 + "','" + AUTH + "')"), /isn’t supported/);
+  assert.throws(() => as(ANA, "select count(*) from push_private.rate_limits"), /permission denied/);
+});
+
+test("SQL and Edge parse the same provider-shaped subscriptions", { skip }, () => {
+  const samples = [
+    "https://web.push.apple.com/fixture",
+    "https://fcm.googleapis.com/wp/current",
+    "https://FCM.googleapis.com:443/fcm/send/legacy",
+    "https://updates.push.services.mozilla.com/wpush/v2/example",
+    "https://wns2-test.notify.windows.com/?token=abc%2fdef%3d",
+    "https://wns2-test.notify.windows.com/?token=abc&extra=unused",
+    "https://unapproved.example/fixture",
+    "https://web.push.apple.com/../fixture",
+    "https://web.push.apple.com/home#fragment",
+    "https://web.push.apple.com:444/example",
+  ];
+  for (const endpoint of samples) {
+    const result = one("select coalesce(push_private.endpoint('" + endpoint + "'), '')");
+    assert.equal(result || null, pushEndpoint(endpoint));
+  }
+});
+
+test("test-send rolling limit applies even when there are no registered devices", { skip }, () => {
+  psql("update push_private.rate_limits set tests = array(select now() - i * interval '2 minutes' from generate_series(1,5) i) where user_id = '" + ANA + "'");
+  psql("update public.push_subscriptions set last_test_at = null where user_id = '" + ANA + "'");
+  assert.throws(() => as(ANA, "select count(*) from public.push_test_targets()"), /Test limit reached/);
+  psql("update push_private.rate_limits set tests = array[now() - interval '1 hour 1 second'] where user_id = '" + ANA + "'");
+  assert.equal(as(ANA, "select count(*) from public.push_test_targets()"), "1");
+  as(ANA, "select public.forget_push_subscription('https://fcm.googleapis.com/wp/ana-phone')");
+  assert.throws(() => as(ANA, "select count(*) from public.push_test_targets()"), /Test limit reached/);
+});
+
+const psqlAsync = promisify(execFile);
+function concurrent(user, sql) {
+  return psqlAsync("psql", [DB_URL, "-X", "-q", "-t", "-A", "-v", "ON_ERROR_STOP=1",
+    "-c", "begin; set local role authenticated; set local request.jwt.claim.sub = '" + user + "'; " + sql + "; commit;"]);
+}
+test("concurrent registrations and test requests share the server's ownership and quota locks", { skip }, async () => {
+  const register = "select public.save_push_subscription('https://fcm.googleapis.com/wp/shared-fixture', '" + P256 + "', '" + AUTH + "')";
+  const results = await Promise.allSettled([concurrent(ANA, register), concurrent(BEN, register)]);
+  assert.equal(results.filter(r => r.status === "fulfilled").length, 1);
+  assert.match(String(results.find(r => r.status === "rejected").reason.stderr), /enable them again/);
+  assert.equal(one("select count(*) from public.push_subscriptions where endpoint like '%shared-fixture'"), "1");
+
+  const send = "select count(*) from public.push_test_targets()";
+  const tests = await Promise.allSettled([concurrent(BEN, send), concurrent(BEN, send)]);
+  assert.equal(tests.filter(r => r.status === "fulfilled").length, 1);
+  assert.match(String(tests.find(r => r.status === "rejected").reason.stderr), /Test limit reached/);
 });

@@ -172,3 +172,30 @@ test("the key-making page: opens even with the app installed, and makes a workin
   assert.deepEqual(errors, []);
   await ctx.close();
 });
+
+test("an account conflict disconnects the browser subscription and uses a fresh one on the next tap", { skip }, async () => {
+  const { page, errors, ctx } = await openWithPush();
+  try {
+    const oldEndpoint = await page.evaluate(async () => {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.subscribe({ applicationServerKey: new Uint8Array(65) });
+      // Match the fake browser subscription to the current VAPID key, as on a shared device.
+      const key = window.__fake.pushKey.replace(/-/g, "+").replace(/_/g, "/");
+      sub.options.applicationServerKey = Uint8Array.from(atob(key + "="), c => c.charCodeAt(0)).buffer;
+      window.__fake.devices.push({ id: 9, user_id: "previous-user", endpoint: sub.endpoint, label: "Previous account" });
+      return sub.endpoint;
+    });
+    await openSettings(page);
+    await page.click('#sheet [data-push="on"]');
+    await page.waitForFunction(() => document.querySelector(".push-set .msg")?.textContent.includes("old subscription was disconnected"));
+    assert.equal(await page.evaluate(() => window.__pushUnsubscribed), 1);
+    assert.equal(await page.evaluate(() => window.__fake.devices.length), 1);
+    await page.click('#sheet [data-push="on"]');
+    await page.waitForSelector("#sheet .push-on .chip.ok");
+    const devices = await page.evaluate(() => window.__fake.devices.map(({ user_id, endpoint }) => ({ user_id, endpoint })));
+    assert.deepEqual(devices.map(d => d.user_id), ["previous-user", "u-me"]);
+    assert.equal(devices[0].endpoint, oldEndpoint);
+    assert.notEqual(devices[1].endpoint, oldEndpoint);
+    assert.deepEqual(errors, []);
+  } finally { await ctx.close(); }
+});

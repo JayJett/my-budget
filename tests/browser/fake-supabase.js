@@ -158,8 +158,9 @@
       if (table === "budgets") { const h = fake.hh(hid); return { data: h && role(hid) ? { state: copy(h.budget), seq: h.seq, updated_by: ME, updated_at: new Date().toISOString() } : null, error: null }; }
       if (table === "budget_snapshots") return { data: copy((fake.hh(hid) || { snapshots: [] }).snapshots), error: null };
       if (table === "push_subscriptions") {
-        if (q.del) { fake.devices = fake.devices.filter(d => d.id !== q.eq.id); return { data: null, error: null }; }
-        return { data: copy(fake.devices), error: null };
+        const owns = device => (device.user_id || ME) === caller;
+        if (q.del) { fake.devices = fake.devices.filter(d => !owns(d) || d.id !== q.eq.id); return { data: null, error: null }; }
+        return { data: copy(fake.devices.filter(owns)), error: null };
       }
       if (table === "reminders") {
         const all = households.flatMap(h => h.reminders);
@@ -255,11 +256,16 @@
         return { data: 1, error: null };
       }
       case "save_push_subscription": {
-        fake.devices = fake.devices.filter(d => d.endpoint !== a.p_endpoint);
-        const row = { id: 900 + fake.devices.length + fake.rpcCalls.length, endpoint: a.p_endpoint, label: a.p_label, created_at: new Date().toISOString() };
+        const current = fake.devices.find(d => d.endpoint === a.p_endpoint);
+        if (current && (current.user_id || ME) !== caller) return { data: null, error: { code: "PT409" } };
+        if (current) { current.label = a.p_label; return { data: current.id, error: null }; }
+        const row = { id: Math.max(0, ...fake.devices.map(d => d.id)) + 1, user_id: caller,
+          endpoint: a.p_endpoint, label: a.p_label, created_at: new Date().toISOString() };
         fake.devices.push(row); return { data: row.id, error: null };
       }
-      case "forget_push_subscription": fake.devices = fake.devices.filter(d => d.endpoint !== a.p_endpoint); return { data: null, error: null };
+      case "forget_push_subscription":
+        fake.devices = fake.devices.filter(d => (d.user_id || ME) !== caller || d.endpoint !== a.p_endpoint);
+        return { data: null, error: null };
       case "ensure_monthly_snapshot": {
         const hh = fake.hh(id); if (!role(id)) return err("Not a member of this household");
         const d = snapData(hh.budget), m = nzMonth();

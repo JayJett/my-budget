@@ -6,7 +6,7 @@ import { app, TAB_HASH } from "./ctx.js";
 import { $, esc, toast } from "./dom.js";
 import { openDrawer, setDrawerContent, closeDrawer, drawerOpen } from "./drawer.js";
 import { remindersFor, REMINDER_TYPES, DEFAULT_PREFS, DUE_WEEKS } from "../model/reminders.js";
-import { pushSupport, currentSubscription, enablePush, disablePush, myDevices, removeDevice, sendTest } from "./push.js";
+import { pushSupport, currentSubscription, enablePush, disablePush, myDevices, removeDevice, sendTest, sameDeviceEndpoint } from "./push.js";
 
 const cache = store => `mb-rem-v2-${store.userId}:${store.householdId}`;
 const COLS = "id, kind, title, body, tab, created_at, read_at";
@@ -125,7 +125,7 @@ async function loadDevice() {
   let list = [], sub = null;
   try { [list, sub] = await Promise.all([myDevices(), currentSubscription()]); } catch (_) {}
   if (!store.isActive()) return;
-  R.device = { list, endpoint: sub ? sub.endpoint : null, on: !!(sub && list.some(x => x.endpoint === sub.endpoint)), busy: false, msg: R.device && R.device.msg };
+  R.device = { list, endpoint: sub ? sub.endpoint : null, on: !!(sub && list.some(x => sameDeviceEndpoint(x.endpoint, sub.endpoint))), busy: false, msg: R.device && R.device.msg };
   if (isOpen() && R.view === "settings") drawSettings();
 }
 
@@ -143,14 +143,15 @@ function deviceHTML() {
     <div class="rem-acts"><button class="btn small" type="button" data-push="test"${D.busy ? " disabled" : ""}>Send a test</button><button class="btn small" type="button" data-push="off"${D.busy ? " disabled" : ""}>Turn off for this device</button></div>`;
   else body = `<p class="set-note">Get your reminders as a notification on this ${/iPhone|Android.*Mobile/.test(navigator.userAgent) ? "phone" : "device"} too, around 8:30am. Only the reminders you’ve switched on above are sent${anyOn ? "" : ", so switch one on first"}.</p>
     <div class="rem-acts"><button class="btn primary" type="button" data-push="on"${D.busy ? " disabled" : ""}>Turn on for this device</button></div>`;
-  const others = D ? D.list.filter(x => x.endpoint !== D.endpoint) : [];
+  const others = D ? D.list.filter(x => !sameDeviceEndpoint(x.endpoint, D.endpoint)) : [];
   const list = others.length ? `<p class="set-note" style="margin-top:12px">Also on:</p><ul class="push-devices">${others.map(x => `<li><span>${esc(x.label || "A device")}<small>since ${esc(new Date(x.created_at).toLocaleDateString("en-NZ", { day: "numeric", month: "short" }))}</small></span><button class="btn small" type="button" data-push="remove" data-id="${x.id}">Remove</button></li>`).join("")}</ul>` : "";
   const msg = D && D.msg ? `<div class="msg ${D.msg.kind}" style="margin-top:10px">${esc(D.msg.text)}</div>` : "";
   return `<section class="set push-set"><h4>Notifications on this device</h4>${body}${msg}${list}</section>`;
 }
 
 async function pushAction(act, id) {
-  const D = R.device; if (!D || D.busy) return;
+  const store = app.store, D = R.device;
+  if (!store?.isActive() || !D || D.busy) return;
   D.busy = true; D.msg = null; drawSettings();
   try {
     if (act === "on") { await enablePush(); D.msg = { kind: "ok", text: "Notifications are on for this device. Try “Send a test” to check." }; }
@@ -158,6 +159,7 @@ async function pushAction(act, id) {
     if (act === "test") D.msg = { kind: "info", text: await sendTest() };
     if (act === "remove") await removeDevice(id);
   } catch (e) { D.msg = { kind: "err", text: (e && e.message) || "Something went wrong." }; }
+  if (!store.isActive() || D !== R.device || !isOpen() || R.view !== "settings") return;
   D.busy = false;
   await loadDevice();
 }
