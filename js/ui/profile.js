@@ -121,25 +121,29 @@ export function loadImage(file) {
 
 /** Save a cropped picture: upload first, then point your login at it, then tidy the old one away.
     If any step fails, your previous picture stays exactly as it was. */
-export async function savePhoto(blob) {
+export async function savePhoto(blob, current = () => true) {
   const id = uid(); if (!id || !app.sb) throw new Error("You need to be signed in.");
   if (!blob || blob.size > 512 * 1024) throw new Error("That picture is too big to save. Try zooming in a little.");
   const old = meta().avatar, path = `${id}/${Date.now()}.jpg`, bucket = app.sb.storage.from(AVATAR_BUCKET);
   const up = await bucket.upload(path, blob, { contentType: "image/jpeg", upsert: false, cacheControl: "3600" });
   if (up.error) throw new Error(/not found|bucket/i.test(up.error.message || "") ? "Profile pictures aren’t switched on yet." : app.friendly ? app.friendly(up.error) : up.error.message);
+  if (!current()) return;
   const { data, error } = await app.sb.auth.updateUser({ data: { avatar: path } });
+  if (!current()) return;
   if (error) { await bucket.remove([path]); throw new Error(app.friendly ? app.friendly(error) : error.message); }
   if (data && data.user) app.session.user = data.user;
   const copy = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.onerror = () => r(null); fr.readAsDataURL(blob); });
+  if (!current()) return;
   write(id, { path, copy, src: copy, exp: 0 });
   if (old && old !== path && old.startsWith(id + "/")) bucket.remove([old]); // only ever your own folder
   refreshAvatars();
 }
 
 /** Remove your picture: your login forgets it first, then the file goes. Your initial comes back. */
-export async function removePhoto() {
+export async function removePhoto(current = () => true) {
   const id = uid(), old = meta().avatar; if (!id || !old) return;
   const { data, error } = await app.sb.auth.updateUser({ data: { avatar: null } });
+  if (!current()) return;
   if (error) throw new Error(app.friendly ? app.friendly(error) : error.message);
   if (data && data.user) app.session.user = data.user;
   write(id, null);

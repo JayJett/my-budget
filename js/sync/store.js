@@ -27,7 +27,15 @@ export function hasDeviceBudgetDrafts(userId, householdId) {
   catch (_) { return false; }
 }
 
-export function createStore({ sb, userId, householdId, canWrite, isCurrent, setState, onStatus, onRemote, onSaved = () => {}, onDenied = () => {} }) {
+// The session ID is stable across token refreshes. Use it only to distinguish local lifecycles.
+export function sessionIdentity(session) {
+  try {
+    const claims = session.access_token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    return JSON.parse(atob(claims)).session_id || null;
+  } catch (_) { return null; }
+}
+
+export function createStore({ sb, userId, householdId, sessionId = null, canWrite, isCurrent, setState, onStatus, onRemote, onSaved = () => {}, onDenied = () => {} }) {
   if (!userId || !householdId) throw new Error("A budget store needs a user and household");
   const device = localStorage, tab = sessionStorage;
   const identity = encodeURIComponent(userId) + ":" + encodeURIComponent(householdId);
@@ -78,21 +86,30 @@ export function createStore({ sb, userId, householdId, canWrite, isCurrent, setS
 
   // Pin the bearer for this specific request. The shared SDK may refresh its
   // session or switch users before its fetch executes.
-  async function request(makeRequest) {
-    if (!active()) return { error: cancelled() };
+  async function withSession(send, stillRelevant = () => true) {
+    const current = () => active() && stillRelevant();
+    if (!current()) return { error: cancelled() };
     if (navigator.onLine === false) return { error: { message: "Offline" } };
     try {
       const { data, error } = await sb.auth.getSession();
-      if (!active()) return { error: cancelled() };
+      if (!current()) return { error: cancelled() };
       if (error) return { error };
       const session = data?.session;
-      if (session?.user?.id !== userId || !session.access_token) return { error: { message: "Not signed in to this budget" } };
+      if (session?.user?.id !== userId || !session.access_token || (sessionId && sessionIdentity(session) !== sessionId)) {
+        return { error: { message: "Not signed in to this budget" } };
+      }
+      return await send(session.access_token);
+    } catch (error) { return { error }; }
+  }
+
+  function request(makeRequest, stillRelevant) {
+    return withSession(async token => {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 15000);
       try {
-        return await makeRequest().setHeader("Authorization", "Bearer " + session.access_token).abortSignal(controller.signal);
+        return await makeRequest(sb).setHeader("Authorization", "Bearer " + token).abortSignal(controller.signal);
       } finally { clearTimeout(timeout); }
-    } catch (error) { return { error }; }
+    }, stillRelevant);
   }
 
   const readBudget = () => request(() => sb.from("budgets").select("state, seq, updated_by, updated_at")
@@ -347,6 +364,7 @@ export function createStore({ sb, userId, householdId, canWrite, isCurrent, setS
   return Object.freeze({
     userId, householdId, load, schedule, subscribe, stop, receive, commit, catchUp,
     isActive: active,
+    scopedRequest: request, withSession,
     householdRpc: (name, params) => request(() => sb.rpc(name, { ...params, p_household: householdId })),
     flushNow: async () => {
       if (timer) { clearTimeout(timer); timer = null; }
